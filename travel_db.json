@@ -1,0 +1,278 @@
+{
+  "_meta": {
+    "description": "동영 과외/일정 장소 간 이동시간 데이터베이스",
+    "last_updated": "2026-06-04",
+    "note": "양방향 동일 소요시간. options 중 가장 빠른 수단 기준으로 정렬."
+  },
+  "locations": {
+    "skycastle": {
+      "name": "스카이캐슬 스터디카페 3호점",
+      "short": "스카이캐슬",
+      "context": "신수민 과외"
+    },
+    "lagom": {
+      "name": "라곰스터디카페",
+      "short": "라곰",
+      "context": "이태현 과외"
+    },
+    "yellowstone": {
+      "name": "강남역 옐로스톤 스터디룸",
+      "short": "옐로스톤",
+      "context": "박재표 과외"
+    },
+    "daechibido": {
+      "name": "대치미도아파트",
+      "short": "대치미도",
+      "context": "정예원 과외"
+    },
+    "songnaeyeok": {
+      "name": "송내역 숨스터디카페",
+      "short": "송내역",
+      "context": "이하린 과외 (6/6)"
+    },
+    "sindorim": {
+      "name": "신도림 스터디카페",
+      "short": "신도림",
+      "context": "이하린 과외 (6/20)"
+    },
+    "hantistation": {
+      "name": "한티역",
+      "short": "한티역",
+      "context": "김수현 과외"
+    },
+    "helios": {
+      "name": "헬리오시티",
+      "short": "헬리오",
+      "context": "연제이 과외"
+    }
+  },
+  "routes": [
+    {
+      "from": "skycastle",
+      "to": "lagom",
+      "options": [
+        { "mode": "도보", "duration_min": 5, "distance_m": 322 }
+      ],
+      "fastest_min": 5
+    },
+    {
+      "from": "skycastle",
+      "to": "yellowstone",
+      "options": [
+        { "mode": "버스", "duration_min": 30 }
+      ],
+      "fastest_min": 30
+    },
+    {
+      "from": "skycastle",
+      "to": "daechibido",
+      "options": [
+        { "mode": "버스", "duration_min": 17 }
+      ],
+      "fastest_min": 17
+    },
+    {
+      "from": "skycastle",
+      "to": "songnaeyeok",
+      "options": [
+        { "mode": "지하철", "duration_min": 90 }
+      ],
+      "fastest_min": 90
+    },
+    {
+      "from": "skycastle",
+      "to": "sindorim",
+      "options": [
+        { "mode": "지하철", "duration_min": 60 }
+      ],
+      "fastest_min": 60
+    },
+    {
+      "from": "skycastle",
+      "to": "hantistation",
+      "options": [
+        { "mode": "도보", "duration_min": 11, "distance_m": 771 }
+      ],
+      "fastest_min": 11
+    },
+    {
+      "from": "skycastle",
+      "to": "helios",
+      "options": [
+        { "mode": "버스", "duration_min": 30 }
+      ],
+      "fastest_min": 30
+    },
+    {
+      "from": "lagom",
+      "to": "yellowstone",
+      "options": [
+        { "mode": "버스", "duration_min": 30 }
+      ],
+      "fastest_min": 30
+    },
+    {
+      "from": "lagom",
+      "to": "daechibido",
+      "options": [
+        { "mode": "버스", "duration_min": 21 },
+        { "mode": "도보", "duration_min": 32, "distance_m": 2000 }
+      ],
+      "fastest_min": 21
+    },
+    {
+      "from": "lagom",
+      "to": "songnaeyeok",
+      "options": [
+        { "mode": "지하철", "duration_min": 90 }
+      ],
+      "fastest_min": 90
+    },
+    {
+      "from": "lagom",
+      "to": "sindorim",
+      "options": [
+        { "mode": "지하철", "duration_min": 50 }
+      ],
+      "fastest_min": 50
+    },
+    {
+      "from": "lagom",
+      "to": "hantistation",
+      "options": [
+        { "mode": "도보", "duration_min": 11, "distance_m": 759 }
+      ],
+      "fastest_min": 11
+    },
+    {
+      "from": "lagom",
+      "to": "helios",
+      "options": [
+        { "mode": "버스", "duration_min": 50 }
+      ],
+      "fastest_min": 50
+    },
+    {
+      "from": "yellowstone",
+      "to": "daechibido",
+      "options": [
+        { "mode": "지하철", "duration_min": 40 }
+      ],
+      "fastest_min": 40
+    },
+    {
+      "from": "yellowstone",
+      "to": "songnaeyeok",
+      "options": [
+        { "mode": "지하철", "duration_min": 80 }
+      ],
+      "fastest_min": 80
+    },
+    {
+      "from": "yellowstone",
+      "to": "sindorim",
+      "options": [
+        { "mode": "지하철", "duration_min": 40 }
+      ],
+      "fastest_min": 40
+    },
+    {
+      "from": "yellowstone",
+      "to": "hantistation",
+      "options": [
+        { "mode": "지하철", "duration_min": 20 }
+      ],
+      "fastest_min": 20
+    },
+    {
+      "from": "yellowstone",
+      "to": "helios",
+      "options": [
+        { "mode": "지하철", "duration_min": 40 }
+      ],
+      "fastest_min": 40
+    },
+    {
+      "from": "daechibido",
+      "to": "songnaeyeok",
+      "options": [
+        { "mode": "지하철", "duration_min": 90 }
+      ],
+      "fastest_min": 90
+    },
+    {
+      "from": "daechibido",
+      "to": "sindorim",
+      "options": [
+        { "mode": "지하철", "duration_min": 50 }
+      ],
+      "fastest_min": 50
+    },
+    {
+      "from": "daechibido",
+      "to": "hantistation",
+      "options": [
+        { "mode": "버스", "duration_min": 20 },
+        { "mode": "도보", "duration_min": 30, "distance_m": 1800 }
+      ],
+      "fastest_min": 20
+    },
+    {
+      "from": "daechibido",
+      "to": "helios",
+      "options": [
+        { "mode": "버스", "duration_min": 40 }
+      ],
+      "fastest_min": 40
+    },
+    {
+      "from": "songnaeyeok",
+      "to": "sindorim",
+      "options": [
+        { "mode": "지하철", "duration_min": 30 }
+      ],
+      "fastest_min": 30
+    },
+    {
+      "from": "songnaeyeok",
+      "to": "hantistation",
+      "options": [
+        { "mode": "지하철", "duration_min": 80 }
+      ],
+      "fastest_min": 80
+    },
+    {
+      "from": "songnaeyeok",
+      "to": "helios",
+      "options": [
+        { "mode": "지하철", "duration_min": 100 },
+        { "mode": "광역버스", "duration_min": 100 }
+      ],
+      "fastest_min": 100
+    },
+    {
+      "from": "sindorim",
+      "to": "hantistation",
+      "options": [
+        { "mode": "지하철", "duration_min": 50 }
+      ],
+      "fastest_min": 50
+    },
+    {
+      "from": "sindorim",
+      "to": "helios",
+      "options": [
+        { "mode": "지하철", "duration_min": 70 }
+      ],
+      "fastest_min": 70
+    },
+    {
+      "from": "hantistation",
+      "to": "helios",
+      "options": [
+        { "mode": "버스/지하철", "duration_min": 30 }
+      ],
+      "fastest_min": 30
+    }
+  ]
+}

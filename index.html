@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>동영 스케줄</title>
+<style>
+:root{
+  --bg:#0d0d10;--s1:#141418;--s2:#1b1b22;--s3:#22222c;
+  --bd:#2c2c38;--bd2:#3a3a48;
+  --tx:#e8e8f0;--tx2:#8888a0;--tx3:#44445a;
+  --acc:#6366f1;
+  --c-class:#3b82f6;--c-lab:#06b6d4;--c-sem:#8b5cf6;--c-exam:#ef4444;
+  --c-tutor:#f97316;--c-ws:#22c55e;--c-tr:#38bdf8;--c-dl:#a855f7;--c-proj:#f59e0b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+nav{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid var(--bd);flex-shrink:0;background:var(--s1)}
+.logo{font-size:14px;font-weight:700}.logo em{color:var(--acc);font-style:normal}
+.ntabs{display:flex;gap:3px;background:var(--s3);border-radius:9px;padding:3px}
+.ntab{padding:5px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;color:var(--tx2);border:none;background:transparent;transition:all .12s}
+.ntab.on{background:var(--acc);color:#fff}
+.badge-n{display:inline-block;background:var(--c-exam);color:#fff;border-radius:8px;font-size:9px;padding:1px 5px;margin-left:3px;font-weight:700;vertical-align:middle}
+#sync-dot{font-size:11px;cursor:default;user-select:none}
+.view{flex:1;overflow:hidden;display:none}.view.on{display:flex}
+
+/* ── CALENDAR ── */
+#v-cal{flex-direction:row}
+.cal-main{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:14px 14px 0}
+.dow-row{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:5px}
+.dow{text-align:center;font-size:10px;font-weight:700;color:var(--tx3);letter-spacing:.5px;padding:2px 0}
+.dow.s{color:#f87171}.dow.sa{color:#60a5fa}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;overflow-y:auto;flex:1;padding-bottom:12px}
+.dc{background:var(--s2);border:1px solid var(--bd);border-radius:9px;min-height:95px;padding:6px 5px 4px;cursor:pointer;transition:border-color .12s;display:flex;flex-direction:column}
+.dc:hover{border-color:var(--bd2)}.dc.tod{border-color:var(--acc)!important;border-width:1.5px}
+.dc.sel{border-color:var(--acc);background:var(--s3)}.dc.dim{opacity:.22;pointer-events:none}
+.dc.ebg{background:#1d1010}.dc.wbg{background:#0f1a10}.dc.tbg{background:#0c141d}
+.dn{font-size:12px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:4px;color:var(--tx)}
+.dn.s{color:#f87171}.dn.sa{color:#60a5fa}
+.tb{font-size:9px;background:var(--acc);color:#fff;border-radius:3px;padding:1px 4px;font-weight:700}
+.chip{border-radius:3px;padding:2px 5px;margin:1px 0;font-size:9px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.more{font-size:9px;color:var(--tx3);padding-left:2px;margin-top:1px}
+.panel{width:275px;min-width:275px;border-left:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;background:var(--s1)}
+.ph{padding:14px 14px 10px;border-bottom:1px solid var(--bd)}
+.pd{font-size:15px;font-weight:700}.ps{font-size:11px;color:var(--tx2);margin-top:2px}
+.pb{flex:1;overflow-y:auto;padding:10px 12px}
+.pmt{color:var(--tx3);font-size:12px;text-align:center;margin-top:30px}
+.etl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin:10px 0 4px;opacity:.7}
+.etl:first-child{margin-top:0}
+.ec{background:var(--s3);border-radius:8px;padding:8px 10px;margin-bottom:3px;border-left:2.5px solid transparent}
+.ect{font-size:12px;font-weight:700;margin-bottom:3px}.ecm{font-size:10px;color:var(--tx2);line-height:1.5}
+.ecn{font-size:10px;font-weight:600;color:#f59e0b;margin-top:2px}
+.tc{display:flex;align-items:center;gap:5px;padding:2px 4px;margin:2px 0}
+.tcl{flex:1;height:1px;background:var(--bd)}
+.tcp{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap}
+.tcb{font-size:10px;font-weight:700;white-space:nowrap}
+.pal{border-top:1px solid var(--bd);padding:8px 12px}
+.pat{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--tx3);margin-bottom:6px}
+.pai{display:flex;gap:6px;align-items:flex-start;margin-bottom:4px}
+.pad{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.pax{font-size:10px;color:var(--tx2);line-height:1.5}.pax b{color:var(--tx);font-weight:600}
+.leg{display:flex;flex-wrap:wrap;gap:6px;padding:7px 14px;border-top:1px solid var(--bd);background:var(--s1);flex-shrink:0}
+.li{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--tx2)}
+.ld{width:8px;height:8px;border-radius:2px}
+.lv-wrap{flex:1;overflow-y:auto;display:none;flex-direction:column;gap:2px;padding:14px}
+.lv-wrap.on{display:flex}
+.cal-main.lm .cal-grid,.cal-main.lm .dow-row{display:none}
+.cal-main.lm .lv-wrap{display:flex}
+.lg2{margin-bottom:10px}
+.lgh{font-size:11px;color:var(--tx2);padding:4px 0;border-bottom:1px solid var(--bd);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.lgh .n{font-size:17px;font-weight:700;color:var(--tx);min-width:22px}.lgh.tr .n{color:var(--acc)}
+.lrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--s2);margin-bottom:2px}
+.lbar{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:26px}
+.lt{font-size:11px;font-weight:700}.lm2{font-size:10px;color:var(--tx2)}
+
+/* ── PLAN ── */
+#v-plan{flex-direction:column;overflow-y:auto;padding:22px 26px}
+.plan-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.plan-hdr h2{font-size:17px;font-weight:700}.plan-hdr h2 em{color:var(--acc);font-style:normal}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+.sc{background:var(--s2);border:1px solid var(--bd);border-radius:11px;padding:12px 16px;flex:1;min-width:120px;display:flex;align-items:center;gap:10px}
+.sb{width:4px;height:32px;border-radius:2px;flex-shrink:0}
+.sl{font-size:10px;color:var(--tx2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px}
+.sv{font-size:19px;font-weight:700}.ss{font-size:11px;color:var(--tx2)}
+.phase{display:flex;align-items:center;gap:10px;margin:22px 0 8px;font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px}
+.phase::before{content:'';width:3px;height:13px;border-radius:2px;background:var(--acc)}
+.phase::after{content:'';flex:1;height:1px;background:var(--bd)}
+.day-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dc2{background:var(--s2);border:1px solid var(--bd);border-radius:11px;padding:13px 14px;transition:border-color .12s}
+.dc2:hover{border-color:var(--bd2)}.dc2.exam-day{border-color:rgba(239,68,68,.35);background:#1b1010}
+.dc2.rest-day{opacity:.6}.dc2.free-day{border-color:rgba(99,102,241,.3)}.dc2.full{grid-column:span 2}
+.dch{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px}
+.dcn{font-size:14px;font-weight:700}.dct{font-size:11px;color:var(--tx2)}
+.tbadge{font-size:9px;background:var(--acc);color:#fff;border-radius:3px;padding:1px 5px;font-weight:700;margin-left:6px;vertical-align:middle}
+.pbadge{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;border-radius:5px;padding:3px 8px;margin-bottom:6px;width:fit-content}
+.pbadge.exam{background:rgba(239,68,68,.12);color:#f87171}.pbadge.alert{background:rgba(245,158,11,.12);color:#fbbf24}
+.pbadge.note{background:rgba(99,102,241,.1);color:#a5b4fc}.pbadge.rest{background:rgba(255,255,255,.04);color:var(--tx2);font-style:italic;font-weight:400}
+.blocks{display:flex;flex-direction:column;gap:6px}
+.blk{display:flex;gap:9px;align-items:flex-start}
+.blkbar{width:3px;border-radius:2px;flex-shrink:0;margin-top:3px;min-height:26px}
+.blkslot{font-size:10px;color:var(--tx2);margin-bottom:1px}.blkdesc{font-size:12px;font-weight:700;line-height:1.4}
+.blkhrs{font-size:10px;color:var(--tx2);margin-top:1px}
+.blocks-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.plan-summary{background:var(--s2);border:1px solid var(--bd);border-radius:11px;padding:16px 20px;margin-top:18px}
+.plan-summary h3{font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.sum-row{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px}
+.sum-item{display:flex;align-items:center;gap:7px}
+.sum-dot{width:9px;height:9px;border-radius:2px}
+.sum-subj{font-size:13px;font-weight:700}.sum-h{font-size:12px;color:var(--tx2)}
+.strat{border-top:1px solid var(--bd);padding-top:12px}
+.strat li{font-size:12px;color:var(--tx2);margin-bottom:4px;list-style:none;padding-left:14px;position:relative;line-height:1.5}
+.strat li::before{content:'—';position:absolute;left:0;color:var(--tx3)}.strat li strong{color:var(--tx)}
+
+/* ── ALERT ── */
+#v-alert{flex-direction:column;overflow-y:auto;padding:22px 26px}
+#v-alert h2{font-size:16px;font-weight:700;margin-bottom:16px}#v-alert h2 em{color:var(--acc);font-style:normal}
+.ag{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:24px}
+.ac{background:var(--s2);border:1px solid var(--bd);border-radius:11px;padding:13px 15px;border-left-width:3px}
+.ac.red{border-left-color:var(--c-exam)}.ac.orange{border-left-color:var(--c-tutor)}.ac.unk{border-left-color:var(--tx3)}
+.adate{font-size:12px;font-weight:700;margin-bottom:4px}
+.ac.red .adate{color:#f87171}.ac.orange .adate{color:#fb923c}.ac.unk .adate{color:var(--tx2)}
+.aroute{font-size:13px;font-weight:600;margin-bottom:3px}
+.adetail{font-size:12px;color:var(--tx2);line-height:1.6}
+.adetail .buf{font-weight:700}.ac.red .buf{color:#f87171}.ac.orange .buf{color:#fb923c}
+.asec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--tx3);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.asec::after{content:'';flex:1;height:1px;background:var(--bd)}
+.no-conflicts{font-size:13px;color:var(--tx2);text-align:center;padding:30px;background:var(--s2);border-radius:11px;border:1px solid var(--bd)}
+
+/* ── EDIT TAB ── */
+#v-edit{flex-direction:column;overflow-y:auto}
+.edit-scroll{padding:20px 24px;max-width:700px;width:100%}
+.edit-section{background:var(--s2);border:1px solid var(--bd);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.esec-title{font-size:12px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.esec-title::after{content:'';flex:1;height:1px;background:var(--bd)}
+.edit-textarea{width:100%;background:var(--s3);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-family:inherit;font-size:12px;padding:10px 12px;resize:vertical;min-height:72px;outline:none;transition:border-color .12s}
+.edit-textarea:focus{border-color:var(--acc)}
+.edit-input{background:var(--s3);border:1px solid var(--bd);border-radius:7px;color:var(--tx);font-family:inherit;font-size:12px;padding:7px 10px;outline:none;transition:border-color .12s;width:100%}
+.edit-input:focus{border-color:var(--acc)}
+.edit-form{display:grid;grid-template-columns:auto 1fr;gap:7px 10px;align-items:center}
+.edit-form label{font-size:11px;color:var(--tx2);font-weight:600;white-space:nowrap}
+.edit-row{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+.btn-primary{background:var(--acc);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .12s}
+.btn-primary:hover{opacity:.85}.btn-primary:disabled{opacity:.4;cursor:default}
+.btn-secondary{background:var(--s3);color:var(--tx2);border:1px solid var(--bd);border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-danger{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.status-msg{font-size:11px;color:var(--tx2)}
+.status-msg.ok{color:#22c55e}.status-msg.err{color:#ef4444}
+.preview-area{margin-top:12px;border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.preview-item{padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.preview-item:last-child{border-bottom:none}
+.preview-main{font-size:12px;font-weight:700}.preview-sub{font-size:11px;color:var(--tx2);margin-top:2px}
+.preview-actions{display:flex;gap:6px;flex-shrink:0;margin-top:2px}
+.hint{font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.6}
+.tt-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tt-row select,.tt-row input{flex:1;min-width:80px}
+.tt-arrow{color:var(--tx3);font-size:14px;font-weight:700;flex-shrink:0}
+.settings-grid{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center}
+.settings-grid label{font-size:11px;color:var(--tx2);font-weight:600}
+.settings-note{font-size:11px;color:var(--tx3);margin-top:10px;line-height:1.6}
+@media(max-width:600px){
+  .edit-scroll{padding:14px 14px}
+  .panel{width:0;min-width:0;display:none}
+  .cal-main{padding:10px 8px 0}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">동영 <em>6월</em></span>
+  <div class="ntabs">
+    <button class="ntab on" id="t-cal" onclick="sw('cal')">달력</button>
+    <button class="ntab" id="t-plan" onclick="sw('plan')">공부 플랜</button>
+    <button class="ntab" id="t-alert" onclick="sw('alert')">충돌 <span class="badge-n" id="alrt-n">…</span></button>
+    <button class="ntab" id="t-edit" onclick="sw('edit')">편집</button>
+  </div>
+  <span id="sync-dot" title="GitHub 동기화 상태">⬤</span>
+</nav>
+
+<div class="view on" id="v-cal">
+  <div class="cal-main" id="calMain">
+    <div class="dow-row">
+      <div class="dow s">일</div><div class="dow">월</div><div class="dow">화</div>
+      <div class="dow">수</div><div class="dow">목</div><div class="dow">금</div><div class="dow sa">토</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="lv-wrap" id="listWrap"></div>
+    <div class="leg">
+      <div class="li"><div class="ld" style="background:var(--c-class)"></div>수업</div>
+      <div class="li"><div class="ld" style="background:var(--c-lab)"></div>랩</div>
+      <div class="li"><div class="ld" style="background:var(--c-exam)"></div>시험</div>
+      <div class="li"><div class="ld" style="background:var(--c-tutor)"></div>과외</div>
+      <div class="li"><div class="ld" style="background:var(--c-ws)"></div>워크숍</div>
+      <div class="li"><div class="ld" style="background:var(--c-tr)"></div>여행</div>
+      <div class="li"><div class="ld" style="background:var(--c-dl)"></div>마감</div>
+      <div class="li"><div class="ld" style="background:var(--c-proj)"></div>프로젝트</div>
+      <div style="margin-left:auto"><button onclick="toggleList()" id="listBtn" style="font-size:10px;background:var(--s3);border:1px solid var(--bd);color:var(--tx2);border-radius:6px;padding:3px 10px;cursor:pointer">목록 보기</button></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph"><div class="pd" id="panelDate">날짜를 선택하세요</div><div class="ps" id="panelSub">클릭하면 상세 일정 표시</div></div>
+    <div class="pb" id="panelBody"><div class="pmt">📅</div></div>
+    <div class="pal">
+      <div class="pat">주의 사항</div>
+      <div class="pai"><div class="pad" style="background:#a855f7"></div><div class="pax"><b>6/8 9:30</b> 공학수학 동영상 마감</div></div>
+      <div class="pai"><div class="pad" style="background:#8b5cf6"></div><div class="pax"><b>6/9, 6/16</b> 세미나 소감문 필수</div></div>
+      <div class="pai"><div class="pad" style="background:#ef4444"></div><div class="pax"><b>6/15</b> 기말 2연속 (공학수학·방법론)</div></div>
+      <div class="pai"><div class="pad" style="background:#f97316"></div><div class="pax"><b>잠실 파크리오</b> 이동시간 미등록</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="view" id="v-plan"></div>
+<div class="view" id="v-alert"></div>
+
+<div class="view" id="v-edit">
+  <div class="edit-scroll">
+
+    <!-- AI 자연어 입력 -->
+    <div class="edit-section">
+      <div class="esec-title">🤖 자연어로 추가 (Gemini AI)</div>
+      <textarea id="nl-input" class="edit-textarea" placeholder="예시:
+이벤트: 정현우 6/28 토 17시-20시 잠실 파크리오 대면 과외
+이동시간: 잠실 파크리오 → 강남역 옐로스톤 25분 지하철"></textarea>
+      <div class="edit-row">
+        <button class="btn-primary" id="nl-btn" onclick="parseNL()">AI 파싱</button>
+        <span id="nl-status" class="status-msg"></span>
+      </div>
+      <div id="nl-preview" style="display:none" class="preview-area"></div>
+      <p class="hint">Gemini가 이벤트/이동시간을 자동 감지합니다. 확인 후 저장하면 GitHub에 반영돼요.</p>
+    </div>
+
+    <!-- 이벤트 직접 추가 -->
+    <div class="edit-section">
+      <div class="esec-title">📅 이벤트 직접 추가</div>
+      <div class="edit-form">
+        <label>날짜</label><input type="date" id="ef-date" class="edit-input" value="2026-06-">
+        <label>타입</label>
+        <select id="ef-type" class="edit-input">
+          <option value="tutor">과외</option><option value="class">수업</option>
+          <option value="exam">시험</option><option value="lab">랩/실험</option>
+          <option value="seminar">세미나</option><option value="workshop">워크숍</option>
+          <option value="travel">여행</option><option value="deadline">마감</option>
+          <option value="project">프로젝트</option>
+        </select>
+        <label>이름</label><input type="text" id="ef-name" class="edit-input" placeholder="이벤트 이름">
+        <label>시간 표시</label><input type="text" id="ef-ti" class="edit-input" placeholder="9:30–12:30 (표시용)">
+        <label>시작</label><input type="time" id="ef-start" class="edit-input">
+        <label>종료</label><input type="time" id="ef-end" class="edit-input">
+        <label>장소 ID</label>
+        <select id="ef-lid" class="edit-input" onchange="autoFillLoc()">
+          <option value="">없음</option>
+          <option value="skycastle">스카이캐슬</option><option value="lagom">라곰</option>
+          <option value="yellowstone">강남역 옐로스톤</option><option value="daechibido">대치미도아파트</option>
+          <option value="songnaeyeok">송내역</option><option value="sindorim">신도림</option>
+          <option value="hantistation">한티역</option><option value="helios">헬리오시티</option>
+          <option value="parkrio">잠실 파크리오</option>
+        </select>
+        <label>장소명</label><input type="text" id="ef-loc" class="edit-input" placeholder="자동 입력 또는 직접 입력">
+        <label>메모</label><input type="text" id="ef-no" class="edit-input" placeholder="추가 메모 (선택)">
+      </div>
+      <div class="edit-row">
+        <button class="btn-primary" onclick="addEventFromForm()">추가 및 저장</button>
+        <span id="ef-status" class="status-msg"></span>
+      </div>
+    </div>
+
+    <!-- 이동시간 추가 -->
+    <div class="edit-section">
+      <div class="esec-title">🚌 이동시간 추가/수정</div>
+      <div class="tt-row" style="margin-bottom:8px">
+        <select id="tt-from" class="edit-input">
+          <option value="">출발 장소</option>
+          <option value="skycastle">스카이캐슬</option><option value="lagom">라곰</option>
+          <option value="yellowstone">강남역 옐로스톤</option><option value="daechibido">대치미도아파트</option>
+          <option value="songnaeyeok">송내역</option><option value="sindorim">신도림</option>
+          <option value="hantistation">한티역</option><option value="helios">헬리오시티</option>
+          <option value="parkrio">잠실 파크리오</option>
+        </select>
+        <span class="tt-arrow">→</span>
+        <select id="tt-to" class="edit-input">
+          <option value="">도착 장소</option>
+          <option value="skycastle">스카이캐슬</option><option value="lagom">라곰</option>
+          <option value="yellowstone">강남역 옐로스톤</option><option value="daechibido">대치미도아파트</option>
+          <option value="songnaeyeok">송내역</option><option value="sindorim">신도림</option>
+          <option value="hantistation">한티역</option><option value="helios">헬리오시티</option>
+          <option value="parkrio">잠실 파크리오</option>
+        </select>
+      </div>
+      <div class="tt-row">
+        <input type="number" id="tt-min" class="edit-input" placeholder="소요시간 (분)" min="1" style="max-width:160px">
+        <select id="tt-mode" class="edit-input" style="max-width:160px">
+          <option value="지하철">지하철</option><option value="버스">버스</option>
+          <option value="도보">도보</option><option value="버스/지하철">버스/지하철</option>
+          <option value="택시">택시</option>
+        </select>
+      </div>
+      <div class="edit-row">
+        <button class="btn-primary" onclick="addTravelFromForm()">추가 및 저장</button>
+        <span id="tt-status" class="status-msg"></span>
+      </div>
+      <p class="hint">양방향으로 자동 등록됩니다. 기존 경로는 덮어씁니다.</p>
+    </div>
+
+    <!-- 설정 -->
+    <div class="edit-section">
+      <div class="esec-title">⚙ 설정</div>
+      <div class="settings-grid">
+        <label>GitHub PAT</label>
+        <input type="password" id="cfg-pat" class="edit-input" placeholder="ghp_xxxx (repo 권한 필요)">
+        <label>Gemini API Key</label>
+        <input type="password" id="cfg-gemini" class="edit-input" placeholder="AIza...">
+        <label>GitHub Repo</label>
+        <input type="text" id="cfg-repo" class="edit-input" placeholder="schedule">
+      </div>
+      <div class="edit-row">
+        <button class="btn-primary" onclick="saveSettings()">설정 저장</button>
+        <span id="cfg-status" class="status-msg"></span>
+      </div>
+      <p class="settings-note">
+        설정은 이 브라우저에만 저장돼요 (localStorage). 파일에 기록되지 않습니다.<br>
+        GitHub PAT 발급: github.com → Settings → Developer settings → Personal access tokens → <b>repo</b> 권한 선택<br>
+        Gemini API: <b>aistudio.google.com</b> → Get API key (무료, 카드 불필요)
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const TODAY='2026-06-04';
+const DOW=['일','월','화','수','목','금','토'];
+const TCh={class:'#3b82f6',lab:'#06b6d4',seminar:'#8b5cf6',exam:'#ef4444',tutor:'#f97316',workshop:'#22c55e',travel:'#38bdf8',deadline:'#a855f7',project:'#f59e0b'};
+const TL={class:'수업',lab:'랩/실험',seminar:'세미나',exam:'시험',tutor:'과외',workshop:'워크숍',travel:'여행/훈련',deadline:'마감',project:'프로젝트'};
+const TO=['deadline','exam','project','class','lab','seminar','workshop','travel','tutor'];
+const GITHUB_USER='jdyece25-byte';
+const LOC_NAMES={skycastle:'스카이캐슬 3호점',lagom:'라곰스터디카페',yellowstone:'강남역 옐로스톤',daechibido:'대치미도아파트',songnaeyeok:'송내역 숨스터디카페',sindorim:'신도림 스터디카페',hantistation:'한티역',helios:'헬리오시티',parkrio:'잠실 파크리오'};
+
+// Config from localStorage
+let cfg={
+  repo: localStorage.getItem('cfg_repo')||'schedule',
+  pat:  localStorage.getItem('cfg_pat')||'',
+  gemini: localStorage.getItem('cfg_gemini')||''
+};
+
+// Runtime data — populated by loadData()
+let EVENTS=[], TT={}, TM={};
+let EM={};
+
+// ── FALLBACK DATA (used when fetch fails / local file) ─────────────────
+const FB_EVENTS=[
+  {d:'2026-06-04',t:'class',n:'기초회로이론 및 실험',ti:'14:00–15:15',s:840,e:915},
+  {d:'2026-06-04',t:'tutor',n:'과외 · 이민희·최지요',ti:'19:00–21:00',s:1140,e:1260,no:'온라인'},
+  {d:'2026-06-04',t:'tutor',n:'과외 · 정현우',ti:'21:00–?',s:1260,no:'온라인 · 종료 미정'},
+  {d:'2026-06-05',t:'lab',n:'프로그래밍 방법론 LAB (마지막)',ti:'11:00–12:50',s:660,e:770,no:'마지막 랩 수업'},
+  {d:'2026-06-06',t:'tutor',n:'과외 · 정예원 (경기과고2)',ti:'9:30–12:00',s:570,e:720,lid:'daechibido',loc:'대치미도아파트',no:'물리'},
+  {d:'2026-06-06',t:'tutor',n:'과외 · 이하린',ti:'13:30–16:30',s:810,e:990,lid:'songnaeyeok',loc:'송내역 숨스터디카페'},
+  {d:'2026-06-06',t:'tutor',n:'과외 · 김수현 (숙명여중2)',ti:'18:00–20:00',s:1080,e:1200,lid:'hantistation',loc:'한티역'},
+  {d:'2026-06-06',t:'tutor',n:'과외 · 연제이 (중1)',ti:'22:00–24:00',s:1320,e:1440,lid:'helios',loc:'헬리오시티'},
+  {d:'2026-06-07',t:'tutor',n:'과외 · 신수민 (경기과고1)',ti:'9:30–12:30',s:570,e:750,lid:'skycastle',loc:'스카이캐슬 3호점',no:'물리'},
+  {d:'2026-06-07',t:'tutor',n:'과외 · 이태현 (경기과고1)',ti:'13:30–15:30',s:810,e:930,lid:'lagom',loc:'라곰스터디카페',no:'물리'},
+  {d:'2026-06-07',t:'tutor',n:'과외 · 정현우',ti:'17:00–20:00',s:1020,e:1200,lid:'parkrio',loc:'잠실 파크리오'},
+  {d:'2026-06-07',t:'tutor',n:'과외 · 박재표 (광주과고2)',ti:'20:30–23:30',s:1230,e:1410,lid:'yellowstone',loc:'강남역 옐로스톤',no:'물리'},
+  {d:'2026-06-08',t:'deadline',n:'공학수학2 동영상 강의 마감',ti:'9:30까지',s:0,no:'수업 전 완료 필수'},
+  {d:'2026-06-08',t:'class',n:'공학수학2',ti:'9:30–10:45',s:570,e:645},
+  {d:'2026-06-08',t:'class',n:'프로그래밍 방법론 (이론)',ti:'11:00–12:50',s:660,e:770},
+  {d:'2026-06-08',t:'class',n:'스페인어권 명작의 이해',ti:'14:00–15:15',s:840,e:915},
+  {d:'2026-06-08',t:'tutor',n:'과외 · 김태율 (휘문중1)',ti:'21:00–23:30',s:1260,e:1410},
+  {d:'2026-06-09',t:'class',n:'기초회로이론 및 실험',ti:'14:00–15:15',s:840,e:915},
+  {d:'2026-06-09',t:'seminar',n:'전기정보세미나',ti:'17:30–18:20',s:1050,e:1100,no:'소감문 제출 필수'},
+  {d:'2026-06-09',t:'tutor',n:'과외 · 정현우',ti:'20:00–?',s:1200,no:'온라인 · 종료 미정'},
+  {d:'2026-06-10',t:'class',n:'공학수학2',ti:'9:30–10:45',s:570,e:645},
+  {d:'2026-06-10',t:'class',n:'스페인어권 명작의 이해',ti:'14:00–15:15',s:840,e:915},
+  {d:'2026-06-10',t:'tutor',n:'과외 · 김태율 (휘문중1)',ti:'21:00–23:30',s:1260,e:1410},
+  {d:'2026-06-11',t:'class',n:'기초회로이론 및 실험',ti:'14:00–15:15',s:840,e:915},
+  {d:'2026-06-11',t:'tutor',n:'과외 · 정현우 ①',ti:'17:30–19:00',s:1050,e:1140,lid:'parkrio',loc:'잠실 파크리오'},
+  {d:'2026-06-11',t:'tutor',n:'과외 · 이민희·최지요',ti:'19:00–21:00',s:1140,e:1260,no:'온라인 (잠실 현지 수업 가능)'},
+  {d:'2026-06-11',t:'tutor',n:'과외 · 정현우 ②',ti:'21:00–22:30',s:1260,e:1350,lid:'parkrio',loc:'잠실 파크리오'},
+  {d:'2026-06-12',t:'class',n:'수업 종강일',ti:''},
+  {d:'2026-06-12',t:'tutor',n:'과외 · 정예원 (경기과고2)',ti:'19:00–21:30',s:1140,e:1290,lid:'daechibido',loc:'대치미도아파트',no:'물리'},
+  {d:'2026-06-13',t:'exam',n:'기초회로이론 및 실험 기말고사',ti:'13:00–16:00',s:780,e:960},
+  {d:'2026-06-13',t:'tutor',n:'과외 · 김수현 (숙명여중2)',ti:'18:00–20:00',s:1080,e:1200,lid:'hantistation',loc:'한티역'},
+  {d:'2026-06-13',t:'tutor',n:'과외 · 연제이 (중1)',ti:'22:00–24:00',s:1320,e:1440,lid:'helios',loc:'헬리오시티'},
+  {d:'2026-06-14',t:'tutor',n:'과외 · 신수민 (경기과고1)',ti:'9:30–12:30',s:570,e:750,lid:'skycastle',loc:'스카이캐슬 3호점',no:'물리'},
+  {d:'2026-06-14',t:'tutor',n:'과외 · 이태현 (경기과고1)',ti:'13:30–15:30',s:810,e:930,lid:'lagom',loc:'라곰스터디카페',no:'물리'},
+  {d:'2026-06-14',t:'tutor',n:'과외 · 정현우',ti:'17:00–20:00',s:1020,e:1200,lid:'parkrio',loc:'잠실 파크리오'},
+  {d:'2026-06-14',t:'tutor',n:'과외 · 박재표 (광주과고2)',ti:'20:30–23:30',s:1230,e:1410,lid:'yellowstone',loc:'강남역 옐로스톤',no:'물리'},
+  {d:'2026-06-15',t:'exam',n:'공학수학2 기말고사',ti:'9:00–10:45',s:540,e:645},
+  {d:'2026-06-15',t:'exam',n:'프로그래밍 방법론 기말고사',ti:'11:00–13:00',s:660,e:780},
+  {d:'2026-06-15',t:'tutor',n:'과외 · 김태율 (휘문중1)',ti:'21:00–23:30',s:1260,e:1410},
+  {d:'2026-06-16',t:'seminar',n:'전기정보세미나 종강',ti:'17:30–18:20',s:1050,e:1100,no:'소감문 (마지막)'},
+  {d:'2026-06-16',t:'tutor',n:'과외 · 정현우',ti:'20:00–?',s:1200,no:'온라인 · 종료 미정'},
+  {d:'2026-06-17',t:'project',n:'기초회로이론 프로젝트',ti:'오전~이른 오후 (미정)',no:'시간 공지 확인'},
+  {d:'2026-06-17',t:'tutor',n:'과외 · 김태율 (휘문중1)',ti:'21:00–23:30',s:1260,e:1410},
+  {d:'2026-06-18',t:'project',n:'기초회로이론 프로젝트',ti:'오전~이른 오후 (미정)',no:'시간 공지 확인'},
+  {d:'2026-06-18',t:'tutor',n:'과외 · 정현우 ①',ti:'17:30–19:00',s:1050,e:1140,lid:'parkrio',loc:'잠실 파크리오'},
+  {d:'2026-06-18',t:'tutor',n:'과외 · 이민희·최지요',ti:'19:00–21:00',s:1140,e:1260,no:'온라인 (잠실 현지 수업 가능)'},
+  {d:'2026-06-18',t:'tutor',n:'과외 · 정현우 ②',ti:'21:00–22:30',s:1260,e:1350,lid:'parkrio',loc:'잠실 파크리오'},
+  {d:'2026-06-19',t:'workshop',n:'[W] 집결',ti:'9:30',s:570},
+  {d:'2026-06-19',t:'workshop',n:'[W] Soundscape WS',ti:'10:00–12:00',s:600,e:720},
+  {d:'2026-06-19',t:'workshop',n:'[W] 서울대 이동',ti:'12:00–13:00',s:720,e:780},
+  {d:'2026-06-19',t:'workshop',n:'[W] Soundscape WS',ti:'13:00–15:00',s:780,e:900,loc:'301동 104호'},
+  {d:'2026-06-19',t:'workshop',n:'[W] Artbora Movement',ti:'15:30–18:00',s:930,e:1080,loc:'관악 해동 로비'},
+  {d:'2026-06-19',t:'workshop',n:'[W] 시흥 이동',ti:'18:15–19:30',s:1095,e:1170},
+  {d:'2026-06-19',t:'workshop',n:'[W] 저녁 만찬',ti:'19:30~',s:1170,loc:'고기원칙'},
+  {d:'2026-06-19',t:'workshop',n:'[W] 간담회·방배정',ti:'21:30~',s:1290},
+  {d:'2026-06-20',t:'workshop',n:'[W] 아침 식사',ti:'8:00–9:00',s:480,e:540,loc:'시흥 연수원'},
+  {d:'2026-06-20',t:'workshop',n:'[W] Jay Rhee Lecture',ti:'9:00–11:00',s:540,e:660,loc:'시흥 강의실'},
+  {d:'2026-06-20',t:'workshop',n:'[W] 시흥 FESTA',ti:'11:00–12:00',s:660,e:720},
+  {d:'2026-06-20',t:'workshop',n:'[W] 버스→서울대',ti:'12:15',s:735},
+  {d:'2026-06-20',t:'tutor',n:'과외 · 이하린',ti:'13:00–16:00',s:780,e:960,lid:'sindorim',loc:'신도림 스터디카페'},
+  {d:'2026-06-20',t:'tutor',n:'과외 · 김수현 (숙명여중2)',ti:'18:00–20:00',s:1080,e:1200,lid:'hantistation',loc:'한티역'},
+  {d:'2026-06-20',t:'tutor',n:'과외 · 연제이 (중1)',ti:'22:00–24:00',s:1320,e:1440,lid:'helios',loc:'헬리오시티'},
+  {d:'2026-06-21',t:'tutor',n:'과외 · 정예원 (경기과고2)',ti:'9:30–12:00',s:570,e:720,lid:'daechibido',loc:'대치미도아파트',no:'물리'},
+  {d:'2026-06-21',t:'tutor',n:'과외 · 이태현 (경기과고1)',ti:'13:30–15:30',s:810,e:930,lid:'lagom',loc:'라곰스터디카페',no:'물리'},
+  {d:'2026-06-21',t:'tutor',n:'과외 · 정현우',ti:'17:00–20:00',s:1020,e:1200,lid:'parkrio',loc:'잠실 파크리오'},
+  {d:'2026-06-21',t:'tutor',n:'과외 · 박재표 (광주과고2)',ti:'20:30–23:30',s:1230,e:1410,lid:'yellowstone',loc:'강남역 옐로스톤',no:'물리'},
+  {d:'2026-06-22',t:'tutor',n:'과외 · 김태율 (휘문중1)',ti:'21:00–23:30',s:1260,e:1410},
+  {d:'2026-06-24',t:'travel',n:'WSC 전지훈련 Day 1',loc:'제주도',no:'김태율 과외 없음'},
+  {d:'2026-06-25',t:'travel',n:'WSC 전지훈련 Day 2',loc:'제주도'},
+  {d:'2026-06-26',t:'travel',n:'WSC 전지훈련 Day 3',loc:'제주도'},
+  {d:'2026-06-27',t:'tutor',n:'과외 · 정예원 (경기과고2)',ti:'9:30–12:00',s:570,e:720,lid:'daechibido',loc:'대치미도아파트',no:'물리'},
+  {d:'2026-06-27',t:'tutor',n:'과외 · 김수현 (숙명여중2)',ti:'18:00–20:00',s:1080,e:1200,lid:'hantistation',loc:'한티역'},
+  {d:'2026-06-27',t:'tutor',n:'과외 · 연제이 (중1)',ti:'22:00–24:00',s:1320,e:1440,lid:'helios',loc:'헬리오시티'},
+  {d:'2026-06-28',t:'tutor',n:'과외 · 이태현 (경기과고1)',ti:'13:30–15:30',s:810,e:930,lid:'lagom',loc:'라곰스터디카페',no:'물리'},
+  {d:'2026-06-28',t:'tutor',n:'과외 · 박재표 (광주과고2)',ti:'20:30–23:30',s:1230,e:1410,lid:'yellowstone',loc:'강남역 옐로스톤',no:'물리'},
+  {d:'2026-06-29',t:'tutor',n:'과외 · 김태율 (휘문중1)',ti:'21:00–23:30',s:1260,e:1410}
+];
+const FB_TT={'skycastle-lagom':5,'lagom-skycastle':5,'skycastle-yellowstone':30,'yellowstone-skycastle':30,'skycastle-daechibido':17,'daechibido-skycastle':17,'skycastle-songnaeyeok':90,'songnaeyeok-skycastle':90,'skycastle-sindorim':60,'sindorim-skycastle':60,'skycastle-hantistation':11,'hantistation-skycastle':11,'skycastle-helios':30,'helios-skycastle':30,'lagom-yellowstone':30,'yellowstone-lagom':30,'lagom-daechibido':21,'daechibido-lagom':21,'lagom-songnaeyeok':90,'songnaeyeok-lagom':90,'lagom-sindorim':50,'sindorim-lagom':50,'lagom-hantistation':11,'hantistation-lagom':11,'lagom-helios':50,'helios-lagom':50,'yellowstone-daechibido':40,'daechibido-yellowstone':40,'yellowstone-songnaeyeok':80,'songnaeyeok-yellowstone':80,'yellowstone-sindorim':40,'sindorim-yellowstone':40,'yellowstone-hantistation':20,'hantistation-yellowstone':20,'yellowstone-helios':40,'helios-yellowstone':40,'daechibido-songnaeyeok':90,'songnaeyeok-daechibido':90,'daechibido-sindorim':50,'sindorim-daechibido':50,'daechibido-hantistation':20,'hantistation-daechibido':20,'daechibido-helios':40,'helios-daechibido':40,'songnaeyeok-sindorim':30,'sindorim-songnaeyeok':30,'songnaeyeok-hantistation':80,'hantistation-songnaeyeok':80,'songnaeyeok-helios':100,'helios-songnaeyeok':100,'sindorim-hantistation':50,'hantistation-sindorim':50,'sindorim-helios':70,'helios-sindorim':70,'hantistation-helios':30,'helios-hantistation':30};
+const FB_TM={'skycastle-lagom':'도보','lagom-skycastle':'도보','skycastle-hantistation':'도보','hantistation-skycastle':'도보','lagom-hantistation':'도보','hantistation-lagom':'도보','skycastle-daechibido':'버스','daechibido-skycastle':'버스','skycastle-helios':'버스','helios-skycastle':'버스','lagom-daechibido':'버스','daechibido-lagom':'버스','lagom-helios':'버스','helios-lagom':'버스','daechibido-hantistation':'버스','hantistation-daechibido':'버스','daechibido-helios':'버스','helios-daechibido':'버스','hantistation-helios':'버스/지하철','helios-hantistation':'버스/지하철','skycastle-yellowstone':'버스','yellowstone-skycastle':'버스','lagom-yellowstone':'버스','yellowstone-lagom':'버스'};
+
+// ── DATA LOADING ─────────────────────────────────────────────────────
+function rebuildEM(){
+  EM={};
+  EVENTS.forEach(e=>{if(!EM[e.d])EM[e.d]=[];EM[e.d].push(e);});
+  Object.keys(EM).forEach(d=>{EM[d].sort((a,b)=>(a.s??0)-(b.s??0));});
+}
+function gtt(a,b){return TT[`${a}-${b}`]??null;}
+function gmd(a,b){return TM[`${a}-${b}`]||'지하철';}
+
+async function loadData(){
+  setSyncDot('loading');
+  try{
+    const [evRes,trRes]=await Promise.all([
+      fetch('./events.json'),
+      fetch('./travel.json')
+    ]);
+    if(!evRes.ok||!trRes.ok) throw new Error('fetch failed');
+    EVENTS=await evRes.json();
+    const tr=await trRes.json();
+    TT={...tr.times};
+    TM={...tr.modes};
+    setSyncDot('ok');
+  } catch {
+    EVENTS=[...FB_EVENTS];
+    TT={...FB_TT};
+    TM={...FB_TM};
+    setSyncDot('offline');
+  }
+  rebuildEM();
+}
+function setSyncDot(s){
+  const el=document.getElementById('sync-dot');
+  if(s==='ok'){el.style.color='#22c55e';el.title='GitHub 연동됨';}
+  else if(s==='loading'){el.style.color='#6366f1';el.title='로딩 중...';}
+  else if(s==='offline'){el.style.color='var(--tx3)';el.title='오프라인 (로컬 데이터 사용 중)';}
+  else if(s==='saving'){el.style.color='#f59e0b';el.title='GitHub에 저장 중...';}
+  else if(s==='error'){el.style.color='#ef4444';el.title='저장 오류';}
+}
+
+// ── GITHUB API ────────────────────────────────────────────────────────
+async function githubSave(filename, data){
+  if(!cfg.pat){return {ok:false,msg:'PAT 미설정'};}
+  setSyncDot('saving');
+  try{
+    const url=`https://api.github.com/repos/${GITHUB_USER}/${cfg.repo}/contents/${filename}`;
+    const headers={'Authorization':`token ${cfg.pat}`,'Accept':'application/vnd.github.v3+json'};
+    // Get SHA of existing file
+    let sha=null;
+    const getR=await fetch(url,{headers});
+    if(getR.ok){const gd=await getR.json();sha=gd.sha;}
+    // Encode content (handle Korean)
+    const str=JSON.stringify(data,null,2);
+    const bytes=new TextEncoder().encode(str);
+    let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));
+    const content=btoa(bin);
+    const body={message:`Update ${filename} via schedule app`,content};
+    if(sha)body.sha=sha;
+    const putR=await fetch(url,{method:'PUT',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(putR.ok){setSyncDot('ok');return {ok:true};}
+    else{setSyncDot('error');return {ok:false,msg:`HTTP ${putR.status}`};}
+  }catch(e){setSyncDot('error');return {ok:false,msg:e.message};}
+}
+async function saveAllData(){
+  const [r1,r2]=await Promise.all([
+    githubSave('events.json',EVENTS),
+    githubSave('travel.json',{locations:LOC_NAMES,times:TT,modes:TM})
+  ]);
+  return r1.ok&&r2.ok;
+}
+
+// ── GEMINI API ────────────────────────────────────────────────────────
+async function geminiParse(text){
+  if(!cfg.gemini) return {ok:false,msg:'Gemini API 키가 설정되지 않았습니다. 편집 탭 → 설정에서 입력하세요.'};
+  const prompt=`당신은 한국 대학생의 일정 관리 앱 파싱 AI입니다.
+입력 텍스트가 다음 중 어느 것인지 판단하고 JSON으로만 응답하세요:
+
+1. 일정(이벤트): {"type":"event","data":[{"d":"2026-MM-DD","t":"타입","n":"이름","ti":"HH:MM–HH:MM","s":시작분,"e":종료분,"lid":"장소ID","loc":"장소명","no":"메모"}]}
+2. 이동시간: {"type":"travel","data":[{"from":"장소ID","to":"장소ID","min":분수,"mode":"교통수단"}]}
+
+이벤트 타입: tutor(과외), class(수업), exam(시험), lab(랩), seminar(세미나), workshop(워크숍), travel(여행), deadline(마감), project(프로젝트)
+장소 ID 목록: skycastle(스카이캐슬 3호점), lagom(라곰스터디카페), yellowstone(강남역 옐로스톤), daechibido(대치미도아파트), songnaeyeok(송내역 숨스터디카페), sindorim(신도림 스터디카페), hantistation(한티역), helios(헬리오시티), parkrio(잠실 파크리오)
+시간→분 변환: 9:00=540, 13:30=810, 17:00=1020, 20:00=1200, 21:00=1260
+lid, loc, no 필드는 해당 정보가 있을 때만 포함. JSON만 반환, 설명 없이.
+
+입력: ${text}`;
+  try{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${cfg.gemini}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.1}})
+    });
+    if(!res.ok){const e=await res.json();return {ok:false,msg:`Gemini 오류: ${e.error?.message||res.status}`};}
+    const data=await res.json();
+    const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    // Extract JSON from possible markdown code block
+    const clean=raw.replace(/```(?:json)?/g,'').replace(/```/g,'').trim();
+    const match=clean.match(/\{[\s\S]*\}/);
+    if(!match) return {ok:false,msg:'파싱 실패: JSON을 찾을 수 없습니다.'};
+    const parsed=JSON.parse(match[0]);
+    return {ok:true,result:parsed};
+  }catch(e){return {ok:false,msg:`오류: ${e.message}`};}
+}
+
+// ── PARSE NL ──────────────────────────────────────────────────────────
+let pendingParsed=null;
+async function parseNL(){
+  const text=document.getElementById('nl-input').value.trim();
+  if(!text){setStatus('nl-status','텍스트를 입력하세요','err');return;}
+  const btn=document.getElementById('nl-btn');
+  btn.disabled=true;btn.textContent='분석 중...';
+  setStatus('nl-status','','');
+  document.getElementById('nl-preview').style.display='none';
+  const r=await geminiParse(text);
+  btn.disabled=false;btn.textContent='AI 파싱';
+  if(!r.ok){setStatus('nl-status',r.msg,'err');return;}
+  pendingParsed=r.result;
+  renderNLPreview(r.result);
+}
+function renderNLPreview(parsed){
+  const el=document.getElementById('nl-preview');
+  if(parsed.type==='event'){
+    let h='';
+    parsed.data.forEach((ev,i)=>{
+      const col=TCh[ev.t]||'#888';
+      h+=`<div class="preview-item">
+        <div>
+          <div class="preview-main" style="color:${col}">${ev.n}</div>
+          <div class="preview-sub">${ev.d} ${ev.ti||''} ${ev.loc?'· '+ev.loc:''} ${ev.no?'· '+ev.no:''}</div>
+        </div>
+        <div class="preview-actions">
+          <button class="btn-primary" style="padding:4px 12px;font-size:11px" onclick="confirmEvent(${i})">추가</button>
+        </div>
+      </div>`;
+    });
+    el.innerHTML=h;
+  } else if(parsed.type==='travel'){
+    let h='';
+    parsed.data.forEach((tt,i)=>{
+      h+=`<div class="preview-item">
+        <div>
+          <div class="preview-main">${LOC_NAMES[tt.from]||tt.from} → ${LOC_NAMES[tt.to]||tt.to}</div>
+          <div class="preview-sub">${tt.min}분 · ${tt.mode||'지하철'} (양방향)</div>
+        </div>
+        <div class="preview-actions">
+          <button class="btn-primary" style="padding:4px 12px;font-size:11px" onclick="confirmTravel(${i})">추가</button>
+        </div>
+      </div>`;
+    });
+    el.innerHTML=h;
+  } else {
+    el.innerHTML=`<div class="preview-item"><div class="preview-sub">알 수 없는 형식</div></div>`;
+  }
+  el.style.display='block';
+}
+async function confirmEvent(i){
+  const ev=pendingParsed.data[i];
+  EVENTS.push(ev);
+  EVENTS.sort((a,b)=>a.d===b.d?(a.s||0)-(b.s||0):a.d.localeCompare(b.d));
+  rebuildEM();buildCal();
+  const saved=await saveAllData();
+  setStatus('nl-status',saved?'✓ 저장 완료':'⚠ 로컬 추가됨 (GitHub 저장 실패)','ok');
+}
+async function confirmTravel(i){
+  const tt=pendingParsed.data[i];
+  TT[`${tt.from}-${tt.to}`]=tt.min;TT[`${tt.to}-${tt.from}`]=tt.min;
+  TM[`${tt.from}-${tt.to}`]=tt.mode||'지하철';TM[`${tt.to}-${tt.from}`]=tt.mode||'지하철';
+  const saved=await saveAllData();
+  setStatus('nl-status',saved?'✓ 이동시간 저장 완료':'⚠ 로컬 업데이트됨 (GitHub 저장 실패)','ok');
+}
+
+// ── DIRECT FORM ───────────────────────────────────────────────────────
+function autoFillLoc(){
+  const id=document.getElementById('ef-lid').value;
+  document.getElementById('ef-loc').value=LOC_NAMES[id]||'';
+}
+function t2m(t){if(!t)return null;const[h,m]=t.split(':').map(Number);return h*60+m;}
+async function addEventFromForm(){
+  const date=document.getElementById('ef-date').value;
+  const name=document.getElementById('ef-name').value.trim();
+  if(!date||!name){setStatus('ef-status','날짜와 이름은 필수입니다','err');return;}
+  const startT=document.getElementById('ef-start').value;
+  const endT=document.getElementById('ef-end').value;
+  const sm=t2m(startT),em=t2m(endT);
+  const lid=document.getElementById('ef-lid').value||undefined;
+  const loc=document.getElementById('ef-loc').value.trim()||undefined;
+  const no=document.getElementById('ef-no').value.trim()||undefined;
+  const ti=document.getElementById('ef-ti').value.trim()||(startT&&endT?`${startT}–${endT}`:'');
+  const ev={d:date,t:document.getElementById('ef-type').value,n:name,ti};
+  if(sm!=null)ev.s=sm;if(em!=null)ev.e=em;
+  if(lid)ev.lid=lid;if(loc)ev.loc=loc;if(no)ev.no=no;
+  EVENTS.push(ev);
+  EVENTS.sort((a,b)=>a.d===b.d?(a.s||0)-(b.s||0):a.d.localeCompare(b.d));
+  rebuildEM();buildCal();
+  const saved=await saveAllData();
+  setStatus('ef-status',saved?'✓ 저장 완료':'⚠ 로컬 추가됨 (GitHub 미저장)','ok');
+  // Clear form
+  ['ef-name','ef-ti','ef-start','ef-end','ef-loc','ef-no'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ef-lid').value='';
+}
+async function addTravelFromForm(){
+  const from=document.getElementById('tt-from').value;
+  const to=document.getElementById('tt-to').value;
+  const min=parseInt(document.getElementById('tt-min').value);
+  const mode=document.getElementById('tt-mode').value;
+  if(!from||!to||!min){setStatus('tt-status','출발/도착/시간을 모두 입력하세요','err');return;}
+  if(from===to){setStatus('tt-status','출발과 도착이 같습니다','err');return;}
+  TT[`${from}-${to}`]=min;TT[`${to}-${from}`]=min;
+  TM[`${from}-${to}`]=mode;TM[`${to}-${from}`]=mode;
+  const saved=await saveAllData();
+  setStatus('tt-status',saved?`✓ ${LOC_NAMES[from]||from} ↔ ${LOC_NAMES[to]||to} ${min}분 저장`:'⚠ 로컬 업데이트됨 (GitHub 미저장)','ok');
+}
+function setStatus(id,msg,cls){
+  const el=document.getElementById(id);el.textContent=msg;
+  el.className='status-msg'+(cls?' '+cls:'');
+}
+function saveSettings(){
+  cfg.pat=document.getElementById('cfg-pat').value.trim();
+  cfg.gemini=document.getElementById('cfg-gemini').value.trim();
+  cfg.repo=document.getElementById('cfg-repo').value.trim()||'schedule';
+  localStorage.setItem('cfg_pat',cfg.pat);
+  localStorage.setItem('cfg_gemini',cfg.gemini);
+  localStorage.setItem('cfg_repo',cfg.repo);
+  setStatus('cfg-status','✓ 저장됨','ok');
+  setTimeout(()=>setStatus('cfg-status','',''),2000);
+}
+
+// ── CALENDAR BUILD ────────────────────────────────────────────────────
+function buildCal(){
+  const g=document.getElementById('calGrid');g.innerHTML='';
+  const fd=1;
+  for(let i=0;i<fd;i++){const b=document.createElement('div');b.className='dc dim';b.innerHTML=`<div class="dn">${31-fd+1+i}</div>`;g.appendChild(b);}
+  for(let d=1;d<=30;d++){
+    const ds=`2026-06-${String(d).padStart(2,'0')}`;
+    const dow=(fd+d-1)%7;const evs=EM[ds]||[];
+    const cell=document.createElement('div');cell.className='dc';
+    if(ds===TODAY)cell.classList.add('tod');
+    if(evs.some(e=>e.t==='exam'))cell.classList.add('ebg');
+    if(evs.some(e=>e.t==='workshop'))cell.classList.add('wbg');
+    if(evs.some(e=>e.t==='travel'))cell.classList.add('tbg');
+    cell.dataset.date=ds;cell.onclick=()=>selDay(ds);
+    const dn=document.createElement('div');
+    dn.className='dn'+(dow===0?' s':dow===6?' sa':'');
+    dn.innerHTML=d+(ds===TODAY?' <span class="tb">오늘</span>':'');
+    cell.appendChild(dn);
+    const MX=3;
+    evs.slice(0,MX).forEach(ev=>{
+      const c=document.createElement('div');c.className='chip';
+      c.style.background=TCh[ev.t];c.textContent=(ev.n||'').replace(/\[W\] /,'');
+      cell.appendChild(c);
+    });
+    if(evs.length>MX){const m=document.createElement('div');m.className='more';m.textContent=`+${evs.length-MX}개 더`;cell.appendChild(m);}
+    g.appendChild(cell);
+  }
+  const ld=(fd+29)%7;const need=ld===6?0:6-ld;
+  for(let i=1;i<=need;i++){const b=document.createElement('div');b.className='dc dim';b.innerHTML=`<div class="dn">${i}</div>`;g.appendChild(b);}
+  updateAlertBadge();
+}
+function selDay(ds){
+  document.querySelectorAll('.dc').forEach(c=>c.classList.remove('sel'));
+  const cl=document.querySelector(`[data-date="${ds}"]`);if(cl)cl.classList.add('sel');
+  const d=new Date(ds);
+  document.getElementById('panelDate').textContent=`${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]})`;
+  const evs=EM[ds]||[];
+  const pb=document.getElementById('panelBody');
+  if(!evs.length){pb.innerHTML='<div class="pmt">🌿 여유 있는 날</div>';document.getElementById('panelSub').textContent='일정 없음';return;}
+  const cnt={};evs.forEach(e=>cnt[e.t]=(cnt[e.t]||0)+1);
+  document.getElementById('panelSub').textContent=`총 ${evs.length}개 · `+Object.entries(cnt).map(([t,c])=>`${TL[t]||t} ${c}`).join(' · ');
+  let html='',lt=null;
+  for(let i=0;i<evs.length;i++){
+    const ev=evs[i];
+    if(ev.t!==lt){html+=`<div class="etl" style="color:${TCh[ev.t]}">${TL[ev.t]||ev.t}</div>`;lt=ev.t;}
+    const nm=(ev.n||'').replace(/\[W\] /,'');
+    html+=`<div class="ec" style="border-left-color:${TCh[ev.t]}">
+      <div class="ect">${nm}</div>
+      <div class="ecm">${ev.ti?`<span>🕐 ${ev.ti}</span> `:''}${ev.loc?`<span>📍 ${ev.loc}</span>`:''}</div>
+      ${ev.no?`<div class="ecn">⚠ ${ev.no}</div>`:''}
+    </div>`;
+    const nx=evs[i+1];
+    if(nx&&ev.lid&&nx.lid&&ev.lid!==nx.lid&&ev.e!=null&&nx.s!=null){
+      const tt=gtt(ev.lid,nx.lid);
+      if(tt!=null){
+        const md=gmd(ev.lid,nx.lid);const gap=nx.s-ev.e;const buf=gap-tt;
+        let col=buf<0?'#ef4444':buf<30?'#f97316':'#22c55e';
+        html+=`<div class="tc"><div class="tcl"></div>
+          <div class="tcp" style="background:${col}18;color:${col};border:.5px solid ${col}40">↓ ${tt}분 · ${md}</div>
+          <div class="tcb" style="color:${col}">${buf<0?`여유 ${buf}분 ⚠`:`+${buf}분`}</div>
+          <div class="tcl"></div></div>`;
+        lt=null;
+      }
+    }
+  }
+  pb.innerHTML=html;
+}
+
+// ── LIST VIEW ─────────────────────────────────────────────────────────
+let isListMode=false;
+function toggleList(){
+  isListMode=!isListMode;
+  const cm=document.getElementById('calMain');
+  const btn=document.getElementById('listBtn');
+  if(isListMode){cm.classList.add('lm');btn.textContent='달력 보기';buildList();}
+  else{cm.classList.remove('lm');btn.textContent='목록 보기';}
+}
+function buildList(){
+  const lw=document.getElementById('listWrap');lw.innerHTML='';
+  Object.keys(EM).sort().forEach(ds=>{
+    const d=new Date(ds);const evs=EM[ds];
+    const g2=document.createElement('div');g2.className='lg2';
+    const h=document.createElement('div');h.className='lgh'+(ds===TODAY?' tr':'');
+    h.innerHTML=`<span class="n">${d.getDate()}</span>6월 ${DOW[d.getDay()]}요일${ds===TODAY?' · 오늘':''}`;
+    g2.appendChild(h);
+    evs.forEach(ev=>{
+      const r=document.createElement('div');r.className='lrow';
+      const b=document.createElement('div');b.className='lbar';b.style.background=TCh[ev.t];
+      const info=document.createElement('div');
+      const nm=(ev.n||'').replace(/\[W\] /,'');
+      info.innerHTML=`<div class="lt">${nm}</div><div class="lm2">${[ev.ti,ev.loc].filter(Boolean).join(' · ')||TL[ev.t]||ev.t}</div>`;
+      r.appendChild(b);r.appendChild(info);g2.appendChild(r);
+    });
+    lw.appendChild(g2);
+  });
+}
+
+// ── TAB SWITCH ────────────────────────────────────────────────────────
+function sw(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.ntab').forEach(x=>x.classList.remove('on'));
+  document.getElementById('v-'+v).classList.add('on');
+  document.getElementById('t-'+v).classList.add('on');
+  if(v==='plan'&&!document.getElementById('v-plan').children.length)buildPlan();
+  if(v==='alert')buildAlerts();
+  if(v==='edit')initEditSettings();
+}
+function initEditSettings(){
+  document.getElementById('cfg-pat').value=cfg.pat;
+  document.getElementById('cfg-gemini').value=cfg.gemini;
+  document.getElementById('cfg-repo').value=cfg.repo;
+}
+
+// ── CONFLICT DETECTION ────────────────────────────────────────────────
+function computeConflicts(){
+  const conflicts=[];
+  const seen=new Set();
+  Object.keys(EM).sort().forEach(ds=>{
+    const evs=EM[ds];
+    for(let i=0;i<evs.length-1;i++){
+      const a=evs[i],b=evs[i+1];
+      if(a.lid&&b.lid&&a.lid!==b.lid&&a.e!=null&&b.s!=null){
+        const key=`${ds}-${a.lid}-${b.lid}`;
+        if(seen.has(key))continue;seen.add(key);
+        const tt=gtt(a.lid,b.lid);
+        const gap=b.s-a.e;
+        if(tt==null){
+          if(gap<180) conflicts.push({cls:'unk',ds,a,b,gap,tt:null});
+        } else {
+          const buf=gap-tt;
+          if(buf<30) conflicts.push({cls:buf<0?'red':'orange',ds,a,b,gap,tt,buf});
+        }
+      }
+    }
+  });
+  return conflicts;
+}
+function updateAlertBadge(){
+  const n=computeConflicts().length;
+  document.getElementById('alrt-n').textContent=n||'✓';
+  document.getElementById('alrt-n').style.background=n?'var(--c-exam)':'#22c55e';
+}
+function buildAlerts(){
+  const el=document.getElementById('v-alert');
+  const conflicts=computeConflicts();
+  const red=conflicts.filter(c=>c.cls==='red');
+  const orange=conflicts.filter(c=>c.cls==='orange');
+  const unk=conflicts.filter(c=>c.cls==='unk');
+  const fmtDate=ds=>{const d=new Date(ds);return `${d.getMonth()+1}/${d.getDate()} (${DOW[d.getDay()]})`;};
+  const fmtMin=m=>{const h=Math.floor(m/60),min=m%60;return `${h}:${String(min).padStart(2,'0')}`;};
+  let h=`<h2>충돌 알림 <em>& 이동시간</em></h2>`;
+  if(!conflicts.length){h+=`<div class="no-conflicts">🎉 현재 충돌 없음</div>`;el.innerHTML=h;return;}
+  if(red.length||orange.length){
+    h+=`<div class="asec">이동시간 충돌</div><div class="ag">`;
+    [...red,...orange].forEach(c=>{
+      const md=gmd(c.a.lid,c.b.lid);
+      h+=`<div class="ac ${c.cls}">
+        <div class="adate">${fmtDate(c.ds)} · 여유 ${c.buf}분</div>
+        <div class="aroute">${c.a.n.replace('[W] ','')} → ${c.b.n.replace('[W] ','')}</div>
+        <div class="adetail">${fmtMin(c.a.e)} 종료 → 이동 ${c.tt}분(${md}) → ${fmtMin(c.b.s)} 시작<br>여유: <span class="buf">${c.buf<0?`${Math.abs(c.buf)}분 초과 ⚠`:`${c.buf}분`}</span></div>
+      </div>`;
+    });
+    h+='</div>';
+  }
+  if(unk.length){
+    h+=`<div class="asec">이동시간 미확인</div><div class="ag">`;
+    unk.forEach(c=>{
+      h+=`<div class="ac unk">
+        <div class="adate">${fmtDate(c.ds)}</div>
+        <div class="aroute">${c.a.n.replace('[W] ','')} → ${c.b.n.replace('[W] ','')}</div>
+        <div class="adetail">${fmtMin(c.a.e)} 종료, ${fmtMin(c.b.s)} 시작 (여유 ${c.gap}분)<br><span class="buf">이동시간 DB 미등록 — 편집 탭에서 추가</span></div>
+      </div>`;
+    });
+    h+='</div>';
+  }
+  el.innerHTML=h;
+}
+
+// ── STUDY PLAN ────────────────────────────────────────────────────────
+const PLAN=[
+  {date:'6/4 목',today:true,total:'약 5.5h',blocks:[{c:'#3b82f6',s:'오전 (자유, ~14시)',d:'기초회로 전범위 훑기 · 기출 확인',h:'2.5h'},{c:'#3b82f6',s:'저녁 (15:15–19:00)',d:'기초회로 취약 파트 집중 정리',h:'3h'}],note:'19시 이후: 이민희·최지요 → 정현우 온라인 연속'},
+  {date:'6/5 금',total:'약 4h',blocks:[{c:'#3b82f6',s:'오전 (~11시)',d:'기초회로 계속',h:'1.5h'},{c:'#3b82f6',s:'오후 (13:00~)',d:'기초회로 문제 풀기',h:'2.5h'}]},
+  {date:'6/6 토',rest:true,note:'과외 4연속 + 이동 빡빡 — 공부 없이 체력 관리'},
+  {date:'6/7 일',alert:'공학수학 동영상 강의 오늘 중 시청! (내일 9:30 마감)',total:'약 3h',blocks:[{c:'#f59e0b',s:'이른 오전 (~9:30)',d:'공학수학 동영상 강의 시청',h:'1.5h'},{c:'#3b82f6',s:'오후 (15:30–17:00)',d:'기초회로 복습',h:'1.5h'}],note:'17시 이후: 정현우 대면 → 박재표 (잠실↔강남 이동시간 미확인)'},
+  {date:'6/8 월',alert:'동영상 강의 9:30 마감',total:'약 3h',blocks:[{c:'#3b82f6',s:'저녁 (15:15–21:00)',d:'기초회로 문제 풀기 집중',h:'3h'}]},
+  {date:'6/9 화',total:'약 4h',blocks:[{c:'#3b82f6',s:'오전 (~14:00)',d:'기초회로 중요 파트 집중',h:'3.5h'},{c:'#8b5cf6',s:'세미나 직후',d:'소감문 작성',h:'30분'}],note:'20시 이후: 정현우 온라인 과외'},
+  {date:'6/10 수',total:'약 4.5h',blocks:[{c:'#3b82f6',s:'오전 (수업 틈새)',d:'기초회로 취약점 마무리',h:'2h'},{c:'#f59e0b',s:'저녁 (15:15–21:00)',d:'공학수학 핵심 파트 시작',h:'2.5h'}]},
+  {date:'6/11 목',total:'약 4.5h',blocks:[{c:'#3b82f6',s:'오전 (~14:00)',d:'기초회로 최종 정리 · 요약노트',h:'3h'},{c:'#f59e0b',s:'저녁 (15:15–17:30)',d:'공학수학 문제 풀기',h:'1.5h'}],note:'17:30 이후: 정현우①→이민희·최지요(온라인)→정현우② 연속'},
+  {date:'6/12 금',free:true,total:'약 6h',note:'종강! 최대 집중일',blocks:[{c:'#3b82f6',s:'오전',d:'기초회로 파이널 마무리 · 요약노트',h:'3h'},{c:'#f59e0b',s:'오후 (~19:00)',d:'공학수학 집중 복습',h:'3h'}],grid:true},
+  {date:'6/13 토',exam:'기초회로이론 기말고사 13:00–16:00',total:'약 1.5h',blocks:[{c:'#3b82f6',s:'오전 (~12:00)',d:'기초회로 마지막 점검',h:'1.5h'}],note:'저녁: 과외 2연속 (공부 없음)'},
+  {date:'6/14 일',total:'약 2.5h',blocks:[{c:'#f59e0b',s:'이른 오전 (~9:30)',d:'공학수학 정리',h:'1h'},{c:'#f59e0b',s:'오후 (15:30–17:00)',d:'공학수학 + 방법론 시작',h:'1.5h'}],note:'17시 이후: 정현우 대면, 20:30 박재표 (공부 시간 매우 한정)'},
+  {date:'6/15 월',exam:'공학수학2 9:00 · 방법론 11:00',blocks:[{c:'#f59e0b',s:'기상 직후',d:'공학수학 요약노트 최종 확인',h:'30분'},{c:'#06b6d4',s:'10:45–11:00',d:'방법론 마지막 체크',h:'15분'}]},
+];
+function buildPlan(){
+  const el=document.getElementById('v-plan');
+  const phases=[
+    {label:'Phase 1 — 기초회로 집중 (D-9 ~ D-4)',days:PLAN.slice(0,6)},
+    {label:'Phase 2 — 기초회로 마무리 + 공학수학 병행 (D-3 ~ D-1)',days:PLAN.slice(6,9)},
+    {label:'Phase 3 — 시험 주간',days:PLAN.slice(9)},
+  ];
+  let h=`<div class="plan-hdr"><h2>시험 준비 플랜 <em>6/4–6/15</em></h2></div>
+  <div class="stats">
+    <div class="sc"><div class="sb" style="background:#3b82f6"></div><div><div class="sl">기초회로이론</div><div class="sv">약 24h</div><div class="ss">D-9부터 집중</div></div></div>
+    <div class="sc"><div class="sb" style="background:#f59e0b"></div><div><div class="sl">공학수학2</div><div class="sv">약 13h</div><div class="ss">D-5부터 병행</div></div></div>
+    <div class="sc"><div class="sb" style="background:#06b6d4"></div><div><div class="sl">방법론</div><div class="sv">약 2h</div><div class="ss">프로젝트 병행 중</div></div></div>
+    <div class="sc"><div class="sb" style="background:var(--acc)"></div><div><div class="sl">총 공부 시간</div><div class="sv">약 39h</div><div class="ss">12일간</div></div></div>
+  </div>`;
+  phases.forEach(p=>{
+    h+=`<div class="phase">${p.label}</div><div class="day-grid">`;
+    p.days.forEach(day=>{
+      const cls='dc2'+(day.exam?' exam-day':day.rest?' rest-day':day.free?' free-day':'')+(day.grid?' full':'');
+      h+=`<div class="${cls}"><div class="dch"><span class="dcn">${day.date}${day.today?' <span class="tbadge">오늘</span>':''}</span><span class="dct">${day.total||''}</span></div>`;
+      if(day.exam)h+=`<div class="pbadge exam">🎯 ${day.exam}</div>`;
+      if(day.alert)h+=`<div class="pbadge alert">⚠ ${day.alert}</div>`;
+      if(day.note&&!day.rest)h+=`<div class="pbadge note">${day.note}</div>`;
+      if(day.rest)h+=`<div class="pbadge rest">${day.note}</div>`;
+      if(day.blocks&&day.blocks.length){
+        h+=`<div class="${day.grid?'blocks-grid':'blocks'}">`;
+        day.blocks.forEach(b=>{h+=`<div class="blk"><div class="blkbar" style="background:${b.c}"></div><div><div class="blkslot">${b.s}</div><div class="blkdesc">${b.d}</div><div class="blkhrs">${b.h}</div></div></div>`;});
+        h+='</div>';
+      }
+      h+='</div>';
+    });
+    h+='</div>';
+  });
+  h+=`<div class="plan-summary"><h3>전략 메모</h3>
+    <div class="sum-row">
+      <div class="sum-item"><div class="sum-dot" style="background:#3b82f6"></div><span class="sum-subj">기초회로</span><span class="sum-h">약 24h</span></div>
+      <div class="sum-item"><div class="sum-dot" style="background:#f59e0b"></div><span class="sum-subj">공학수학2</span><span class="sum-h">약 13h</span></div>
+      <div class="sum-item"><div class="sum-dot" style="background:#06b6d4"></div><span class="sum-subj">방법론</span><span class="sum-h">약 2h</span></div>
+    </div>
+    <ul class="strat">
+      <li><strong>기초회로 우선:</strong> 시험이 6/13으로 6/15보다 이틀 빠름</li>
+      <li><strong>6/12 종강일이 황금 시간:</strong> 기초회로 마무리 + 공학수학 진입 동시에</li>
+      <li><strong>6/14 공부 시간 매우 한정:</strong> 정현우 17시 + 박재표 20:30 → 실질 2.5h 이하</li>
+      <li><strong>방법론은 가볍게:</strong> 바운스볼 프로젝트로 실력 확보, 이론 범위 빠르게 훑기</li>
+      <li><strong>소감문:</strong> 6/9, 6/16 세미나 후 30분 이내 작성</li>
+    </ul>
+  </div>`;
+  el.innerHTML=h;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────
+loadData().then(()=>{buildCal();selDay(TODAY);});
+</script>
+</body>
+</html>

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6월 일정 — 동영</title>
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #1a1a1f;
+    --surface2: #22222a;
+    --border: #2e2e38;
+    --text: #e8e8ed;
+    --text2: #8e8e9a;
+    --text3: #5a5a66;
+    --accent: #6366f1;
+    --c-class:    #3b82f6;
+    --c-lab:      #06b6d4;
+    --c-seminar:  #8b5cf6;
+    --c-exam:     #ef4444;
+    --c-tutor:    #f97316;
+    --c-workshop: #22c55e;
+    --c-travel:   #38bdf8;
+    --c-deadline: #a855f7;
+    --c-project:  #f59e0b;
+    --today-ring: #6366f1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── Header ── */
+  header { display: flex; align-items: center; justify-content: space-between; padding: 18px 28px 14px; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  .tabs { display: flex; gap: 4px; background: var(--surface2); border-radius: 10px; padding: 3px; }
+  .tab { padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text2); transition: all .15s; border: none; background: transparent; }
+  .tab.active { background: var(--accent); color: white; }
+
+  /* ── Layout ── */
+  .layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── Calendar ── */
+  .cal-wrap { flex: 1; padding: 20px 20px 20px 24px; overflow-y: auto; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 5px; }
+  .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; padding: 4px 0 8px; letter-spacing: .8px; }
+  .cal-dow.sun { color: #f87171; }
+  .cal-dow.sat { color: #60a5fa; }
+
+  .day-cell {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-height: 110px;
+    padding: 8px 7px 6px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    position: relative;
+  }
+  .day-cell:hover { border-color: #444455; background: #1e1e26; }
+  .day-cell.today { border-color: var(--today-ring); box-shadow: 0 0 0 1px var(--today-ring); }
+  .day-cell.selected { border-color: var(--accent); background: #1d1d2e; }
+  .day-cell.dim { opacity: .3; pointer-events: none; }
+  .day-cell.exam-bg { background: #1f1515; }
+  .day-cell.workshop-bg { background: #121f14; }
+  .day-cell.travel-bg { background: #111a22; }
+
+  .date-num { font-size: 13px; font-weight: 700; margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
+  .date-num.sun { color: #f87171; }
+  .date-num.sat { color: #60a5fa; }
+  .today-badge { font-size: 9px; background: var(--today-ring); color: white; border-radius: 4px; padding: 1px 5px; font-weight: 700; }
+
+  .ev-chip {
+    border-radius: 4px;
+    padding: 2px 5px;
+    margin: 2px 0;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .more-badge { font-size: 10px; color: var(--text3); margin-top: 2px; padding-left: 2px; }
+
+  /* ── Side Panel ── */
+  .side-panel {
+    width: 320px;
+    min-width: 320px;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-header { padding: 18px 20px 12px; border-bottom: 1px solid var(--border); }
+  .panel-date { font-size: 18px; font-weight: 700; }
+  .panel-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .panel-body { flex: 1; overflow-y: auto; padding: 14px 20px; }
+  .panel-empty { color: var(--text3); font-size: 13px; text-align: center; margin-top: 40px; }
+
+  .ev-card {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 11px 13px;
+    margin-bottom: 8px;
+    border-left: 3px solid transparent;
+  }
+  .ev-card-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .ev-card-meta { font-size: 11px; color: var(--text2); line-height: 1.6; }
+  .ev-card-meta span { display: block; }
+  .ev-card-meta .loc::before { content: '📍 '; }
+  .ev-card-meta .time::before { content: '🕐 '; }
+  .ev-card-meta .note { color: #f59e0b; font-weight: 600; }
+  .ev-card-meta .note::before { content: '⚠️ '; }
+
+  .ev-type-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; opacity: .8; }
+
+  /* ── Alerts Panel ── */
+  .alerts-section { border-top: 1px solid var(--border); padding: 14px 20px; }
+  .alerts-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); margin-bottom: 10px; }
+  .alert-item { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 9px; }
+  .alert-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .alert-text { font-size: 11px; line-height: 1.5; color: var(--text2); }
+  .alert-text strong { color: var(--text); font-weight: 700; }
+
+  /* ── Legend ── */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 24px 14px; border-top: 1px solid var(--border); }
+  .leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+  .leg-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+  /* ── List view ── */
+  .list-view { display: none; flex-direction: column; gap: 4px; padding: 20px 24px; overflow-y: auto; flex: 1; }
+  .list-view.active { display: flex; }
+  .cal-wrap.list-mode { display: none; }
+  .list-day-group { margin-bottom: 8px; }
+  .list-day-header { font-size: 12px; font-weight: 700; color: var(--text2); padding: 8px 0 5px; border-bottom: 1px solid var(--border); margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+  .list-day-header .dnum { font-size: 20px; font-weight: 800; color: var(--text); min-width: 30px; }
+  .list-day-header.today-row .dnum { color: var(--accent); }
+  .list-ev { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; background: var(--surface); margin-bottom: 3px; }
+  .list-ev-bar { width: 3px; height: 34px; border-radius: 2px; flex-shrink: 0; }
+  .list-ev-title { font-size: 12px; font-weight: 700; }
+  .list-ev-meta { font-size: 11px; color: var(--text2); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>2026년 <span>6월</span> — 동영</h1>
+  <div class="tabs">
+    <button class="tab active" onclick="switchView('month')">월간</button>
+    <button class="tab" onclick="switchView('list')">목록</button>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="cal-wrap" id="calWrap">
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <div class="list-view" id="listView"></div>
+
+  <div class="side-panel">
+    <div class="panel-header">
+      <div class="panel-date" id="panelDate">날짜를 선택하세요</div>
+      <div class="panel-sub" id="panelSub">클릭하면 상세 일정을 볼 수 있어요</div>
+    </div>
+    <div class="panel-body" id="panelBody">
+      <div class="panel-empty">📅</div>
+    </div>
+    <div class="alerts-section">
+      <div class="alerts-title">⚠️ 주의 사항</div>
+      <div class="alert-item"><div class="alert-dot" style="background:#a855f7"></div><div class="alert-text"><strong>6/8 9:30</strong> 공학수학2 동영상 강의 마감</div></div>
+      <div class="alert-item"><div class="alert-dot" style="background:#8b5cf6"></div><div class="alert-text"><strong>6/9, 6/16</strong> 전기세미나 소감문 — 절대 빠짐 없이</div></div>
+      <div class="alert-item"><div class="alert-dot" style="background:#ef4444"></div><div class="alert-text"><strong>6/13</strong> 기초회로 기말고사 시간 미정 확인 필요</div></div>
+      <div class="alert-item"><div class="alert-dot" style="background:#ef4444"></div><div class="alert-text"><strong>6/15</strong> 기말 2연속 (공학수학 9시 / 방법론 11시)</div></div>
+      <div class="alert-item"><div class="alert-dot" style="background:#f59e0b"></div><div class="alert-text"><strong>6/17~18</strong> 기초회로 프로젝트 시간 미정</div></div>
+      <div class="alert-item"><div class="alert-dot" style="background:#3b82f6"></div><div class="alert-text">스페인어 독서록 공지 수시 확인</div></div>
+      <div class="alert-item"><div class="alert-dot" style="background:#22c55e"></div><div class="alert-text"><strong>6/20</strong> 워크숍 후 과외 3연속 — 체력 관리</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="leg"><div class="leg-dot" style="background:var(--c-class)"></div>수업</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c-lab)"></div>랩/실험</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c-seminar)"></div>세미나</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c-exam)"></div>시험</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c-tutor)"></div>과외</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c-workshop)"></div>워크숍</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c-travel)"></div>여행</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c-deadline)"></div>마감</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c-project)"></div>프로젝트</div>
+</div>
+
+<script>
+const TODAY = '2026-06-04';
+
+const TYPE_COLOR = {
+  class:    'var(--c-class)',
+  lab:      'var(--c-lab)',
+  seminar:  'var(--c-seminar)',
+  exam:     'var(--c-exam)',
+  tutor:    'var(--c-tutor)',
+  workshop: 'var(--c-workshop)',
+  travel:   'var(--c-travel)',
+  deadline: 'var(--c-deadline)',
+  project:  'var(--c-project)',
+};
+
+const TYPE_LABEL = {
+  class: '수업', lab: '랩/실험', seminar: '세미나', exam: '시험',
+  tutor: '과외', workshop: '워크숍', travel: '여행/훈련', deadline: '마감', project: '프로젝트',
+};
+
+const EVENTS = [
+  // ── 수업 ──────────────────────────────────────────
+  { date:'2026-06-04', type:'class',    title:'기초회로이론 및 실험', time:'14:00–15:15' },
+  { date:'2026-06-05', type:'lab',      title:'프로그래밍 방법론 LAB (마지막)', time:'11:00–12:50', note:'오늘이 마지막 랩 수업' },
+  { date:'2026-06-08', type:'class',    title:'공학수학2', time:'9:30–10:45' },
+  { date:'2026-06-08', type:'class',    title:'프로그래밍 방법론 (이론)', time:'11:00–12:50' },
+  { date:'2026-06-08', type:'class',    title:'스페인어권 명작의 이해', time:'14:00–15:15' },
+  { date:'2026-06-09', type:'class',    title:'기초회로이론 및 실험', time:'14:00–15:15' },
+  { date:'2026-06-09', type:'seminar',  title:'전기정보세미나', time:'17:30–18:20', note:'소감문 제출 필수' },
+  { date:'2026-06-10', type:'class',    title:'공학수학2', time:'9:30–10:45' },
+  { date:'2026-06-10', type:'class',    title:'스페인어권 명작의 이해', time:'14:00–15:15' },
+  { date:'2026-06-11', type:'class',    title:'기초회로이론 및 실험', time:'14:00–15:15' },
+  { date:'2026-06-12', type:'class',    title:'수업 종강일 (전 과목)', time:'' },
+  { date:'2026-06-16', type:'seminar',  title:'전기정보세미나 종강', time:'17:30–18:20', note:'소감문 제출 필수 (마지막)' },
+
+  // ── 마감 ──────────────────────────────────────────
+  { date:'2026-06-08', type:'deadline', title:'공학수학2 동영상 강의 마감', time:'9:30까지', note:'수업 시작 전 완료 필요' },
+
+  // ── 시험 ──────────────────────────────────────────
+  { date:'2026-06-13', type:'exam',     title:'기초회로이론 및 실험 기말고사', time:'시간 미정', note:'시간 공지 확인 필요' },
+  { date:'2026-06-15', type:'exam',     title:'공학수학2 기말고사', time:'9:00–10:45' },
+  { date:'2026-06-15', type:'exam',     title:'프로그래밍 방법론 기말고사', time:'11:00–13:00' },
+
+  // ── 프로젝트 ──────────────────────────────────────
+  { date:'2026-06-17', type:'project',  title:'기초회로이론 프로젝트', time:'오전~이른 오후 (미정)', note:'정확한 시간 공지 확인' },
+  { date:'2026-06-18', type:'project',  title:'기초회로이론 프로젝트', time:'오전~이른 오후 (미정)', note:'정확한 시간 공지 확인' },
+
+  // ── 워크숍 6/19 ───────────────────────────────────
+  { date:'2026-06-19', type:'workshop', title:'[워크숍] 집결', time:'9:30', loc:'서울 시내' },
+  { date:'2026-06-19', type:'workshop', title:'[워크숍] Soundscape Workshop', time:'10:00–12:00', loc:'서울 시내' },
+  { date:'2026-06-19', type:'workshop', title:'[워크숍] 서울대로 이동', time:'12:00–13:00', loc:'대절 버스' },
+  { date:'2026-06-19', type:'workshop', title:'[워크숍] Soundscape Workshop', time:'13:00–15:00', loc:'301동 104호' },
+  { date:'2026-06-19', type:'workshop', title:'[워크숍] Artbora Movement WS', time:'15:30–18:00', loc:'관악캠퍼스 해동 로비' },
+  { date:'2026-06-19', type:'workshop', title:'[워크숍] 시흥캠퍼스 이동', time:'18:15–19:30', loc:'대절 버스' },
+  { date:'2026-06-19', type:'workshop', title:'[워크숍] 저녁 만찬', time:'19:30~', loc:'고기원칙' },
+  { date:'2026-06-19', type:'workshop', title:'[워크숍] 간담회 · 방배정', time:'21:30~' },
+
+  // ── 워크숍 6/20 ───────────────────────────────────
+  { date:'2026-06-20', type:'workshop', title:'[워크숍] 아침 식사', time:'8:00–9:00', loc:'시흥캠퍼스 연수원 조식 뷔페' },
+  { date:'2026-06-20', type:'workshop', title:'[워크숍] Jay Rhee Lecture', time:'9:00–11:00', loc:'시흥캠퍼스 계단식 강의실' },
+  { date:'2026-06-20', type:'workshop', title:'[워크숍] 시흥캠퍼스 FESTA', time:'11:00–12:00', loc:'시흥캠퍼스' },
+  { date:'2026-06-20', type:'workshop', title:'[워크숍] 샌드위치 배부 · 버스 출발', time:'12:15', loc:'→ 서울대' },
+
+  // ── WSC ───────────────────────────────────────────
+  { date:'2026-06-24', type:'travel',   title:'WSC 전지훈련 Day 1', time:'', loc:'제주도', note:'김태율 과외 없음' },
+  { date:'2026-06-25', type:'travel',   title:'WSC 전지훈련 Day 2', time:'', loc:'제주도' },
+  { date:'2026-06-26', type:'travel',   title:'WSC 전지훈련 Day 3', time:'', loc:'제주도' },
+
+  // ── 과외 ──────────────────────────────────────────
+  // 신수민
+  { date:'2026-06-07', type:'tutor', title:'과외 · 신수민 (경기과고 1)', time:'9:30–12:30', loc:'스카이캐슬 스터디카페 3호점', note:'물리' },
+  { date:'2026-06-14', type:'tutor', title:'과외 · 신수민 (경기과고 1)', time:'9:30–12:30', loc:'스카이캐슬 스터디카페 3호점', note:'물리' },
+  // 이태현
+  { date:'2026-06-07', type:'tutor', title:'과외 · 이태현 (경기과고 1)', time:'13:30–15:30', loc:'라곰스터디카페', note:'물리' },
+  { date:'2026-06-14', type:'tutor', title:'과외 · 이태현 (경기과고 1)', time:'13:30–15:30', loc:'라곰스터디카페', note:'물리' },
+  { date:'2026-06-21', type:'tutor', title:'과외 · 이태현 (경기과고 1)', time:'13:30–15:30', loc:'라곰스터디카페', note:'물리' },
+  { date:'2026-06-28', type:'tutor', title:'과외 · 이태현 (경기과고 1)', time:'13:30–15:30', loc:'라곰스터디카페', note:'물리' },
+  // 박재표
+  { date:'2026-06-07', type:'tutor', title:'과외 · 박재표 (광주과고 2)', time:'20:30–23:30', loc:'강남역 옐로스톤 스터디룸', note:'물리' },
+  { date:'2026-06-14', type:'tutor', title:'과외 · 박재표 (광주과고 2)', time:'20:30–23:30', loc:'강남역 옐로스톤 스터디룸', note:'물리' },
+  { date:'2026-06-21', type:'tutor', title:'과외 · 박재표 (광주과고 2)', time:'20:30–23:30', loc:'강남역 옐로스톤 스터디룸', note:'물리' },
+  { date:'2026-06-28', type:'tutor', title:'과외 · 박재표 (광주과고 2)', time:'20:30–23:30', loc:'강남역 옐로스톤 스터디룸', note:'물리' },
+  // 정예원
+  { date:'2026-06-06', type:'tutor', title:'과외 · 정예원 (경기과고 2)', time:'9:30–12:00',  loc:'대치미도아파트', note:'물리' },
+  { date:'2026-06-12', type:'tutor', title:'과외 · 정예원 (경기과고 2)', time:'19:00–21:30', loc:'대치미도아파트', note:'물리' },
+  { date:'2026-06-21', type:'tutor', title:'과외 · 정예원 (경기과고 2)', time:'9:30–12:00',  loc:'대치미도아파트', note:'물리' },
+  { date:'2026-06-27', type:'tutor', title:'과외 · 정예원 (경기과고 2)', time:'9:30–12:00',  loc:'대치미도아파트', note:'물리' },
+  // 김태율
+  { date:'2026-06-08', type:'tutor', title:'과외 · 김태율 (휘문중 1)', time:'21:00–23:30' },
+  { date:'2026-06-10', type:'tutor', title:'과외 · 김태율 (휘문중 1)', time:'21:00–23:30' },
+  { date:'2026-06-15', type:'tutor', title:'과외 · 김태율 (휘문중 1)', time:'21:00–23:30' },
+  { date:'2026-06-17', type:'tutor', title:'과외 · 김태율 (휘문중 1)', time:'21:00–23:30' },
+  { date:'2026-06-22', type:'tutor', title:'과외 · 김태율 (휘문중 1)', time:'21:00–23:30' },
+  { date:'2026-06-29', type:'tutor', title:'과외 · 김태율 (휘문중 1)', time:'21:00–23:30' },
+  // 이하린
+  { date:'2026-06-06', type:'tutor', title:'과외 · 이하린', time:'13:30–16:30', loc:'송내역 숨스터디카페' },
+  { date:'2026-06-20', type:'tutor', title:'과외 · 이하린', time:'13:00–16:00', loc:'신도림 스터디카페' },
+  // 김수현
+  { date:'2026-06-06', type:'tutor', title:'과외 · 김수현 (숙명여중 2)', time:'18:00–20:00', loc:'한티역' },
+  { date:'2026-06-13', type:'tutor', title:'과외 · 김수현 (숙명여중 2)', time:'18:00–20:00', loc:'한티역' },
+  { date:'2026-06-20', type:'tutor', title:'과외 · 김수현 (숙명여중 2)', time:'18:00–20:00', loc:'한티역' },
+  { date:'2026-06-27', type:'tutor', title:'과외 · 김수현 (숙명여중 2)', time:'18:00–20:00', loc:'한티역' },
+  // 연제이
+  { date:'2026-06-06', type:'tutor', title:'과외 · 연제이 (중1)', time:'22:00–24:00', loc:'헬리오시티' },
+  { date:'2026-06-13', type:'tutor', title:'과외 · 연제이 (중1)', time:'22:00–24:00', loc:'헬리오시티' },
+  { date:'2026-06-20', type:'tutor', title:'과외 · 연제이 (중1)', time:'22:00–24:00', loc:'헬리오시티' },
+  { date:'2026-06-27', type:'tutor', title:'과외 · 연제이 (중1)', time:'22:00–24:00', loc:'헬리오시티' },
+];
+
+// Group events by date
+const eventMap = {};
+EVENTS.forEach(e => {
+  if (!eventMap[e.date]) eventMap[e.date] = [];
+  eventMap[e.date].push(e);
+});
+
+// Sort events within each day by type priority
+const TYPE_ORDER = ['deadline','exam','project','class','lab','seminar','workshop','travel','tutor'];
+Object.keys(eventMap).forEach(d => {
+  eventMap[d].sort((a,b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type));
+});
+
+const DOW_KO = ['일','월','화','수','목','금','토'];
+const MONTH_KO = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+function buildCalendar() {
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  // Day-of-week headers
+  ['일','월','화','수','목','금','토'].forEach((d,i) => {
+    const h = document.createElement('div');
+    h.className = 'cal-dow' + (i===0?' sun':i===6?' sat':'');
+    h.textContent = d;
+    grid.appendChild(h);
+  });
+
+  // First day of June 2026 is Monday (index 1)
+  const firstDow = 1; // Monday
+  // Pad start
+  for (let i=0; i<firstDow; i++) {
+    const blank = document.createElement('div');
+    blank.className = 'day-cell dim';
+    const prev = 31 - firstDow + 1 + i; // May days
+    blank.innerHTML = `<div class="date-num">${prev}</div>`;
+    grid.appendChild(blank);
+  }
+
+  for (let d=1; d<=30; d++) {
+    const dateStr = `2026-06-${String(d).padStart(2,'0')}`;
+    const dow = (firstDow + d - 1) % 7;
+    const evs = eventMap[dateStr] || [];
+
+    const cell = document.createElement('div');
+    cell.className = 'day-cell';
+    if (dateStr === TODAY) cell.classList.add('today');
+
+    const hasExam     = evs.some(e=>e.type==='exam');
+    const hasWorkshop = evs.some(e=>e.type==='workshop');
+    const hasTravel   = evs.some(e=>e.type==='travel');
+    if (hasExam)     cell.classList.add('exam-bg');
+    if (hasWorkshop) cell.classList.add('workshop-bg');
+    if (hasTravel)   cell.classList.add('travel-bg');
+
+    cell.dataset.date = dateStr;
+    cell.onclick = () => selectDay(dateStr);
+
+    const numDiv = document.createElement('div');
+    numDiv.className = 'date-num' + (dow===0?' sun':dow===6?' sat':'');
+    numDiv.innerHTML = d + (dateStr===TODAY ? ' <span class="today-badge">오늘</span>' : '');
+    cell.appendChild(numDiv);
+
+    const MAX_VISIBLE = 3;
+    evs.slice(0, MAX_VISIBLE).forEach(ev => {
+      const chip = document.createElement('div');
+      chip.className = 'ev-chip';
+      chip.style.background = TYPE_COLOR[ev.type];
+      chip.title = ev.title + (ev.time ? ' · ' + ev.time : '');
+      chip.textContent = ev.title.replace(/\[워크숍\] /,'');
+      cell.appendChild(chip);
+    });
+    if (evs.length > MAX_VISIBLE) {
+      const more = document.createElement('div');
+      more.className = 'more-badge';
+      more.textContent = `+${evs.length - MAX_VISIBLE}개 더`;
+      cell.appendChild(more);
+    }
+
+    grid.appendChild(cell);
+  }
+
+  // Pad end
+  const lastDow = (firstDow + 29) % 7; // 0-indexed dow of June 30
+  const needed = lastDow === 6 ? 0 : 6 - lastDow;
+  for (let i=1; i<=needed; i++) {
+    const blank = document.createElement('div');
+    blank.className = 'day-cell dim';
+    blank.innerHTML = `<div class="date-num">${i}</div>`;
+    grid.appendChild(blank);
+  }
+}
+
+function selectDay(dateStr) {
+  // Highlight
+  document.querySelectorAll('.day-cell').forEach(c => c.classList.remove('selected'));
+  const clicked = document.querySelector(`[data-date="${dateStr}"]`);
+  if (clicked) clicked.classList.add('selected');
+
+  const d = new Date(dateStr);
+  const dow = DOW_KO[d.getDay()];
+  document.getElementById('panelDate').textContent =
+    `${d.getMonth()+1}월 ${d.getDate()}일 (${dow})`;
+
+  const evs = eventMap[dateStr] || [];
+  const body = document.getElementById('panelBody');
+
+  if (!evs.length) {
+    const isWeekend = d.getDay()===0||d.getDay()===6;
+    body.innerHTML = `<div class="panel-empty">${isWeekend?'🌿 여유 있는 날이에요':'😮‍💨 일정 없음'}</div>`;
+    return;
+  }
+
+  // Count by type
+  const typeCounts = {};
+  evs.forEach(e=>{ typeCounts[e.type]=(typeCounts[e.type]||0)+1; });
+  const summary = Object.entries(typeCounts).map(([t,c])=>
+    `${TYPE_LABEL[t]} ${c}개`).join(' · ');
+  document.getElementById('panelSub').textContent = `총 ${evs.length}개 · ${summary}`;
+
+  let html = '';
+  let lastType = null;
+  evs.forEach(ev => {
+    if (ev.type !== lastType) {
+      if (lastType) html += '';
+      html += `<div class="ev-type-label" style="color:${TYPE_COLOR[ev.type]};margin-top:${lastType?'14px':'0'}">${TYPE_LABEL[ev.type]}</div>`;
+      lastType = ev.type;
+    }
+    const title = ev.title.replace(/\[워크숍\] /,'');
+    html += `<div class="ev-card" style="border-left-color:${TYPE_COLOR[ev.type]}">
+      <div class="ev-card-title">${title}</div>
+      <div class="ev-card-meta">
+        ${ev.time ? `<span class="time">${ev.time}</span>` : ''}
+        ${ev.loc  ? `<span class="loc">${ev.loc}</span>` : ''}
+        ${ev.note ? `<span class="note">${ev.note}</span>` : ''}
+      </div>
+    </div>`;
+  });
+  body.innerHTML = html;
+}
+
+function buildList() {
+  const lv = document.getElementById('listView');
+  lv.innerHTML = '';
+
+  const allDates = Object.keys(eventMap).sort();
+  const today = TODAY;
+
+  allDates.forEach(dateStr => {
+    const d = new Date(dateStr);
+    const dow = DOW_KO[d.getDay()];
+    const evs = eventMap[dateStr];
+    const isToday = dateStr === today;
+
+    const group = document.createElement('div');
+    group.className = 'list-day-group';
+
+    const header = document.createElement('div');
+    header.className = 'list-day-header' + (isToday ? ' today-row' : '');
+    header.innerHTML = `<span class="dnum">${d.getDate()}</span>${MONTH_KO[d.getMonth()]} ${dow}요일${isToday?' · 오늘':''}`;
+    group.appendChild(header);
+
+    evs.forEach(ev => {
+      const row = document.createElement('div');
+      row.className = 'list-ev';
+      const bar = document.createElement('div');
+      bar.className = 'list-ev-bar';
+      bar.style.background = TYPE_COLOR[ev.type];
+      const info = document.createElement('div');
+      const title = ev.title.replace(/\[워크숍\] /,'');
+      info.innerHTML = `<div class="list-ev-title">${title}</div>
+        <div class="list-ev-meta">${[ev.time, ev.loc].filter(Boolean).join(' · ') || TYPE_LABEL[ev.type]}</div>`;
+      row.appendChild(bar);
+      row.appendChild(info);
+      group.appendChild(row);
+    });
+
+    lv.appendChild(group);
+  });
+}
+
+function switchView(v) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  if (v === 'month') {
+    document.getElementById('calWrap').classList.remove('list-mode');
+    document.getElementById('listView').classList.remove('active');
+  } else {
+    document.getElementById('calWrap').classList.add('list-mode');
+    document.getElementById('listView').classList.add('active');
+  }
+}
+
+// Init
+buildCalendar();
+buildList();
+// Auto-select today
+selectDay(TODAY);
+</script>
+</body>
+</html>

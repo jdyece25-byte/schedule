@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시험 준비 플랜 — 동영</title>
+<style>
+  :root {
+    --bg: #0f0f11;
+    --sur: #17171c;
+    --sur2: #1e1e26;
+    --sur3: #252530;
+    --brd: #2a2a35;
+    --brd2: #383848;
+    --tx: #e8e8f0;
+    --tx2: #8888a0;
+    --tx3: #4a4a60;
+    --acc: #6366f1;
+    --c1: #3b82f6;   /* 기초회로 */
+    --c2: #f59e0b;   /* 공학수학 */
+    --c3: #06b6d4;   /* 방법론 */
+    --c4: #8b5cf6;   /* 세미나 */
+    --exam: #ef4444;
+    --warn: #f97316;
+    --ok: #22c55e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--tx); font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 14px; line-height: 1.6; min-height: 100vh; }
+
+  /* ── Layout ── */
+  .container { max-width: 960px; margin: 0 auto; padding: 40px 24px 60px; }
+
+  /* ── Header ── */
+  .page-header { margin-bottom: 32px; }
+  .page-header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
+  .page-header h1 em { color: var(--acc); font-style: normal; }
+  .page-header p { font-size: 13px; color: var(--tx2); }
+
+  /* ── Stats Bar ── */
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
+  .stat-card {
+    background: var(--sur);
+    border: 1px solid var(--brd);
+    border-radius: 12px;
+    padding: 14px 20px;
+    flex: 1;
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .stat-bar { width: 4px; height: 36px; border-radius: 2px; flex-shrink: 0; }
+  .stat-label { font-size: 11px; color: var(--tx2); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 2px; }
+  .stat-val { font-size: 22px; font-weight: 700; color: var(--tx); }
+  .stat-sub { font-size: 11px; color: var(--tx2); }
+
+  /* ── Section titles ── */
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--tx3);
+    margin: 32px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--brd); }
+
+  /* ── Conflict Cards ── */
+  .conflict-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-bottom: 8px; }
+  .conflict-card {
+    background: var(--sur);
+    border: 1px solid var(--brd);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border-left-width: 3px;
+  }
+  .conflict-card.red { border-left-color: var(--exam); }
+  .conflict-card.orange { border-left-color: var(--warn); }
+  .conflict-card.unknown { border-left-color: var(--tx3); }
+  .conflict-date { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .conflict-card.red .conflict-date { color: var(--exam); }
+  .conflict-card.orange .conflict-date { color: var(--warn); }
+  .conflict-card.unknown .conflict-date { color: var(--tx2); }
+  .conflict-route { font-size: 13px; font-weight: 600; color: var(--tx); margin-bottom: 4px; }
+  .conflict-detail { font-size: 12px; color: var(--tx2); line-height: 1.6; }
+  .conflict-detail .buf { font-weight: 700; }
+  .conflict-card.red .buf { color: var(--exam); }
+  .conflict-card.orange .buf { color: var(--warn); }
+
+  /* ── Phase Label ── */
+  .phase {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 28px 0 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--tx2);
+    text-transform: uppercase;
+    letter-spacing: .7px;
+  }
+  .phase::before { content: ''; width: 3px; height: 14px; border-radius: 2px; background: var(--acc); }
+  .phase::after { content: ''; flex: 1; height: 1px; background: var(--brd); }
+
+  /* ── Day Grid ── */
+  .day-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  /* ── Day Card ── */
+  .day-card {
+    background: var(--sur);
+    border: 1px solid var(--brd);
+    border-radius: 12px;
+    padding: 16px;
+    transition: border-color .15s;
+  }
+  .day-card:hover { border-color: var(--brd2); }
+  .day-card.exam-day { border-color: rgba(239,68,68,.3); background: #1a1010; }
+  .day-card.rest-day { opacity: .6; }
+  .day-card.free-day { border-color: rgba(99,102,241,.3); }
+
+  .day-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .day-name { font-size: 15px; font-weight: 700; color: var(--tx); }
+  .day-name .today-badge {
+    font-size: 10px; background: var(--acc); color: white;
+    border-radius: 4px; padding: 1px 6px; font-weight: 700; margin-left: 6px; vertical-align: middle;
+  }
+  .day-total { font-size: 12px; color: var(--tx2); }
+
+  /* exam / alert / note badges */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600;
+    border-radius: 6px; padding: 3px 9px; margin-bottom: 8px;
+    width: 100%;
+  }
+  .badge.exam { background: rgba(239,68,68,.12); color: #f87171; }
+  .badge.alert { background: rgba(245,158,11,.12); color: #fbbf24; }
+  .badge.note { background: rgba(99,102,241,.1); color: #a5b4fc; }
+  .badge.rest-note { background: rgba(255,255,255,.04); color: var(--tx2); font-style: italic; font-weight: 400; }
+
+  /* Study blocks */
+  .blocks { display: flex; flex-direction: column; gap: 8px; }
+  .block { display: flex; gap: 10px; align-items: flex-start; }
+  .block-bar { width: 3px; border-radius: 2px; flex-shrink: 0; margin-top: 3px; }
+  .block-body { flex: 1; }
+  .block-slot { font-size: 11px; color: var(--tx2); margin-bottom: 1px; }
+  .block-desc { font-size: 13px; font-weight: 600; color: var(--tx); line-height: 1.4; }
+  .block-hrs { font-size: 11px; color: var(--tx2); margin-top: 1px; }
+
+  /* subject pill */
+  .subj {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    border-radius: 4px; padding: 1px 6px;
+    margin-right: 4px; vertical-align: middle;
+  }
+
+  /* ── Summary ── */
+  .summary {
+    background: var(--sur);
+    border: 1px solid var(--brd);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-top: 32px;
+  }
+  .summary h3 { font-size: 13px; font-weight: 700; color: var(--tx2); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 14px; }
+  .summary-row { display: flex; gap: 24px; flex-wrap: wrap; }
+  .summary-item { display: flex; align-items: center; gap: 8px; }
+  .summary-dot { width: 10px; height: 10px; border-radius: 3px; }
+  .summary-subj { font-size: 13px; font-weight: 700; color: var(--tx); }
+  .summary-hrs { font-size: 13px; color: var(--tx2); }
+  .strategy-list { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--brd); }
+  .strategy-list li { font-size: 13px; color: var(--tx2); margin-bottom: 5px; list-style: none; padding-left: 16px; position: relative; }
+  .strategy-list li::before { content: '—'; position: absolute; left: 0; color: var(--tx3); }
+  .strategy-list li strong { color: var(--tx); }
+
+  /* ── Footer ── */
+  footer { text-align: center; margin-top: 48px; font-size: 12px; color: var(--tx3); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <h1>시험 준비 플랜 <em>6/4 – 6/15</em></h1>
+    <p>기초회로이론 기말 (6/13) · 공학수학2 기말 (6/15) · 프로그래밍 방법론 기말 (6/15)</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-bar" style="background:var(--c1)"></div>
+      <div>
+        <div class="stat-label">기초회로이론</div>
+        <div class="stat-val">약 24h</div>
+        <div class="stat-sub">D-9 부터 집중</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-bar" style="background:var(--c2)"></div>
+      <div>
+        <div class="stat-label">공학수학2</div>
+        <div class="stat-val">약 15h</div>
+        <div class="stat-sub">D-5 부터 병행</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-bar" style="background:var(--c3)"></div>
+      <div>
+        <div class="stat-label">방법론</div>
+        <div class="stat-val">약 2h</div>
+        <div class="stat-sub">프로젝트 병행 중</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-bar" style="background:var(--acc)"></div>
+      <div>
+        <div class="stat-label">총 공부 시간</div>
+        <div class="stat-val">약 41h</div>
+        <div class="stat-sub">12일간</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conflict Alerts -->
+  <div class="section-title">일정 충돌 · 주의 구간</div>
+  <div class="conflict-grid">
+    <div class="conflict-card red">
+      <div class="conflict-date">6/6 (토) · 이동 0분 여유</div>
+      <div class="conflict-route">정예원(대치미도) → 이하린(송내역)</div>
+      <div class="conflict-detail">
+        과외 12:00 종료 → 이동 90분 → 도착 13:30<br>
+        여유: <span class="buf">0분 — 12시 정각에 출발 필수</span>
+      </div>
+    </div>
+    <div class="conflict-card orange">
+      <div class="conflict-date">6/6 (토) · 이동 10분 여유</div>
+      <div class="conflict-route">이하린(송내역) → 김수현(한티역)</div>
+      <div class="conflict-detail">
+        과외 16:30 종료 → 이동 80분 → 도착 17:50<br>
+        여유: <span class="buf">10분 — 매우 빡빡</span>
+      </div>
+    </div>
+    <div class="conflict-card unknown">
+      <div class="conflict-date">6/13 (토) · 이동시간 미확인</div>
+      <div class="conflict-route">기초회로 기말(서울대) → 김수현(한티역)</div>
+      <div class="conflict-detail">
+        기말 16:00 종료, 김수현 18:00 시작<br>
+        서울대→한티역 이동시간 DB 없음 → 확인 필요
+      </div>
+    </div>
+    <div class="conflict-card unknown">
+      <div class="conflict-date">6/20 (토) · 이동시간 미확인</div>
+      <div class="conflict-route">워크숍 버스(시흥) → 이하린(신도림)</div>
+      <div class="conflict-detail">
+        버스 12:15 출발, 이하린 13:00 시작<br>
+        시흥→신도림 이동시간 DB 없음 → 확인 필요
+      </div>
+    </div>
+  </div>
+
+  <!-- Study Plan -->
+  <div class="section-title">일별 공부 플랜</div>
+
+  <!-- Phase 1 -->
+  <div class="phase">Phase 1 — 기초회로 집중 (D-9 ~ D-4)</div>
+  <div class="day-grid">
+
+    <!-- 6/4 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div class="day-name">6/4 목 <span class="today-badge">오늘</span></div>
+        <div class="day-total">약 4.5h</div>
+      </div>
+      <div class="blocks">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">오전 (자유 시간)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>전범위 훑기 · 기출 확인</div>
+            <div class="block-hrs">2.5h</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">저녁 (15:15 이후)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>취약 파트 집중 정리</div>
+            <div class="block-hrs">2h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6/5 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div class="day-name">6/5 금</div>
+        <div class="day-total">약 4h</div>
+      </div>
+      <div class="blocks">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">오전 (~11시, 랩 수업 전)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>계속 정리</div>
+            <div class="block-hrs">1.5h</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">오후 (13:00 이후)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>문제 풀기</div>
+            <div class="block-hrs">2.5h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6/6 -->
+    <div class="day-card rest-day">
+      <div class="day-header">
+        <div class="day-name">6/6 토</div>
+      </div>
+      <span class="badge rest-note">과외 4연속 + 이동 빡빡 — 공부 없이 체력 관리</span>
+    </div>
+
+    <!-- 6/7 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div class="day-name">6/7 일</div>
+        <div class="day-total">약 4.5h</div>
+      </div>
+      <span class="badge alert">⚠ 공학수학 동영상 강의 오늘 중 시청! (내일 9:30 마감)</span>
+      <div class="blocks">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c2);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">이른 오전 (~9:30)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(245,158,11,.2);color:#fbbf24">공학수학</span>동영상 강의 시청</div>
+            <div class="block-hrs">1.5h</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">오후 (15:30–20:30)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>집중 복습</div>
+            <div class="block-hrs">3h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6/8 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div class="day-name">6/8 월</div>
+        <div class="day-total">약 3h</div>
+      </div>
+      <span class="badge alert">마감: 공학수학 동영상 강의 9:30까지</span>
+      <div class="blocks">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">저녁 (15:15–21:00)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>문제 풀기 집중</div>
+            <div class="block-hrs">3h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6/9 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div class="day-name">6/9 화</div>
+        <div class="day-total">약 4h</div>
+      </div>
+      <div class="blocks">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">오전 (~14:00)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>중요 파트 집중</div>
+            <div class="block-hrs">3.5h</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c4);height:36px"></div>
+          <div class="block-body">
+            <div class="block-slot">세미나 직후</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(139,92,246,.2);color:#c4b5fd">세미나</span>소감문 작성</div>
+            <div class="block-hrs">30분</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Phase 2 -->
+  <div class="phase">Phase 2 — 기초회로 마무리 + 공학수학 병행 (D-3 ~ D-1)</div>
+  <div class="day-grid">
+
+    <!-- 6/10 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div class="day-name">6/10 수</div>
+        <div class="day-total">약 4.5h</div>
+      </div>
+      <div class="blocks">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">오전 (수업 전후 틈새)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>취약점 마무리</div>
+            <div class="block-hrs">2h</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c2);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">저녁 (15:15–21:00)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(245,158,11,.2);color:#fbbf24">공학수학</span>핵심 파트 시작</div>
+            <div class="block-hrs">2.5h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6/11 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div class="day-name">6/11 목</div>
+        <div class="day-total">약 5h</div>
+      </div>
+      <div class="blocks">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">오전 (~14:00)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>최종 정리 · 요약노트 완성</div>
+            <div class="block-hrs">3h</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c2);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">저녁 (15:15 이후)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(245,158,11,.2);color:#fbbf24">공학수학</span>문제 풀기</div>
+            <div class="block-hrs">2h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6/12 -->
+    <div class="day-card free-day" style="grid-column: span 2;">
+      <div class="day-header">
+        <div class="day-name">6/12 금 — 종강일 🎉</div>
+        <div class="day-total">약 6h · 최대 활용</div>
+      </div>
+      <span class="badge note">수업 없는 마지막 여유일 — 오전부터 저녁 과외(19:00) 전까지 집중</span>
+      <div class="blocks" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:52px"></div>
+          <div class="block-body">
+            <div class="block-slot">오전</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>파이널 마무리 · 요약노트</div>
+            <div class="block-hrs">3h</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c2);height:52px"></div>
+          <div class="block-body">
+            <div class="block-slot">오후 (~19:00)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(245,158,11,.2);color:#fbbf24">공학수학</span>집중 복습</div>
+            <div class="block-hrs">3h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Phase 3 -->
+  <div class="phase">Phase 3 — 시험 주간 (기초회로 D-0 · 공학수학·방법론 D-2~0)</div>
+  <div class="day-grid">
+
+    <!-- 6/13 -->
+    <div class="day-card exam-day">
+      <div class="day-header">
+        <div class="day-name">6/13 토</div>
+        <div class="day-total">약 1.5h</div>
+      </div>
+      <span class="badge exam">🎯 기초회로이론 기말고사 13:00–16:00</span>
+      <div class="blocks">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c1);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">오전 (~12:00)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(59,130,246,.2);color:#60a5fa">기초회로</span>마지막 점검 · 요약 확인</div>
+            <div class="block-hrs">1.5h</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--tx2)">저녁: 과외 2연속 (공부 시간 없음)</div>
+    </div>
+
+    <!-- 6/14 -->
+    <div class="day-card">
+      <div class="day-header">
+        <div class="day-name">6/14 일</div>
+        <div class="day-total">약 5h</div>
+      </div>
+      <div class="blocks">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c2);height:36px"></div>
+          <div class="block-body">
+            <div class="block-slot">이른 오전 (~9:30)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(245,158,11,.2);color:#fbbf24">공학수학</span>정리</div>
+            <div class="block-hrs">1h</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c2);height:44px"></div>
+          <div class="block-body">
+            <div class="block-slot">오후 (15:30–20:30)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(245,158,11,.2);color:#fbbf24">공학수학</span>집중 + 방법론 시작</div>
+            <div class="block-hrs">3h</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c3);height:36px"></div>
+          <div class="block-body">
+            <div class="block-slot">오후 후반</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(6,182,212,.2);color:#67e8f9">방법론</span>핵심 내용 파악</div>
+            <div class="block-hrs">1h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6/15 -->
+    <div class="day-card exam-day" style="grid-column: span 2;">
+      <div class="day-header">
+        <div class="day-name">6/15 월 — 기말 2연속</div>
+      </div>
+      <span class="badge exam">🎯 공학수학2 기말고사 9:00–10:45</span>
+      <span class="badge exam">🎯 프로그래밍 방법론 기말고사 11:00–13:00</span>
+      <div class="blocks" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">
+        <div class="block">
+          <div class="block-bar" style="background:var(--c2);height:40px"></div>
+          <div class="block-body">
+            <div class="block-slot">기상 직후</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(245,158,11,.2);color:#fbbf24">공학수학</span>요약노트 최종 확인</div>
+            <div class="block-hrs">30분</div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-bar" style="background:var(--c3);height:40px"></div>
+          <div class="block-body">
+            <div class="block-slot">10:45–11:00 (시험 사이)</div>
+            <div class="block-desc"><span class="subj" style="background:rgba(6,182,212,.2);color:#67e8f9">방법론</span>마지막 체크</div>
+            <div class="block-hrs">15분</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Summary & Strategy -->
+  <div class="summary">
+    <h3>전략 메모</h3>
+    <div class="summary-row">
+      <div class="summary-item">
+        <div class="summary-dot" style="background:var(--c1)"></div>
+        <span class="summary-subj">기초회로이론</span>
+        <span class="summary-hrs">약 24h</span>
+      </div>
+      <div class="summary-item">
+        <div class="summary-dot" style="background:var(--c2)"></div>
+        <span class="summary-subj">공학수학2</span>
+        <span class="summary-hrs">약 15h</span>
+      </div>
+      <div class="summary-item">
+        <div class="summary-dot" style="background:var(--c3)"></div>
+        <span class="summary-subj">방법론</span>
+        <span class="summary-hrs">약 2h</span>
+      </div>
+      <div class="summary-item" style="margin-left:auto">
+        <span style="font-size:13px;color:var(--tx2)">합계</span>
+        <span class="summary-subj">약 41h</span>
+      </div>
+    </div>
+    <div class="strategy-list">
+      <ul>
+        <li><strong>기초회로 우선:</strong> 시험이 6/15보다 이틀 빠르고 난이도가 높음 — Phase 1 전체를 여기에 집중</li>
+        <li><strong>6/12 종강일이 황금 시간:</strong> 수업 없는 유일한 평일 — 기초회로 마무리 + 공학수학 진입 동시에</li>
+        <li><strong>6/13 저녁은 포기:</strong> 기말 직후 과외 2연속 — 무리하지 말고 컨디션 관리</li>
+        <li><strong>방법론은 가볍게:</strong> 바운스볼 프로젝트로 이미 실력 확보 — 이론 범위 빠르게 훑는 것으로 충분</li>
+        <li><strong>전기세미나 소감문:</strong> 6/9, 6/16 수업 후 30분 이내 작성 — 절대 빠뜨리지 않기</li>
+        <li><strong>스페인어 독서록:</strong> 공지 뜨는 즉시 확인 후 일정에 추가</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>마지막 업데이트: 2026-06-04 · jdyece25@snu.ac.kr</footer>
+
+</div>
+</body>
+</html>
