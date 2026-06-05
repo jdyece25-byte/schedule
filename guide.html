@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>동영 스케줄 앱 — 사용설명서</title>
+<style>
+:root{
+  --bg:#0d0d10;--s1:#141418;--s2:#1b1b22;--s3:#22222c;
+  --bd:#2c2c38;--tx:#e8e8f0;--tx2:#8888a0;--tx3:#44445a;
+  --acc:#6366f1;--green:#22c55e;--orange:#f97316;--red:#ef4444;--yellow:#f59e0b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;font-size:14px;line-height:1.7}
+.wrap{max-width:720px;margin:0 auto;padding:40px 24px 80px}
+h1{font-size:26px;font-weight:800;margin-bottom:6px}
+h1 em{color:var(--acc);font-style:normal}
+.subtitle{color:var(--tx2);font-size:14px;margin-bottom:40px}
+h2{font-size:16px;font-weight:700;margin:36px 0 14px;display:flex;align-items:center;gap:10px}
+h2::after{content:'';flex:1;height:1px;background:var(--bd)}
+h3{font-size:13px;font-weight:700;color:var(--acc);margin:18px 0 8px}
+p{color:var(--tx2);margin-bottom:10px;font-size:13px}
+.card{background:var(--s2);border:1px solid var(--bd);border-radius:12px;padding:18px 20px;margin-bottom:12px}
+.card-title{font-size:14px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.card-body{font-size:13px;color:var(--tx2);line-height:1.8}
+.tag{display:inline-block;font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px;margin-right:4px;vertical-align:middle}
+.tag.blue{background:rgba(59,130,246,.15);color:#60a5fa}
+.tag.green{background:rgba(34,197,94,.15);color:#4ade80}
+.tag.orange{background:rgba(249,115,22,.15);color:#fb923c}
+.tag.purple{background:rgba(99,102,241,.15);color:#a5b4fc}
+.tag.red{background:rgba(239,68,68,.15);color:#f87171}
+code{background:var(--s3);border:1px solid var(--bd);border-radius:5px;padding:2px 7px;font-family:'Menlo','Consolas',monospace;font-size:12px;color:#a5b4fc}
+pre{background:var(--s3);border:1px solid var(--bd);border-radius:8px;padding:14px 16px;font-family:'Menlo','Consolas',monospace;font-size:12px;color:#a5b4fc;overflow-x:auto;margin:10px 0 16px;line-height:1.7}
+.step{display:flex;gap:12px;margin-bottom:10px;align-items:flex-start}
+.step-n{width:22px;height:22px;border-radius:50%;background:var(--acc);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-body{font-size:13px;color:var(--tx2);flex:1;line-height:1.7}
+.step-body strong{color:var(--tx)}
+.ex{background:var(--s3);border-left:3px solid var(--acc);border-radius:0 6px 6px 0;padding:10px 14px;margin:8px 0;font-size:13px;color:var(--tx2);line-height:1.8}
+.ex b{color:var(--tx)}
+.warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:12px 14px;font-size:12px;color:#fbbf24;margin:12px 0;line-height:1.7}
+.warn strong{color:#f59e0b}
+.ok{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:12px 14px;font-size:12px;color:#4ade80;margin:12px 0;line-height:1.7}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+@media(max-width:500px){.grid2{grid-template-columns:1fr}}
+.url-box{background:var(--s3);border:1px solid var(--acc);border-radius:8px;padding:12px 16px;font-family:'Menlo','Consolas',monospace;font-size:13px;color:var(--acc);text-align:center;margin:12px 0;word-break:break-all}
+a{color:var(--acc);text-decoration:none}
+a:hover{text-decoration:underline}
+hr{border:none;border-top:1px solid var(--bd);margin:32px 0}
+.toc{background:var(--s2);border:1px solid var(--bd);border-radius:12px;padding:18px 20px;margin-bottom:36px}
+.toc-title{font-size:12px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px}
+.toc a{display:block;font-size:13px;color:var(--tx2);padding:4px 0;border-bottom:1px solid var(--bd)}
+.toc a:last-child{border-bottom:none}
+.toc a:hover{color:var(--tx)}
+.toc-num{color:var(--tx3);margin-right:8px;font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>동영 스케줄 앱 <em>사용설명서</em></h1>
+<p class="subtitle">GitHub Pages 기반 인터랙티브 일정 관리 시스템 · 2026년 6월</p>
+
+<div class="toc">
+  <div class="toc-title">목차</div>
+  <a href="#access"><span class="toc-num">1</span>앱 접속 방법</a>
+  <a href="#tabs"><span class="toc-num">2</span>탭 구성</a>
+  <a href="#cal"><span class="toc-num">3</span>달력 탭</a>
+  <a href="#plan"><span class="toc-num">4</span>공부 플랜 탭</a>
+  <a href="#alert"><span class="toc-num">5</span>충돌 알림 탭</a>
+  <a href="#edit"><span class="toc-num">6</span>편집 탭 — 핵심 기능</a>
+  <a href="#update"><span class="toc-num">7</span>앱 기능 업데이트 방법 (데이터 보존)</a>
+  <a href="#phone"><span class="toc-num">8</span>핸드폰에서 사용하기</a>
+  <a href="#trouble"><span class="toc-num">9</span>문제 해결</a>
+</div>
+
+<!-- ─────────────── 1. 접속 ─────────────── -->
+<h2 id="access">1 앱 접속 방법</h2>
+<div class="url-box">https://jdyece25-byte.github.io/schedule/</div>
+<p>이 URL로 PC / 핸드폰 / 태블릿 어디서든 접근 가능해요. 북마크 저장 권장.</p>
+<div class="ok">⬤ 상단 오른쪽 점이 <strong>초록색</strong>이면 GitHub와 연동됨. 회색이면 오프라인(로컬 데이터 사용 중).</div>
+
+<!-- ─────────────── 2. 탭 ─────────────── -->
+<h2 id="tabs">2 탭 구성</h2>
+<div class="grid2">
+  <div class="card"><div class="card-title">📅 달력</div><div class="card-body">6월 전체 월간 달력. 날짜 클릭 → 오른쪽 패널에 상세 일정 + 이동시간 표시.</div></div>
+  <div class="card"><div class="card-title">📚 공부 플랜</div><div class="card-body">기말고사 준비 12일 플랜 (6/4–6/15). 과목별 시간 배분 및 전략 메모.</div></div>
+  <div class="card"><div class="card-title">⚠ 충돌 알림</div><div class="card-body">이동시간 부족 or 미등록 구간 자동 감지. 숫자 배지 = 충돌 건수.</div></div>
+  <div class="card"><div class="card-title">✏ 편집</div><div class="card-body">일정 추가 · 이동시간 등록 · AI 추천. GitHub 자동 저장.</div></div>
+</div>
+
+<!-- ─────────────── 3. 달력 ─────────────── -->
+<h2 id="cal">3 달력 탭</h2>
+<h3>월간 뷰</h3>
+<p>날짜 셀 클릭 → 오른쪽 패널에 당일 일정 상세 표시. 연속된 과외 사이에 이동시간·여유시간이 색으로 표시돼요:</p>
+<div class="card-body" style="margin-bottom:12px">
+  <span class="tag red">빨강</span> 여유 0분 미만 — 이미 늦음<br>
+  <span class="tag orange">주황</span> 여유 30분 미만 — 빠듯<br>
+  <span class="tag green">초록</span> 여유 30분 이상 — 여유 있음
+</div>
+<h3>목록 뷰</h3>
+<p>달력 오른쪽 아래 <code>목록 보기</code> 버튼 → 날짜순 전체 일정 리스트로 전환.</p>
+<h3>이벤트 색상</h3>
+<div class="card-body">
+  <span class="tag blue">수업</span><span class="tag" style="background:rgba(6,182,212,.15);color:#22d3ee">랩</span><span class="tag red">시험</span><span class="tag orange">과외</span><span class="tag green">워크숍</span><span class="tag purple">마감</span>
+</div>
+
+<!-- ─────────────── 4. 공부 플랜 ─────────────── -->
+<h2 id="plan">4 공부 플랜 탭</h2>
+<p>6/4(목) ~ 6/15(월) 12일간 기말고사 준비 플랜. 3단계로 구성돼요:</p>
+<div class="card"><div class="card-body">
+  <strong>Phase 1</strong> (6/4–6/9) — 기초회로 집중<br>
+  <strong>Phase 2</strong> (6/10–6/12) — 기초회로 마무리 + 공학수학 병행<br>
+  <strong>Phase 3</strong> (6/13–6/15) — 시험 주간
+</div></div>
+<p>각 날짜 카드에 추천 공부 블록·시간·주의사항이 표시돼요. 과외·수업 일정을 고려해 실제 가능한 시간대만 표시한 거예요.</p>
+
+<!-- ─────────────── 5. 충돌 알림 ─────────────── -->
+<h2 id="alert">5 충돌 알림 탭</h2>
+<p>달력 데이터를 자동 분석해서 문제 구간을 감지해요. 새 일정이나 이동시간을 추가하면 실시간으로 재계산돼요.</p>
+<div class="grid2">
+  <div class="card"><div class="card-title"><span class="tag red">충돌</span> 이동시간 초과</div><div class="card-body">이동에 걸리는 시간이 과외 사이 여유보다 길어요. 즉시 조정 필요.</div></div>
+  <div class="card"><div class="card-title"><span class="tag orange">빠듯</span> 여유 30분 미만</div><div class="card-body">이동은 가능하지만 여유가 없어요. 지각 위험.</div></div>
+</div>
+<div class="warn">⚠ <strong>잠실 파크리오 관련 구간</strong>은 이동시간 미등록 상태예요. 편집 탭 → 이동시간 추가에서 등록하면 충돌 분석에 반영돼요.</div>
+
+<!-- ─────────────── 6. 편집 탭 ─────────────── -->
+<h2 id="edit">6 편집 탭 — 핵심 기능</h2>
+
+<h3>① 자연어로 추가 (Gemini AI)</h3>
+<p>텍스트박스에 자유롭게 입력 → <strong>AI 파싱</strong> 버튼 → 미리보기 확인 → <strong>추가</strong> 버튼.</p>
+<div class="ex">
+  <b>이벤트 추가:</b><br>
+  정현우 6/28 토 17시-20시 잠실 파크리오 대면 과외<br>
+  이민희 최지요 6/25 목 19-21시 온라인<br>
+  신수민 7/5 토요일 9:30-12:30 스카이캐슬 물리
+</div>
+<div class="ex">
+  <b>이동시간 추가:</b><br>
+  잠실 파크리오 → 강남역 옐로스톤 25분 지하철<br>
+  서울대 관악 → 잠실 파크리오 40분
+</div>
+<p>AI가 이벤트인지 이동시간인지 자동으로 판단해요. 확인 후 저장 누르면 GitHub에 즉시 반영.</p>
+
+<h3>② 언제 잡을까? (AI 추천)</h3>
+<p>현재 달력 전체를 Gemini에게 보내서 <strong>빈 시간대를 찾아 추천</strong>받는 기능이에요.</p>
+<div class="ex">
+  정현우 과외 대면 2시간, 이번 주 일요일 가능한 시간 추천해줘<br>
+  다음 주 중 공부할 시간 3시간 확보하고 싶어<br>
+  6월 셋째 주에 신수민 과외 넣고 싶은데 언제 괜찮아?
+</div>
+<p>추천 결과는 텍스트로 보여줘요. 마음에 들면 위의 "자연어로 추가"에 그대로 복붙해서 저장하면 돼요.</p>
+
+<h3>③ 이벤트 직접 추가</h3>
+<p>날짜·타입·이름·시간·장소를 폼으로 직접 입력하고 저장. AI 없이도 사용 가능해요.</p>
+
+<h3>④ 이동시간 추가/수정</h3>
+<p>출발·도착 장소 선택 → 소요시간(분) 입력 → 교통수단 선택 → 저장. <strong>양방향 자동 등록</strong>이에요.</p>
+<div class="warn">⚠ 현재 미등록 구간: 잠실 파크리오 ↔ 강남역 옐로스톤 / 서울대 ↔ 잠실 파크리오</div>
+
+<h3>⑤ 설정</h3>
+<div class="card"><div class="card-body">
+  <strong>GitHub PAT</strong> — 저장 권한. <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a>에서 <code>repo</code> 권한으로 발급.<br>
+  <strong>Gemini API Key</strong> — AI 기능. <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a>에서 무료 발급.<br>
+  <strong>GitHub Repo</strong> — 기본값 <code>schedule</code>. 저장소 이름 바꿨을 때만 수정.<br><br>
+  ⚠ 키는 브라우저(localStorage)에만 저장됨. <strong>기기마다 한 번씩 입력</strong> 필요.
+</div></div>
+
+<!-- ─────────────── 7. 앱 업데이트 ─────────────── -->
+<h2 id="update">7 앱 기능 업데이트 방법 (데이터 보존)</h2>
+<p>앱에 새 기능을 추가할 때 일정 데이터(<code>events.json</code>)가 날아가지 않는 방법이에요.</p>
+<div class="ok">💡 <strong>원리:</strong> 일정 데이터는 GitHub의 events.json에 저장돼요. HTML(index.html)을 업데이트해도 데이터 파일은 건드리지 않아요.</div>
+
+<h3>Claude에게 기능 추가 요청 후 업데이트 순서</h3>
+<div class="step"><div class="step-n">1</div><div class="step-body">Claude가 <code>index.html</code> 수정 완료 후 PowerShell 열기</div></div>
+<div class="step"><div class="step-n">2</div><div class="step-body"><strong>반드시 pull 먼저</strong> — 앱에서 추가한 최신 데이터를 로컬로 가져옴<pre>cd C:\Users\ASL\Desktop\Projects\schedule
+git pull</pre></div></div>
+<div class="step"><div class="step-n">3</div><div class="step-body"><strong>index.html만 add</strong> — 데이터 파일은 건드리지 않음<pre>git add index.html
+git commit -m "기능 추가: 내용 요약"
+git push</pre></div></div>
+<div class="step"><div class="step-n">4</div><div class="step-body">1~2분 후 사이트 새로고침하면 업데이트 반영</div></div>
+
+<div class="warn">⚠ <strong>절대 <code>git add .</code> 하지 마세요!</strong> 로컬의 events.json(초기 버전)이 GitHub의 최신 데이터를 덮어써요.</div>
+
+<!-- ─────────────── 8. 핸드폰 ─────────────── -->
+<h2 id="phone">8 핸드폰에서 사용하기</h2>
+<div class="step"><div class="step-n">1</div><div class="step-body">Safari / Chrome에서 <code>https://jdyece25-byte.github.io/schedule/</code> 접속</div></div>
+<div class="step"><div class="step-n">2</div><div class="step-body">편집 탭 → 설정에서 GitHub PAT, Gemini 키 입력 (기기마다 한 번씩)</div></div>
+<div class="step"><div class="step-n">3</div><div class="step-body">홈 화면에 추가하면 앱처럼 사용 가능<br>iOS: 공유 버튼 → 홈 화면에 추가 / Android: 메뉴 → 앱 설치</div></div>
+
+<!-- ─────────────── 9. 문제 해결 ─────────────── -->
+<h2 id="trouble">9 문제 해결</h2>
+<div class="card"><div class="card-title">⬤ 동기화 점이 회색이에요</div><div class="card-body">로컬 파일로 열었거나 네트워크 없음. GitHub Pages URL로 접속하면 초록색으로 바뀌어요.</div></div>
+<div class="card"><div class="card-title">AI 파싱 오류 / "Gemini 오류"</div><div class="card-body">설정에서 Gemini API 키 확인. 키가 만료됐으면 aistudio.google.com에서 새로 발급.</div></div>
+<div class="card"><div class="card-title">GitHub 저장 실패 ("HTTP 401")</div><div class="card-body">GitHub PAT가 만료됐어요. github.com/settings/tokens에서 새 토큰 발급 후 설정 업데이트.</div></div>
+<div class="card"><div class="card-title">사이트에 업데이트가 반영 안 돼요</div><div class="card-body">GitHub Pages 배포에 1~3분 걸려요. 강력 새로고침(<code>Ctrl+Shift+R</code> / <code>Cmd+Shift+R</code>) 해보세요.</div></div>
+<div class="card"><div class="card-title">일정을 잘못 추가했어요</div><div class="card-body">github.com/jdyece25-byte/schedule → events.json → 연필 아이콘 → 해당 항목 삭제 → Commit changes.</div></div>
+
+<hr>
+<p style="text-align:center;color:var(--tx3);font-size:12px">동영 스케줄 앱 · jdyece25-byte.github.io/schedule · 2026.06</p>
+
+</div>
+</body>
+</html>
