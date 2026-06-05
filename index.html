@@ -43,8 +43,7 @@ body{
 .view{flex:1;overflow-y:auto;display:none;flex-direction:column;
   padding-bottom:calc(var(--bnav-h) + env(safe-area-inset-bottom));}
 .view.on{display:flex}
-/* cal view uses inner scroll, not view scroll */
-#v-cal{overflow:hidden;padding-bottom:0}
+/* cal view uses inner scroll — see .cal-wrap below */
 
 /* ── BOTTOM NAV ── */
 .bnav{
@@ -143,7 +142,6 @@ body{
 .leg{
   display:flex;flex-wrap:wrap;gap:5px;padding:6px 10px;
   border-top:1px solid var(--bd);background:var(--s1);flex-shrink:0;
-  padding-bottom:calc(var(--bnav-h) + env(safe-area-inset-bottom) + 6px);
 }
 .li{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--tx2)}
 .ld{width:8px;height:8px;border-radius:2px}
@@ -198,7 +196,9 @@ body{
 .pax{font-size:10px;color:var(--tx2);line-height:1.5}.pax b{color:var(--tx);font-weight:600}
 
 /* ── PLAN VIEW ── */
-#v-plan{padding:18px 16px}
+#v-plan{padding:0;overflow-y:auto;padding-bottom:0;display:none;flex-direction:column}
+#v-plan.on{display:flex}
+#v-plan .nl-section{padding-bottom:calc(var(--bnav-h) + env(safe-area-inset-bottom) + 8px)}
 .plan-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .plan-hdr h2{font-size:17px;font-weight:700}.plan-hdr h2 em{color:var(--acc);font-style:normal}
 .stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
@@ -281,13 +281,94 @@ body{
 .settings-grid label{font-size:11px;color:var(--tx2);font-weight:600}
 .settings-note{font-size:11px;color:var(--tx3);margin-top:10px;line-height:1.6}
 
+/* ── HOME VIEW ── */
+#v-home{padding:0;overflow-y:auto;padding-bottom:calc(var(--bnav-h) + env(safe-area-inset-bottom))}
+.home-top{
+  padding:22px 20px 16px;
+  padding-top:max(22px,env(safe-area-inset-top));
+  flex-shrink:0;
+}
+.home-greeting{font-size:13px;color:var(--tx2);margin-bottom:4px}
+.home-date{font-size:24px;font-weight:800;letter-spacing:-.5px}
+.home-date em{color:var(--acc);font-style:normal}
+.home-cards{display:flex;flex-direction:column;gap:14px;padding:0 16px 16px}
+.hc{
+  background:var(--s2);border:1.5px solid var(--bd);border-radius:18px;
+  padding:20px 20px 18px;cursor:pointer;
+  transition:border-color .15s,background .15s;
+  display:flex;flex-direction:column;gap:10px;
+  -webkit-tap-highlight-color:transparent;
+  min-height:110px;
+}
+.hc:active{background:var(--s3);border-color:var(--bd2)}
+.hc-top{display:flex;align-items:center;justify-content:space-between}
+.hc-icon{font-size:26px;line-height:1}
+.hc-arrow{font-size:18px;color:var(--tx3)}
+.hc-title{font-size:18px;font-weight:800;margin-top:2px}
+.hc-sub{font-size:12px;color:var(--tx2);line-height:1.6;margin-top:2px}
+.hc-badge{display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700}
+.hc.today{border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.05)}
+.hc.cal{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04)}
+.hc.plan{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.04)}
+.home-quick{display:flex;gap:10px;padding:0 16px 8px}
+.hq{flex:1;background:var(--s2);border:1px solid var(--bd);border-radius:12px;padding:12px 10px;
+  text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:var(--tx2);
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  -webkit-tap-highlight-color:transparent;
+}
+.hq:active{background:var(--s3)}
+.hq svg{width:20px;height:20px;stroke-width:1.8}
+
+/* ── NL PROMPT (shared) ── */
+.nl-section{
+  flex-shrink:0;border-top:1px solid var(--bd);
+  background:var(--s1);
+  padding:10px 14px;
+  padding-bottom:calc(var(--bnav-h) + env(safe-area-inset-bottom) + 8px);
+}
+.nl-label{font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.nl-row{display:flex;gap:7px;align-items:flex-end}
+.nl-ta{
+  flex:1;background:var(--s3);border:1px solid var(--bd);border-radius:10px;
+  color:var(--tx);font-family:inherit;font-size:13px;padding:9px 12px;
+  resize:none;outline:none;transition:border-color .12s;height:40px;line-height:1.4;
+  overflow:hidden;
+}
+.nl-ta:focus{border-color:var(--acc);height:auto;min-height:40px}
+.nl-send{
+  background:var(--acc);color:#fff;border:none;border-radius:10px;
+  width:40px;height:40px;font-size:18px;cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.nl-result{
+  margin-top:8px;background:var(--s3);border:1px solid var(--bd);
+  border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.8;
+  color:var(--tx);white-space:pre-wrap;display:none;max-height:200px;overflow-y:auto;
+}
+.nl-preview-inline{margin-top:8px;display:none}
+.nl-pi{
+  background:var(--s3);border:1px solid var(--bd);border-radius:8px;
+  padding:9px 11px;margin-bottom:4px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.nl-pi-main{font-size:12px;font-weight:700}
+.nl-pi-sub{font-size:11px;color:var(--tx2);margin-top:2px}
+
+/* Cal view layout with NL */
+#v-cal{display:none;flex-direction:column;padding-bottom:0;overflow:hidden}
+#v-cal.on{display:flex}
+.cal-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
 /* ── DESKTOP OVERRIDES ── */
 @media(min-width:769px){
   :root{--bnav-h:0px}
   .bnav{display:none}
   .view{padding-bottom:0}
+  #v-plan.on,#v-plan{display:flex}
   .dt-tabs{display:flex}
   #v-cal{flex-direction:row}
+  #v-cal.on{flex-direction:row}
+  .cal-wrap{flex-direction:row}
   .cal-main{padding:14px 14px 0}
   .dc{min-height:95px}
   .chip{font-size:9px;padding:2px 5px}
@@ -313,7 +394,8 @@ body{
 <header class="hdr">
   <span class="logo">동영 <em id="hdr-month">6월</em></span>
   <div class="dt-tabs">
-    <button class="dt-btn on" id="dt-today" onclick="sw('today')">오늘</button>
+    <button class="dt-btn on" id="dt-home" onclick="sw('home')">홈</button>
+    <button class="dt-btn" id="dt-today" onclick="sw('today')">오늘</button>
     <button class="dt-btn" id="dt-cal" onclick="sw('cal')">달력</button>
     <button class="dt-btn" id="dt-plan" onclick="sw('plan')">공부 플랜</button>
     <button class="dt-btn" id="dt-alert" onclick="sw('alert')">충돌 <span class="dt-badge" id="alrt-n2">…</span></button>
@@ -322,13 +404,49 @@ body{
   <span id="sync-dot" title="GitHub 동기화 상태">⬤</span>
 </header>
 
+<!-- HOME VIEW -->
+<div class="view on" id="v-home">
+  <div class="home-top">
+    <div class="home-greeting" id="home-greeting">안녕하세요 👋</div>
+    <div class="home-date" id="home-date">로딩 중...</div>
+  </div>
+  <div class="home-cards">
+    <div class="hc today" onclick="sw('today')">
+      <div class="hc-top"><span class="hc-icon">🕐</span><span class="hc-arrow">›</span></div>
+      <div class="hc-title">오늘</div>
+      <div class="hc-sub" id="hc-today-sub">일정 확인 중...</div>
+    </div>
+    <div class="hc cal" onclick="sw('cal')">
+      <div class="hc-top"><span class="hc-icon">📅</span><span class="hc-arrow">›</span></div>
+      <div class="hc-title">달력</div>
+      <div class="hc-sub" id="hc-cal-sub">이번 달 일정 보기</div>
+    </div>
+    <div class="hc plan" onclick="sw('plan')">
+      <div class="hc-top"><span class="hc-icon">📚</span><span class="hc-arrow">›</span></div>
+      <div class="hc-title">공부 플랜</div>
+      <div class="hc-sub" id="hc-plan-sub">과목별 진행 상황 보기</div>
+    </div>
+  </div>
+  <div class="home-quick">
+    <div class="hq" onclick="sw('alert')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      충돌 확인
+    </div>
+    <div class="hq" onclick="sw('edit')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      일정 편집
+    </div>
+  </div>
+</div>
+
 <!-- TODAY VIEW -->
-<div class="view on" id="v-today">
+<div class="view" id="v-today">
   <div class="today-empty">로딩 중...</div>
 </div>
 
 <!-- CALENDAR VIEW -->
 <div class="view" id="v-cal">
+  <div class="cal-wrap">
   <div class="cal-main" id="calMain">
     <div class="dow-row">
       <div class="dow s">일</div><div class="dow">월</div><div class="dow">화</div>
@@ -367,6 +485,17 @@ body{
       <div class="pai"><div class="pad" style="background:#ef4444"></div><div class="pax"><b>6/15</b> 기말 2연속 (공학수학·방법론)</div></div>
       <div class="pai"><div class="pad" style="background:#f97316"></div><div class="pax"><b>잠실 파크리오</b> 이동시간 미등록</div></div>
     </div>
+  </div>
+  </div><!-- /cal-wrap -->
+  <!-- NL Event Input -->
+  <div class="nl-section">
+    <div class="nl-label">🤖 자연어로 일정 추가</div>
+    <div class="nl-row">
+      <textarea id="cal-nl-input" class="nl-ta" placeholder="예: 정현우 6/28 토 17시-20시 잠실 파크리오 과외"></textarea>
+      <button class="nl-send" onclick="calNLParse()" title="파싱">↑</button>
+    </div>
+    <div id="cal-nl-status" style="font-size:11px;color:var(--tx2);margin-top:5px;display:none"></div>
+    <div id="cal-nl-preview" class="nl-preview-inline"></div>
   </div>
 </div>
 
@@ -497,9 +626,9 @@ body{
 
 <!-- BOTTOM NAV -->
 <nav class="bnav">
-  <button class="bn on" id="bn-today" onclick="sw('today')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    오늘
+  <button class="bn on" id="bn-home" onclick="sw('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    홈
   </button>
   <button class="bn" id="bn-cal" onclick="sw('cal')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -1113,13 +1242,61 @@ function sw(v){
   const bn=document.getElementById('bn-'+v);if(bn)bn.classList.add('on');
   const dt=document.getElementById('dt-'+v);if(dt)dt.classList.add('on');
   clearInterval(todayTimer);
-  if(v==='today'){
-    buildToday();
-    todayTimer=setInterval(buildToday,60000);
-  }
-  if(v==='plan'&&!document.getElementById('v-plan').children.length)buildPlan();
+  if(v==='home')buildHome();
+  if(v==='today'){buildToday();todayTimer=setInterval(buildToday,60000);}
+  if(v==='plan')buildPlan();
   if(v==='alert')buildAlerts();
   if(v==='edit')initEditSettings();
+}
+
+// ── HOME VIEW ────────────────────────────────────────────────────────
+function buildHome(){
+  const now=new Date();
+  const nowMin=now.getHours()*60+now.getMinutes();
+  const greeting=now.getHours()<12?'좋은 아침이에요 ☀️':now.getHours()<18?'안녕하세요 👋':'안녕하세요 🌙';
+  document.getElementById('home-greeting').textContent=greeting;
+  const td=new Date(TODAY+'T00:00:00');
+  document.getElementById('home-date').innerHTML=`${td.getMonth()+1}월 <em>${td.getDate()}일</em> ${DOW[td.getDay()]}요일`;
+
+  // 오늘 카드
+  const todayEvs=EM[TODAY]||[];
+  let todaySub='';
+  if(!todayEvs.length){
+    todaySub='오늘 등록된 일정이 없어요';
+  } else {
+    const active=todayEvs.find(e=>e.s!=null&&e.e!=null&&nowMin>=e.s&&nowMin<=e.e);
+    const next=todayEvs.find(e=>e.s!=null&&e.s>nowMin);
+    if(active) todaySub=`진행 중: ${active.n.replace('[W] ','')}`;
+    else if(next) todaySub=`다음: ${next.n.replace('[W] ','')} (${m2t(next.s)})`;
+    else todaySub=`오늘 총 ${todayEvs.length}개 일정 (모두 완료)`;
+    todaySub+=`<br><span style="font-size:11px;opacity:.7">일정 ${todayEvs.length}개</span>`;
+  }
+  document.getElementById('hc-today-sub').innerHTML=todaySub;
+
+  // 달력 카드 - 다음 시험
+  const exams=EVENTS.filter(e=>e.t==='exam'&&e.d>=TODAY).sort((a,b)=>a.d.localeCompare(b.d));
+  let calSub='';
+  if(exams.length){
+    const ex=exams[0];
+    const diff=Math.ceil((new Date(ex.d)-new Date(TODAY))/(1000*60*60*24));
+    calSub=`다음 시험: ${ex.n.replace('기말고사','기말').replace('이론 및 실험','')}<br><span style="font-size:11px;opacity:.7;color:#f87171">D-${diff} · ${ex.ti||''}</span>`;
+  } else {
+    calSub='이번 달 일정 보기';
+  }
+  document.getElementById('hc-cal-sub').innerHTML=calSub;
+
+  // 공부 플랜 카드
+  const planDay=PLAN?PLAN.find(p=>p.d===TODAY):null;
+  let planSub='';
+  if(planDay&&!planDay.rest&&planDay.blocks){
+    planSub=`오늘 목표: ${planDay.total||''}<br><span style="font-size:11px;opacity:.7">${planDay.blocks.map(b=>b.d).join(' · ')}</span>`;
+  } else if(planDay&&planDay.rest){
+    planSub='오늘은 공부 없이 체력 관리의 날 💪';
+  } else {
+    planSub='과목별 기말 준비 플랜 보기';
+  }
+  document.getElementById('hc-plan-sub').innerHTML=planSub;
+  updateAlertBadge();
 }
 
 // ── CONFLICT DETECTION ────────────────────────────────────────────────
@@ -1182,22 +1359,92 @@ function buildAlerts(){
   el.innerHTML=h;
 }
 
+// ── CAL NL HANDLER ────────────────────────────────────────────────────
+let calPending=null;
+async function calNLParse(){
+  const text=document.getElementById('cal-nl-input').value.trim();
+  if(!text)return;
+  const st=document.getElementById('cal-nl-status');
+  const prev=document.getElementById('cal-nl-preview');
+  st.textContent='분석 중...';st.style.display='block';st.style.color='var(--tx2)';
+  prev.style.display='none';prev.innerHTML='';
+  const r=await geminiParse(text);
+  if(!r.ok){st.textContent=r.msg;st.style.color='#ef4444';return;}
+  calPending=r.result;st.textContent='확인 후 추가하세요';st.style.color='var(--acc)';
+  let h='';
+  if(r.result.type==='event'){
+    r.result.data.forEach((ev,i)=>{
+      const col=TCh[ev.t]||'#888';
+      h+=`<div class="nl-pi"><div><div class="nl-pi-main" style="color:${col}">${ev.n}</div><div class="nl-pi-sub">${ev.d} ${ev.ti||''} ${ev.loc?'· '+ev.loc:''}</div></div><button class="btn-primary" style="font-size:11px;padding:4px 11px;flex-shrink:0" onclick="calConfirmEvent(${i})">추가</button></div>`;
+    });
+  } else if(r.result.type==='travel'){
+    r.result.data.forEach((tt,i)=>{
+      h+=`<div class="nl-pi"><div><div class="nl-pi-main">${LOC_NAMES[tt.from]||tt.from} → ${LOC_NAMES[tt.to]||tt.to}</div><div class="nl-pi-sub">${tt.min}분 · ${tt.mode}</div></div><button class="btn-primary" style="font-size:11px;padding:4px 11px;flex-shrink:0" onclick="calConfirmTravel(${i})">추가</button></div>`;
+    });
+  }
+  prev.innerHTML=h;prev.style.display='block';
+}
+async function calConfirmEvent(i){
+  const ev=calPending.data[i];
+  EVENTS.push(ev);EVENTS.sort((a,b)=>a.d===b.d?(a.s||0)-(b.s||0):a.d.localeCompare(b.d));
+  rebuildEM();buildCal();
+  const st=document.getElementById('cal-nl-status');
+  const saved=await saveAllData();
+  st.textContent=saved?'✓ 저장 완료':'⚠ 로컬 추가됨';st.style.color=saved?'#22c55e':'#f59e0b';
+}
+async function calConfirmTravel(i){
+  const tt=calPending.data[i];
+  TT[`${tt.from}-${tt.to}`]=tt.min;TT[`${tt.to}-${tt.from}`]=tt.min;
+  TM[`${tt.from}-${tt.to}`]=tt.mode||'지하철';TM[`${tt.to}-${tt.from}`]=tt.mode||'지하철';
+  const st=document.getElementById('cal-nl-status');
+  const saved=await saveAllData();
+  st.textContent=saved?'✓ 이동시간 저장':'⚠ 로컬 업데이트됨';st.style.color=saved?'#22c55e':'#f59e0b';
+}
+
 // ── STUDY PLAN ────────────────────────────────────────────────────────
+const SUBJECTS=[
+  {id:'circuit',name:'기초회로이론 및 실험',icon:'⚡',color:'#3b82f6',examDate:'2026-06-13',examLabel:'6/13 기말 13:00–16:00',totalHours:'약 24h',strategy:'전범위 정리 + 기출 문제 풀기. D-9부터 집중.'},
+  {id:'math',name:'공학수학2',icon:'📐',color:'#f59e0b',examDate:'2026-06-15',examLabel:'6/15 기말 9:00–10:45',totalHours:'약 13h',strategy:'6/10 시작. 핵심 파트 집중 → 문제 풀기.'},
+  {id:'method',name:'프로그래밍 방법론',icon:'💻',color:'#06b6d4',examDate:'2026-06-15',examLabel:'6/15 기말 11:00–13:00',totalHours:'약 2h',strategy:'바운스볼 프로젝트 병행. 이론 범위 빠르게 훑기.'},
+  {id:'spanish',name:'스페인어권 명작의 이해',icon:'📖',color:'#22c55e',examDate:null,examLabel:'기말 일정 미확인',totalHours:'—',strategy:'수업 집중. 기말 일정 확인 후 계획 수립.'},
+  {id:'seminar',name:'전기정보세미나',icon:'🎓',color:'#8b5cf6',examDate:null,examLabel:'소감문 6/9, 6/16',totalHours:'—',strategy:'세미나 직후 30분 이내 소감문 작성.'}
+];
 function buildPlan(){
   const el=document.getElementById('v-plan');
   if(!PLAN){el.innerHTML='<div style="padding:20px;color:var(--tx2)">플랜 로딩 중...</div>';return;}
+
+  // Subject cards
+  let sc='';
+  SUBJECTS.forEach(sub=>{
+    const daysLeft=sub.examDate?Math.ceil((new Date(sub.examDate)-new Date(TODAY))/(1000*60*60*24)):null;
+    const dLabel=daysLeft!=null?(daysLeft<=0?'<span style="color:#ef4444;font-weight:700">오늘!</span>':`<span style="color:${daysLeft<=3?'#ef4444':daysLeft<=7?'#f59e0b':'#22c55e'};font-weight:700">D-${daysLeft}</span>`):null;
+    sc+=`<div style="background:var(--s2);border:1.5px solid ${sub.color}30;border-radius:14px;padding:14px 15px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
+        <span style="font-size:20px">${sub.icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:800;color:${sub.color}">${sub.name}</div>
+          <div style="font-size:11px;color:var(--tx2);margin-top:1px">${sub.examLabel}</div>
+        </div>
+        ${dLabel?`<div style="font-size:13px">${dLabel}</div>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="background:${sub.color}15;border:1px solid ${sub.color}30;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:${sub.color}">${sub.totalHours}</div>
+        <div style="font-size:11px;color:var(--tx2);flex:1;line-height:1.5">${sub.strategy}</div>
+      </div>
+    </div>`;
+  });
+
   const phases=[
     {label:'Phase 1 — 기초회로 집중 (D-9 ~ D-4)',days:PLAN.slice(0,6)},
     {label:'Phase 2 — 기초회로 마무리 + 공학수학 병행 (D-3 ~ D-1)',days:PLAN.slice(6,9)},
     {label:'Phase 3 — 시험 주간',days:PLAN.slice(9)},
   ];
-  let h=`<div class="plan-hdr"><h2>시험 준비 플랜 <em>6/4–6/15</em></h2></div>
-  <div class="stats">
-    <div class="sc"><div class="sb" style="background:#3b82f6"></div><div><div class="sl">기초회로이론</div><div class="sv">약 24h</div><div class="ss">D-9부터 집중</div></div></div>
-    <div class="sc"><div class="sb" style="background:#f59e0b"></div><div><div class="sl">공학수학2</div><div class="sv">약 13h</div><div class="ss">D-5부터 병행</div></div></div>
-    <div class="sc"><div class="sb" style="background:#06b6d4"></div><div><div class="sl">방법론</div><div class="sv">약 2h</div><div class="ss">프로젝트 병행 중</div></div></div>
-    <div class="sc"><div class="sb" style="background:var(--acc)"></div><div><div class="sl">총 공부 시간</div><div class="sv">약 39h</div><div class="ss">12일간</div></div></div>
-  </div>`;
+  let h=`<div style="padding:16px 16px 0">
+    <div class="plan-hdr"><h2>공부 플랜 <em>과목별 현황</em></h2></div>
+    ${sc}
+    <div style="margin-top:4px;margin-bottom:2px"></div>
+  </div>
+  <div id="v-plan-days" style="padding:0 16px">`;
   phases.forEach(p=>{
     h+=`<div class="phase">${p.label}</div><div class="day-grid">`;
     p.days.forEach(day=>{
@@ -1223,29 +1470,46 @@ function buildPlan(){
     });
     h+='</div>';
   });
-  h+=`<div class="plan-summary"><h3>전략 메모</h3>
-    <div class="sum-row">
-      <div class="sum-item"><div class="sum-dot" style="background:#3b82f6"></div><span class="sum-subj">기초회로</span><span class="sum-h">약 24h</span></div>
-      <div class="sum-item"><div class="sum-dot" style="background:#f59e0b"></div><span class="sum-subj">공학수학2</span><span class="sum-h">약 13h</span></div>
-      <div class="sum-item"><div class="sum-dot" style="background:#06b6d4"></div><span class="sum-subj">방법론</span><span class="sum-h">약 2h</span></div>
+  h+=`</div>
+  <!-- NL Plan Adjustment -->
+  <div class="nl-section" style="margin-top:10px">
+    <div class="nl-label">🤖 공부 플랜 조정 · 질문</div>
+    <div class="nl-row">
+      <textarea id="plan-nl-input" class="nl-ta" placeholder="예: 6/10에 공학수학 2시간 추가해줘&#10;기초회로 현재 진도 어때?"></textarea>
+      <button class="nl-send" onclick="planNLQuery()" title="질문">↑</button>
     </div>
-    <ul class="strat">
-      <li><strong>기초회로 우선:</strong> 시험이 6/13으로 6/15보다 이틀 빠름</li>
-      <li><strong>6/12 종강일이 황금 시간:</strong> 기초회로 마무리 + 공학수학 진입 동시에</li>
-      <li><strong>6/14 공부 시간 매우 한정:</strong> 정현우 17시 + 박재표 20:30 → 실질 2.5h 이하</li>
-      <li><strong>방법론은 가볍게:</strong> 바운스볼 프로젝트로 실력 확보, 이론 범위 빠르게 훑기</li>
-      <li><strong>소감문:</strong> 6/9, 6/16 세미나 후 30분 이내 작성</li>
-    </ul>
+    <div id="plan-nl-status" style="font-size:11px;color:var(--tx2);margin-top:5px;display:none"></div>
+    <div id="plan-nl-result" class="nl-result"></div>
   </div>`;
   el.innerHTML=h;
+}
+
+async function planNLQuery(){
+  const text=document.getElementById('plan-nl-input').value.trim();
+  if(!text)return;
+  const st=document.getElementById('plan-nl-status');
+  const res=document.getElementById('plan-nl-result');
+  st.textContent='분석 중...';st.style.display='block';st.style.color='var(--tx2)';
+  res.style.display='none';
+  const now=new Date();
+  const prompt=`당신은 서울대학교 전기정보공학부 학부생 동영의 공부 플랜 도우미입니다.
+오늘: ${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일.
+과목: 기초회로이론 및 실험(6/13 기말), 공학수학2(6/15 9:00), 프로그래밍 방법론(6/15 11:00), 스페인어권 명작의 이해(기말 미확인), 전기정보세미나(소감문 6/9·6/16).
+현재 일정:\n${buildScheduleSummary()}\n
+공부 플랜 현황: 기초회로 약24h(D-9~집중), 공학수학 약13h(6/10~), 방법론 약2h(바운스볼 병행).
+사용자 요청: ${text}
+친근한 한국어로 구체적으로 답해주세요.`;
+  const r=await geminiQuery(prompt);
+  st.style.display='none';
+  if(!r.ok){st.textContent=r.msg;st.style.display='block';st.style.color='#ef4444';return;}
+  res.textContent=r.text;res.style.display='block';
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────
 loadData().then(()=>{
   buildCal();
-  buildToday();
-  todayTimer=setInterval(buildToday,60000);
-  selDay(TODAY); // pre-load panel for desktop
+  buildHome();
+  selDay(TODAY);
 });
 </script>
 </body>
