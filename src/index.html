@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="bridge-client.css?v=20260914-layout">
 <link rel="stylesheet" href="push-client.css?v=20260914-push1">
+<link rel="stylesheet" href="school-client.css?v=20260914-school1">
 <title>동영 스케줄</title>
 <style>
 :root{
@@ -426,6 +427,7 @@ body{
     <button class="dt-btn" id="dt-plan" onclick="sw('plan')">공부 플랜</button>
     <button class="dt-btn" id="dt-alert" onclick="sw('alert')">충돌 <span class="dt-badge" id="alrt-n2">…</span></button>
     <button class="dt-btn" id="dt-edit" onclick="sw('edit')">편집·설정</button>
+    <button class="dt-btn" id="dt-school" onclick="sw('school')">학교 공지</button>
   </div>
   <span id="sync-dot" title="GitHub 동기화 상태">⬤</span>
 </header>
@@ -453,6 +455,7 @@ body{
       <div class="hc-sub" id="hc-plan-sub">과목별 진행 상황 보기</div>
     </div>
   </div>
+  <button type="button" class="school-home-link" data-school-action="open"><span><strong>학교 공지</strong><small id="school-home-summary">새 공지·시험·과제 확인</small></span><span aria-hidden="true">›</span></button>
   <div class="home-quick">
     <div class="hq" onclick="sw('alert')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -534,9 +537,20 @@ body{
 <div class="view" id="v-alert"></div>
 
 <!-- EDIT VIEW -->
+<div class="view" id="v-school">
+  <section class="school-panel" id="school-panel" aria-label="학교 공지">
+    <div class="school-heading"><h2>학교 공지</h2><select class="edit-input" id="school-filter" aria-label="공지 표시 범위"><option value="review">확인할 공지</option><option value="latest">최근 공지 전체</option></select></div>
+    <p class="school-note">학교 공지와 eTL에서 찾은 일정입니다. 원문을 확인하고 반영할 항목을 선택하세요. 날짜·시각·장소를 수정한 뒤 처리 요청을 보낼 수 있습니다.</p>
+    <div class="school-actions"><button type="button" class="bridge-secondary" data-school-action="refresh">목록 새로고침</button><button type="button" class="bridge-secondary" data-school-action="settings">이 기기 연결 설정</button></div>
+    <p class="school-collectors" id="school-collectors"></p>
+    <p class="school-note" id="school-status" role="status" aria-live="polite"></p>
+    <div id="school-list"></div>
+  </section>
+</div>
+
 <div class="view" id="v-edit">
   <div class="edit-scroll">
-    <div class="push-actions"><button type="button" class="bridge-secondary" onclick="document.getElementById('push-settings-panel').scrollIntoView({block:'start',behavior:'smooth'})">알림 설정으로 이동</button></div>
+    <div class="push-actions"><button type="button" class="bridge-secondary" onclick="document.getElementById('push-settings-panel').scrollIntoView({block:'start',behavior:'smooth'})">알림 설정으로 이동</button><button type="button" class="bridge-secondary" data-school-action="open">학교 공지 확인</button></div>
 
     <div class="edit-section">
       <div class="esec-title">자연어 일정 요청 · Codex / Claude</div>
@@ -647,6 +661,7 @@ body{
         <label class="push-option"><input type="checkbox" id="push-daily" checked><span>오늘 일정<small>매일 아침 7시 30분 요약</small></span></label>
         <label class="push-option"><input type="checkbox" id="push-changes" checked><span>일정 변경<small>일정 반영 후 알림</small></span></label>
         <label class="push-option"><input type="checkbox" id="push-departure" checked><span>이동 출발 알림<small>등록된 이동시간 기준 출발 30분 전</small></span></label>
+        <label class="push-option"><input type="checkbox" id="push-notice" checked><span>학교 공지<small>새 공지와 확인이 필요한 일정</small></span></label>
       </fieldset>
       <div class="push-actions">
         <button type="button" class="btn-primary" id="push-enable" data-push-action="enable">이 기기 알림 켜기</button>
@@ -1275,6 +1290,7 @@ function sw(v){
   if(v==='alert')buildAlerts();
   if(v==='edit')initEditSettings();
   if(window.ScheduleBridge)window.ScheduleBridge.onView(v);
+  if(window.ScheduleSchool)window.ScheduleSchool.onView(v);
 }
 
 // ── HOME VIEW ────────────────────────────────────────────────────────
@@ -1547,6 +1563,7 @@ window.scheduleDataReady=loadData().then(()=>{
 });
 </script>
 <script src="bridge-client.js?v=20260914-layout"></script>
-<script src="push-client.js?v=20260914-push1"></script>
+<script src="push-client.js?v=20260914-push2"></script>
+<script src="school-client.js?v=20260914-school1"></script>
 </body>
 </html>

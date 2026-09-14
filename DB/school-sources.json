@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "term": {"start": "2026-09-01", "end": "2026-12-31"},
+  "etl": {"base_url": "https://myetl.snu.ac.kr"},
+  "courses": [
+    {"key":"macro","name":"거시경제이론","folder":"거시경제이론","aliases":["거시경제이론","거시경제","거시"],"canvas_id":null},
+    {"key":"logic","name":"논리설계 및 실험","folder":"논리설계 및 실험","aliases":["논리설계 및 실험","논리설계","논설"],"canvas_id":null},
+    {"key":"em","name":"기초전자기학 및 연습","folder":"기초전자기학 및 연습","aliases":["기초전자기학 및 연습","기초전자기학","기전"],"canvas_id":null},
+    {"key":"power","name":"전력시장이론","folder":"Power System Economics","aliases":["전력시장이론","Power System Economics"],"canvas_id":null},
+    {"key":"writing","name":"대학 글쓰기 1","folder":"대글1","aliases":["대학 글쓰기 1","대학글쓰기","대글"],"canvas_id":null},
+    {"key":"leadership","name":"공학도의 도전과 리더십 2","folder":"공학도의 도전과 리더십","aliases":["공학도의 도전과 리더십","공도리"],"canvas_id":null}
+  ]
+}

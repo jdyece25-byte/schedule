@@ -3,14 +3,28 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const {PushClient, capability, keyBytes} = require('../push-client.js');
+const {PushClient, capability, keyBytes, preferences} = require('../push-client.js');
 const {notificationData} = require('../sw.js');
 const QUEUE = 'jdyece25-byte/schedule-requests';
 const ID = '12345678-1234-4123-8123-123456789abc';
 const NOW = new Date('2026-09-14T04:00:00Z');
 const KEY = Buffer.from([4, ...new Array(64).fill(21)]).toString('base64url');
-const PREFS = {deadline: true, daily: false, changes: true, departure: false};
+const PREFS = {deadline: true, daily: false, changes: true, departure: false, notice: true};
 const response = (status, value) => ({ok: status >= 200 && status < 300, status, json: async () => value});
+
+test('deadline and departure reminders default on and preserve an explicit opt-out', () => {
+  assert.equal(preferences({}).deadline, true);
+  assert.equal(preferences({}).departure, true);
+  assert.equal(preferences({deadline: false, departure: false}).deadline, false);
+  assert.equal(preferences({deadline: false, departure: false}).departure, false);
+});
+
+test('school notice preference defaults on only when absent and preserves explicit off', () => {
+  assert.equal(preferences({deadline: false}).notice, true);
+  assert.equal(preferences({notice: true}).notice, true);
+  for (const notice of [false, null, 'true', 1]) assert.equal(preferences({notice}).notice, false);
+});
+
 function fixture(options = {}) {
   const store = new Map(Object.entries({cfg_bridge_pat: 'github_pat_fake', cfg_bridge_repo: QUEUE, ...(options.storage || {})}));
   const storage = {getItem: key => store.get(key) || null, setItem: (key, value) => store.set(key, value)};
@@ -192,6 +206,27 @@ test('notification body ignores arbitrary body, title, credentials and request m
   assert.ok(!JSON.stringify(n).includes('private') && !JSON.stringify(n).includes('secret'));
 });
 
+test('school notice pushes use a fixed title and only course and posted time', () => {
+  const n = notificationData({kind: 'notice', title: 'private title', body: 'private text', source_url: 'https://private.invalid/',
+    url: './#school', items: [{name: '테스트 과목', time: '2026-09-14 09:30', location: '', title: 'private title', evidence: 'private evidence'}]},
+  'https://example.test/schedule/');
+  assert.equal(n.title, '학교 공지 · 확인 필요');
+  assert.equal(n.options.body, '테스트 과목 · 2026-09-14 09:30');
+  assert.equal(n.options.data.url, 'https://example.test/schedule/#school');
+  assert.ok(!JSON.stringify(n).includes('private'));
+});
+
+test('tentative notification items append only the fixed confirmation marker', () => {
+  const scope = 'https://example.test/schedule/';
+  const item = {name: '과목', time: '09:30–10:45', location: '301동', status: 'tentative', notes: 'private notes'};
+  const marked = notificationData({kind: 'deadline', items: [item]}, scope);
+  assert.equal(marked.options.body, '과목 · 09:30–10:45 · 301동 · 확인 필요');
+  for (const status of ['confirmed', 'private status', 'TENTATIVE', null, {toString: () => 'tentative'}]) {
+    assert.equal(notificationData({kind: 'daily', items: [{...item, status}]}, scope).options.body, '과목 · 09:30–10:45 · 301동');
+  }
+  assert.ok(!JSON.stringify(marked).includes('private'));
+});
+
 test('notification click URLs cannot escape app scope or retain query credentials', () => {
   const scope = 'https://example.test/schedule/';
   for (const url of ['https://evil.test/', '../other/', '//evil.test/', '/schedule-evil/', 'javascript:alert(1)', 'https://user:pass@example.test/schedule/']) {
@@ -199,6 +234,9 @@ test('notification click URLs cannot escape app scope or retain query credential
   }
   assert.equal(notificationData({url: './?token=secret#private'}, scope).options.data.url, scope);
   assert.equal(notificationData({url: './index.html'}, scope).options.data.url, scope + 'index.html');
+  assert.equal(notificationData({url: './?token=secret#school'}, scope).options.data.url, scope + '#school');
+  assert.equal(notificationData({url: './#school?secret'}, scope).options.data.url, scope);
+  assert.equal(notificationData({url: 'https://evil.test/#school'}, scope).options.data.url, scope);
   assert.equal(notificationData({kind: '__proto__', tag: 'bad\nsecret'}, scope).title, '일정 변경 반영');
 });
 

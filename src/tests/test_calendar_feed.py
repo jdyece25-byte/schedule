@@ -166,6 +166,7 @@ class CalendarBuildTests(unittest.TestCase):
         expected = {"index.html", "bridge-client.js", "bridge-client.css", "push-client.js",
                     "push-client.css", "manifest.webmanifest", "sw.js", "push-config.json",
                     "icon-192.png", "icon-512.png", "badge-96.png", "events.ics",
+                    "school-client.js", "school-client.css",
                     "DB/events.json", "DB/travel.json", "DB/plan.json",
                     "events.json", "travel.json", "plan.json"}
         self.assertEqual(files, expected)

@@ -31,6 +31,13 @@ def subscription(**changes):
                              "keys": {"p256dh": encode(b"\x04" + b"\0" * 64), "auth": encode(b"a" * 16)}}, **changes}
 
 
+def school_item(**changes):
+    return {"id": "notice-one", "content_hash": "version-one", "course": "테스트 과목",
+            "title": "PRIVATE ANNOUNCEMENT TITLE", "source_url": "https://private.invalid/token",
+            "first_seen_at": schedule.stamp(at()), "updated_at": schedule.stamp(at(hour=6)),
+            "state": "needs_review", "candidates": [{"evidence": "PRIVATE EVIDENCE"}], **changes}
+
+
 class FakeGitHub:
     def __init__(self, events=None, now=None):
         self.now = now or at()
@@ -141,7 +148,46 @@ class ScheduleTests(unittest.TestCase):
             after = schedule.snapshot([event(**update)], TRAVEL)
             notices = schedule.changes(before, after, "newrevision", at(), at())
             self.assertEqual(len(notices), 1)
-            self.assertEqual(set(notices[0]["payload"]["items"][0]), {"name", "time", "location"})
+            expected = {"name", "time", "location"}
+            if update.get("status") == "tentative":
+                expected.add("status")
+            self.assertEqual(set(notices[0]["payload"]["items"][0]), expected)
+
+    def test_tentative_rendering_preserves_existing_snapshot_without_change_replay(self):
+        previous = {"id:one:0": {
+            "date": "2026-09-14", "item": {"name": "테스트 과목", "time": "2026-09-14 10:00–11:15", "location": "첫 강의실"},
+            "status": "tentative", "cancelled": False,
+        }}
+        current = schedule.snapshot([event(status="tentative")], TRAVEL)
+        self.assertEqual(current, previous)
+        self.assertFalse(schedule.changes(previous, current, "render-upgrade", at(), at()))
+        changed = schedule.snapshot([event(status="tentative", s=660)], TRAVEL)
+        item = schedule.changes(previous, changed, "time-update", at(), at())[0]["payload"]["items"][0]
+        self.assertEqual(item["status"], "tentative")
+        self.assertIn("11:00", item["time"])
+
+    def test_only_exact_tentative_status_is_allowed_into_payloads(self):
+        self.assertEqual(schedule.display(event(status="tentative"), TRAVEL)["status"], "tentative")
+        for status in ("confirmed", "private secret", "TENTATIVE", None):
+            self.assertNotIn("status", schedule.display(event(status=status), TRAVEL))
+
+    def test_tentative_deadlines_keep_evening_and_morning_reminders(self):
+        values = [event(t="deadline", status="tentative", d="2026-09-15")]
+        for moment, due in ((at(hour=20, minute=2), at(hour=20, minute=0)),
+                            (at(day=15, hour=8, minute=2), at(day=15, hour=8, minute=0))):
+            notices = [n for n in schedule.scheduled(values, TRAVEL, moment) if n["kind"] == "deadline"]
+            self.assertEqual(len(notices), 1)
+            self.assertEqual(schedule.parse_stamp(notices[0]["due"]), due)
+            self.assertEqual(notices[0]["payload"]["items"][0]["status"], "tentative")
+            self.assertTrue(schedule.eligible(subscription(), notices[0], moment))
+
+    def test_lab_and_exam_departures_use_known_routes_and_preserve_tentative_marker(self):
+        for kind in ("lab", "exam"):
+            values = [event(s=480, e=540), event(id="next", t=kind, status="tentative", lid="b", s=660, e=720)]
+            notices = [n for n in schedule.scheduled(values, TRAVEL, at(hour=9, minute=52)) if n["kind"] == "departure"]
+            self.assertEqual(len(notices), 1)
+            self.assertEqual(notices[0]["payload"]["items"][0]["status"], "tentative")
+            self.assertFalse(any(n["kind"] == "departure" for n in schedule.scheduled(values, {}, at(hour=9, minute=52))))
 
     def test_display_excludes_notes_arbitrary_time_labels_and_control_characters(self):
         value = schedule.display(event(n="과목\n이름", no="secret", ti="secret token", s=None, e=None), TRAVEL)
@@ -349,6 +395,110 @@ class EndpointTests(unittest.TestCase):
         self.assertFalse(validate_subscription(value, "../phone1"))
         value["subscription"]["keys"]["auth"] = "bad"
         self.assertFalse(validate_subscription(value, "phone1"))
+
+
+class SchoolNoticeTests(unittest.TestCase):
+    def notices(self, items=None, now=None):
+        return schedule.school_notices({"version": 1, "items": [school_item()] if items is None else items}, now or at())
+
+    def execute(self, github, transport):
+        return run(github, transport, "owner/private", "owner/schedule", True, now=lambda: github.now)
+
+    def setup_sender(self, items=None):
+        github, transport = FakeGitHub(), Transport()
+        github.files[("owner/private", "school/index.json")] = {"version": 1, "items": [school_item()] if items is None else items}
+        return github, transport
+
+    def test_only_reviewable_states_emit_generic_course_time_payload(self):
+        for state in ("needs_review", "info", "conflict", "ready"):
+            notice = self.notices([school_item(state=state)])[0]
+            self.assertEqual(notice["kind"], "notice")
+            self.assertEqual(notice["payload"]["items"], [{"name": "테스트 과목", "time": "2026-09-14 06:32", "location": ""}])
+            self.assertEqual(notice["payload"]["url"], "./#school")
+            self.assertNotIn("PRIVATE", str(notice))
+            self.assertNotIn("private.invalid", str(notice))
+        for state in ("baseline", "ignored", "applied", "unknown"):
+            self.assertEqual(self.notices([school_item(state=state)]), [])
+
+    def test_first_seen_controls_due_time_and_older_posting_does_not_replay(self):
+        item = school_item(updated_at="2020-01-01T00:00:00Z")
+        notice = self.notices([item])[0]
+        self.assertEqual(schedule.parse_stamp(notice["due"]), at())
+        self.assertEqual(notice["payload"]["items"][0]["time"], "2020-01-01 09:00")
+        self.assertFalse(self.notices([school_item(first_seen_at=schedule.stamp(at() - timedelta(days=1)))]))
+        self.assertFalse(self.notices([school_item(first_seen_at=schedule.stamp(at() + timedelta(minutes=1)))]))
+        self.assertFalse(self.notices([school_item(first_seen_at="9999-12-31T23:59:59Z")]))
+
+    def test_old_device_absent_notice_preference_defaults_on_but_explicit_off_is_honored(self):
+        notice = self.notices()[0]
+        self.assertTrue(schedule.eligible(subscription(preferences={"daily": False}), notice, at()))
+        for value in (False, None, "true", 1):
+            self.assertFalse(schedule.eligible(subscription(preferences={"notice": value}), notice, at()))
+        self.assertFalse(schedule.eligible(subscription(enabled=False), notice, at()))
+        self.assertFalse(schedule.eligible(subscription(created_at=schedule.stamp(at() + timedelta(seconds=1))), notice, at() + timedelta(seconds=2)))
+
+    def test_same_content_hash_deduplicates_and_new_content_version_notifies(self):
+        github, transport = self.setup_sender()
+        self.assertEqual(self.execute(github, transport)["sent"], 1)
+        self.assertEqual(self.execute(github, transport)["sent"], 0)
+        self.assertEqual(transport.sent[0]["kind"], "notice")
+        github.files[("owner/private", "school/index.json")]["items"][0]["content_hash"] = "version-two"
+        self.assertEqual(self.execute(github, transport)["sent"], 1)
+        self.assertNotEqual(transport.sent[0]["id"], transport.sent[1]["id"])
+
+    def test_duplicate_registry_entries_and_delimiter_collision_do_not_duplicate_or_merge(self):
+        values = [school_item(), school_item(), school_item(id="a:b", content_hash="c"), school_item(id="a", content_hash="b:c")]
+        notices = self.notices(values)
+        self.assertEqual(len(notices), 3)
+        self.assertEqual(len({notice["id"] for notice in notices}), 3)
+
+    def test_invalid_or_missing_index_does_not_block_regular_daily_alert(self):
+        for value in (None, {}, {"version": 2, "items": []}, {"version": 1, "items": "invalid"},
+                      {"version": 1, "items": [None, school_item(first_seen_at="bad"), school_item(course={})]}):
+            github, transport = FakeGitHub(), Transport()
+            github.files[("owner/private", "school/index.json")] = value
+            result = run(github, transport, "owner/private", "owner/schedule", now=lambda: github.now)
+            self.assertEqual(result["sent"], 1)
+            self.assertEqual([notice["kind"] for notice in transport.sent], ["daily"])
+
+    def test_index_network_failure_is_isolated_from_regular_schedule(self):
+        github, transport = FakeGitHub(), Transport()
+        read = github.read_json
+
+        def failed_index(repo, path, ref="main"):
+            if path == "school/index.json":
+                raise GitHubError(503, "network unavailable")
+            return read(repo, path, ref)
+
+        github.read_json = failed_index
+        result = run(github, transport, "owner/private", "owner/schedule", now=lambda: github.now)
+        self.assertEqual(result["sent"], 1)
+
+    def test_notice_retry_reuses_durable_delivery_ledger(self):
+        github, transport = self.setup_sender()
+        transport.status = 503
+        self.assertEqual(self.execute(github, transport)["retry"], 1)
+        self.assertFalse(github.files[("owner/private", STATE_PATH)]["delivered"])
+        transport.status = 201
+        self.assertEqual(self.execute(github, transport)["sent"], 1)
+        self.assertEqual(self.execute(github, transport)["sent"], 0)
+
+    def test_review_completed_while_waiting_for_send_lease_suppresses_notice(self):
+        github, transport = self.setup_sender()
+        put = github.put_json
+
+        def apply_notice(*args, **kwargs):
+            result = put(*args, **kwargs)
+            github.files[("owner/private", "school/index.json")]["items"][0]["state"] = "applied"
+            return result
+
+        github.put_json = apply_notice
+        self.assertEqual(self.execute(github, transport)["sent"], 0)
+        self.assertFalse(transport.sent)
+
+    def test_posted_date_without_time_is_preserved_and_invalid_time_not_guessed(self):
+        for updated_at, expected in (("2026-09-13", "2026-09-13"), ("PRIVATE UNKNOWN TEXT", "게시 시각 미정")):
+            self.assertEqual(self.notices([school_item(updated_at=updated_at)])[0]["payload"]["items"][0]["time"], expected)
 
 
 if __name__ == "__main__":

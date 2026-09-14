@@ -8,6 +8,8 @@ The public URL remains https://jdyece25-byte.github.io/schedule/.
 | `src/index.html`, `src/bridge-client.js`, `src/bridge-client.css` | Current website |
 | `src/bridge/` | PC request worker, validator, GitHub adapter and install/stop scripts |
 | `src/bridge/supervisor.py`, `health.py` | Automatic recovery and read-only health inspection |
+| `src/school-client.js`, `src/school-client.css` | 학교 공지 확인·일정 후보 편집·반영 요청 화면 |
+| `src/school/` | 독립 학교 공지 수집기, 날짜 추출·반영 검증, eTL 연결 |
 | `src/validate_db.py` | Validate current DB shape without old schedule expectations |
 | `src/build.py` | Build the public website from an explicit file list |
 | `src/tests/` | Regression checks for data, saving and request processing |
@@ -17,10 +19,11 @@ The public URL remains https://jdyece25-byte.github.io/schedule/.
 | `DB/travel_reference.json` | Historical route details and alternatives |
 | `DB/SCHEDULE.md` | Semester rules and unresolved details; current JSON takes priority |
 | `DB/applied/` | Receipts that prevent duplicate request processing |
+| `DB/school-sources.json`, `DB/school-applied/` | 학교 자료의 과목·학기 설정과 중복 반영 방지 기록 |
 
 `.github/workflows/pages.yml` is hidden deployment configuration; `.git/` is local Git history.
 `.claude/CLAUDE.md` imports shared `DB/AGENTS.md` at Claude project startup; root `AGENTS.md` points Codex to the same rules. These are hidden configuration entries, while user files remain in `src/` and `DB/`.
-The site artifact contains only frontend files and the three runtime JSON files.
+The site artifact contains only the frontend/PWA allowlist, three runtime JSON files, and generated `events.ics`.
 Legacy root JSON aliases are generated in that artifact for already-open browsers; source data exists only in `DB/`.
 
 ## Local preview
@@ -126,7 +129,7 @@ python -B "$env:LOCALAPPDATA\ScheduleBridge\runtime\supervisor.py" --config "$en
 ## 개발 검증
 
 ```powershell
-node --test src/tests/schedule.test.cjs src/tests/bridge-client.test.cjs
+node --test src/tests/schedule.test.cjs src/tests/bridge-client.test.cjs src/tests/push-client.test.cjs src/tests/school-client.test.cjs
 python -B -m unittest discover -s src/tests -p 'test_*.py' -v
 python -B src/validate_db.py
 ```
@@ -141,7 +144,7 @@ python -B src/validate_db.py
 2. iPhone: iOS 16.4 이상에서 Safari **공유 → 홈 화면에 추가** 후 홈 화면 아이콘으로 엽니다. 홈 화면 앱에서 버튼을 눌러야 알림 권한을 요청할 수 있습니다. [WebKit 공식 안내](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)
 3. **이 기기 알림 켜기 → 허용**, 종류 선택 후 **알림 종류 저장**을 누릅니다. 설정은 기기별로 적용됩니다. **테스트 알림 보내기**는 실제 일정의 과목·시각·장소를 담은 발송을 요청하며, 버튼의 저장 성공은 휴대폰 수신 성공을 뜻하지 않습니다.
 
-한국 시간 기준으로 마감 전날 20:00·당일 08:00, 오늘 일정 07:30, 일정 변경 반영, 이동 출발 30분 전 알림을 제공합니다. 이동은 바로 앞 일정의 장소에서 다음 일정 장소까지 `DB/travel.json`에 등록된 방향별 이동시간을 사용합니다. 첫 일정·장소 미정·이동 경로 미등록은 추측하지 않고 건너뜁니다. 취소된 일정은 정기 알림에서 제외합니다.
+한국 시간 기준으로 마감 전날 20:00·당일 08:00, 오늘 일정 07:30, 일정 변경 반영, 이동 출발 30분 전 알림을 제공합니다. **학교 공지**도 종류별 설정에서 켜고 끌 수 있습니다. 확인이 필요한 일정에는 **확인 필요** 표시가 붙습니다. 이동은 바로 앞 일정의 장소에서 다음 일정 장소까지 `DB/travel.json`에 등록된 방향별 이동시간을 사용합니다. 첫 일정·장소 미정·이동 경로 미등록은 추측하지 않고 건너뜁니다. 취소된 일정은 정기 알림에서 제외합니다.
 
 발송은 비공개 `schedule-requests`의 GitHub Actions에서 실행되어 PC가 꺼져 있어도 동작합니다. 정기 크론과 요청 처리 결과·구독 설정 변경 시 실행을 함께 사용합니다. GitHub Actions 예약 실행은 지연되거나 실행 한도의 영향을 받을 수 있으므로 정확한 시각의 도착을 보장하지 않습니다. 지연된 실행은 정해진 유효시간 안에서 재시도합니다. [GitHub 예약 실행 안내](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
 
@@ -150,6 +153,8 @@ PC의 별도 `SchedulePush` 프로그램은 약 10초마다 새 GitHub 버전을
 구독은 비공개 `subscriptions/<기기ID>.json`, 발송 기록·변경 대기는 비공개 `notification-state/state.json`에만 저장됩니다. `VAPID_PRIVATE_KEY`는 비공개 저장소 Secret이며, PC용 사본은 `%LOCALAPPDATA%/SchedulePush/vapid.dpapi`에 현재 Windows 계정으로 암호화되어 있습니다. 공개 `src/push-config.json`의 VAPID 공개키는 브라우저 구독용이며 발송 비밀키가 아닙니다. 푸시 본문에는 과목·시각·장소만 넣으며 요청 문장·메모·토큰을 포함하지 않습니다. Service Worker는 GitHub 응답이나 DB를 캐시하지 않습니다.
 
 캘린더 구독 주소는 `https://jdyece25-byte.github.io/schedule/events.ics`입니다. **구독 주소 복사** 또는 **캘린더 구독 열기**를 사용합니다. 주소로 구독하면 캘린더 앱의 주기에 따라 갱신되며, ICS 파일을 한 번 가져오기만 하면 이후 변경이 자동 반영되지 않습니다. ICS에는 일정명·시간·장소와 캘린더 표준 메타데이터만 포함합니다. DB에 ID가 없는 과거 일정은 날짜·제목 변경 시 새 항목으로 인식될 수 있습니다.
+
+Google 캘린더는 **PC 웹 → 설정 → 캘린더 추가 → URL로 추가**에서 위 주소를 붙여넣고 **캘린더 추가**를 누릅니다. 왼쪽 **다른 캘린더 + → URL로 추가**에서도 같은 기능을 엽니다. 휴대폰 앱에서는 같은 Google 계정으로 추가한 캘린더를 표시합니다. **가져오기**로 ICS 파일을 넣는 방식은 한 번 복사되므로 주소 구독을 이용하세요. [Google 캘린더 공식 안내](https://support.google.com/calendar/answer/37100?hl=ko)
 
 ### 발송 코드 운영
 
@@ -167,3 +172,41 @@ node --test src/tests/push-client.test.cjs
 ```
 
 PC 발송기의 `pc.py` 업데이트는 현재 발송이 끝난 뒤 자동 재실행으로 적용되며, 매분 복구 작업과 로그인 시 자동 시작이 등록됩니다. PC 발송만 중지하려면 `%LOCALAPPDATA%/SchedulePush/disabled` 파일을 생성하며, 클라우드 발송까지 끄려면 앱에서 **이 기기 알림 끄기**를 사용합니다. 일반 일정 수정에서는 어느 서비스도 중지하지 않습니다.
+
+## 학교 공지와 eTL 일정 확인
+
+휴대폰의 **홈 → 학교 공지**에서 공지·과제·시험·실험 일정을 확인합니다. **편집·설정 → 학교 공지 확인**으로도 열 수 있으며, 기존 비공개 **일정 요청 연결**을 그대로 사용합니다.
+
+1. 과목·공지 제목과 **학교 원문 열기**를 확인합니다. 기본 화면은 확인할 공지이며, 기존 자료는 접힌 **지난 공지·기준 자료**에 있습니다.
+2. 일정 후보의 날짜·시각·장소를 확인하고 필요한 내용을 수정합니다. 미정 사항은 **확인 필요 상태로 등록**을 유지합니다.
+3. 반영할 후보만 선택하고 **선택한 일정 반영 요청**을 누릅니다. 삭제 후보는 대상이 정해진 기존 일정을 그대로 보여 주며, 명시적으로 선택해야 삭제 요청이 접수됩니다.
+4. **처리 요청 접수**는 대기 상태입니다. **목록 새로고침**으로 반영 완료·충돌을 확인합니다. 일부만 선택하면 남은 후보는 계속 확인 대상으로 남습니다. 일정 후보가 없는 자료는 **확인했어요**, 추가 설명이 필요하면 **자연어 일정 요청으로 열기**를 사용합니다.
+
+학교 공지 상태에는 수집기별 마지막 확인 시각이 표시됩니다. `auth_required`는 **다시 로그인 필요**, 일부 파일만 읽었으면 **일부 수집 · 확인 필요**로 표시합니다. 목록이 없으면 **수집 대기**이며, 서버 연결 성공만으로 eTL 수집이 된 것으로 표시하지 않습니다.
+
+| 처리 위치 | 동작과 주기 |
+| --- | --- |
+| PC `ScheduleSchool` | 지정한 `2-2` 과목 폴더와 연결된 eTL을 약 15분마다 확인합니다. |
+| 비공개 GitHub Actions | eTL 인증 후 약 15분마다 `--inbox-only`로 공지를 수집합니다. PC가 꺼져 있어도 공지 목록·알림을 갱신하며, 공개 일정 DB는 변경하지 않습니다. |
+| PC 반영 처리 | 승인 요청을 약 30초마다 확인합니다. 검증 가능한 과제 마감의 자동 반영과 사용자가 선택한 변경의 검증·DB 저장은 PC에서 처리합니다. |
+
+예약 실행과 네트워크 상황에 따라 실제 처리는 늦어질 수 있습니다. **PC가 꺼져 있으면 일정 DB 반영은 대기**합니다. 학교 수집기는 `%LOCALAPPDATA%/ScheduleSchool`에서 독립 실행되고, 로그인 시 시작하며 매분 복구 작업이 가동 여부를 확인합니다. DB·화면을 수정할 때 `ScheduleSchool`, `ScheduleBridge`, `SchedulePush`를 중지하거나 재설치하지 않습니다.
+
+도입 당시 검증된 일정 392건은 초기 수집에서 변경하지 않고, 기존 자료를 관찰 기준으로 등록합니다. 이후 DB의 실제 일정 수는 늘거나 줄 수 있습니다. eTL에서 가져온 일정 ID·중복 방지 기록·수동 수정은 보존합니다. 주차만 적힌 자료에서 날짜를 만들거나 공휴일이라는 이유만으로 반복 수업을 삭제하지 않습니다. HWP·이미지·텍스트가 없는 PDF처럼 내용을 읽을 수 없는 자료는 확인 대상 정보로 남기며, 일정이 추출됐다고 가정하지 않습니다.
+
+### eTL 최초 연결·운영
+
+초기 eTL 인증은 별도로 필요합니다. 학교 공지에 **다시 로그인 필요**가 보이면 접근 권한이 있는 eTL API 토큰으로 아래 연결 명령을 실행합니다. 입력은 화면에 표시되지 않으며, 학교 계정 비밀번호를 입력하지 않습니다. `--cloud`는 검증된 토큰을 비공개 요청 저장소의 `ETL_API_TOKEN` Secret에도 저장해 PC가 꺼져 있을 때의 수집을 연결합니다. GitHub CLI에는 해당 비공개 저장소 Secret을 설정할 권한이 필요합니다.
+
+```powershell
+# 최초 설치: 2-2 과목 폴더를 지정. 기존 일정·푸시 처리기는 계속 실행
+powershell -NoProfile -ExecutionPolicy Bypass -File src/school/install.ps1 -LocalRoot "<2-2 과목 폴더>"
+
+# 토큰을 숨김 입력으로 검증하고 PC 암호화 저장 + 비공개 Actions Secret 연결
+& "$env:LOCALAPPDATA\ScheduleSchool\.venv\Scripts\python.exe" -B "$env:LOCALAPPDATA\ScheduleSchool\runtime\src\school\connect.py" --cloud
+
+# 실제 PC 수집기 상태 확인: 인증 값이나 공지 원문은 출력하지 않음
+& "$env:LOCALAPPDATA\ScheduleSchool\.venv\Scripts\python.exe" -B "$env:LOCALAPPDATA\ScheduleSchool\runtime\src\school\pc.py" --config "$env:LOCALAPPDATA\ScheduleSchool\config.json" --status
+```
+
+PC용 인증은 현재 Windows 계정으로 암호화한 `etl.dpapi`에 저장합니다. 토큰·쿠키·학교 자료 원문·실제 개인 폴더 경로는 공개 저장소에 넣지 않습니다. 비공개 저장소의 `school/index.json`은 확인 목록, `school/sources/`는 수집 원문, `school/decisions/`는 변경하지 않는 확인 요청, `school/decision-results/`는 처리 결과입니다. 공개 DB에는 검증된 일정과 필요한 출처 식별값만 남깁니다. 원문 해시나 대상 일정이 달라지면 변경을 강행하지 않고 다시 확인하도록 합니다.

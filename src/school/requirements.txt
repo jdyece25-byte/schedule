@@ -1,0 +1,2 @@
+# Optional for local PDFs; Office and text adapters use Python's standard library.
+pypdf==6.14.2

@@ -1,0 +1,74 @@
+# Install only as .github/workflows/school.yml in the PRIVATE request repository.
+# Its GITHUB_TOKEN cannot write the public schedule repository: cloud collection
+# writes the private inbox only. The independent PC importer applies DB changes.
+name: Collect school notices
+
+on:
+  schedule:
+    - cron: '7-59/15 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'school/decisions/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: schedule-school-inbox
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.event.repository.private == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out public collector code
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: jdyece25-byte/schedule
+          ref: main
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            src/school/requirements.txt
+            src/notifications/requirements.txt
+      - name: Install document reader
+        run: python -m pip install --disable-pip-version-check -r src/school/requirements.txt -r src/notifications/requirements.txt
+      - name: Collect into private inbox without changing public DB
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ETL_API_TOKEN: ${{ secrets.ETL_API_TOKEN }}
+        shell: bash
+        run: |
+          set +e
+          python -B src/school/runner.py --sources DB/school-sources.json --inbox-only
+          result=$?
+          if [ "$result" = 75 ]; then
+            echo 'Another collector is active; the next pass will retry.'
+            exit 0
+          fi
+          exit "$result"
+      # GITHUB_TOKEN commits do not trigger another push workflow. Send here
+      # explicitly; the ordinary notification cron remains the retry path.
+      - name: Deliver newly collected notices
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: https://jdyece25-byte.github.io/schedule/
+        shell: bash
+        run: |
+          set +e
+          python -B src/notifications/sender.py --changes-only
+          result=$?
+          if [ "$result" = 75 ]; then
+            echo 'Another sender owns delivery; the ordinary push cron will retry.'
+            exit 0
+          fi
+          exit "$result"

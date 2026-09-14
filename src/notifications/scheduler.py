@@ -7,7 +7,7 @@ import json
 import re
 
 KST = timezone(timedelta(hours=9))
-KINDS = ("deadline", "daily", "changes", "departure")
+KINDS = ("deadline", "daily", "changes", "departure", "notice")
 CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -56,8 +56,11 @@ def display(event, travel):
         if minute(event.get("e")):
             timing += "–" + clock(event["e"])
     location = event.get("loc") or travel.get("locations", {}).get(event.get("lid"))
-    return {"name": clean(event.get("n")), "time": f"{event['d']} {timing}",
+    item = {"name": clean(event.get("n")), "time": f"{event['d']} {timing}",
             "location": clean(location)}
+    if event.get("status") == "tentative":
+        item["status"] = "tentative"
+    return item
 
 
 def snapshot(events, travel):
@@ -70,7 +73,11 @@ def snapshot(events, travel):
             [event["d"], event.get("t"), event["n"]])
         count = occurrences.get(identity, 0)
         occurrences[identity] = count + 1
-        result[f"{identity}:{count}"] = {"date": event["d"], "item": display(event, travel),
+        # Keep the persisted display shape stable. Status already lives outside
+        # item in v1 snapshots; a rendering upgrade must not announce every
+        # unchanged tentative event as a new schedule change.
+        item = {name: value for name, value in display(event, travel).items() if name != "status"}
+        result[f"{identity}:{count}"] = {"date": event["d"], "item": item,
                                           "status": clean(event.get("status")), "cancelled": cancelled(event)}
     return result
 
@@ -107,7 +114,10 @@ def changes(previous, current, revision, changed_at, now):
             continue
         value = after or before
         if value["date"] >= now.astimezone(KST).date().isoformat():
-            changed.append(value["item"])
+            item = dict(value["item"])
+            if value.get("status") == "tentative":
+                item["status"] = "tentative"
+            changed.append(item)
     if not changed:
         return []
     # Date/time/place is the entire payload, including deletion notifications.
@@ -159,8 +169,57 @@ def scheduled(events, travel, now):
     return result
 
 
+def school_notices(index, now):
+    """Private announcements become generic course/time-only notifications.
+
+    The collector owns first_seen_at for each content version. Provider posting
+    dates are display metadata and must never trigger a historical replay.
+    """
+    if not isinstance(index, dict) or index.get("version") != 1 or not isinstance(index.get("items"), list):
+        return []
+    result = []
+    seen = set()
+    for item in index["items"]:
+        if not isinstance(item, dict) or item.get("state") not in ("needs_review", "info", "conflict", "ready"):
+            continue
+        identifier, content_hash, course = item.get("id"), item.get("content_hash"), item.get("course")
+        if any(not isinstance(value, str) or not value.strip() or len(value) > 512
+               for value in (identifier, content_hash, course)):
+            continue
+        key = "notice:" + digest([identifier, content_hash])
+        if key in seen:
+            continue
+        try:
+            due = parse_stamp(item["first_seen_at"])
+        except (KeyError, ValueError, TypeError, AttributeError):
+            continue
+        if due > now:
+            continue
+        expires = due + timedelta(hours=24)
+        if not now < expires:
+            continue
+        posted = "게시 시각 미정"
+        try:
+            posted = parse_stamp(item.get("updated_at", "")).astimezone(KST).strftime("%Y-%m-%d %H:%M")
+        except (ValueError, TypeError, AttributeError):
+            try:
+                posted = date.fromisoformat(item.get("updated_at", "")).isoformat()
+            except (ValueError, TypeError, AttributeError):
+                pass
+        notice = notification("notice", key, due, expires,
+                              [{"name": clean(course), "time": posted, "location": ""}])
+        notice["payload"]["url"] = "./#school"
+        result.append(notice)
+        seen.add(key)
+    return result
+
+
 def eligible(subscription, notice, now):
-    if subscription.get("enabled") is not True or subscription.get("preferences", {}).get(notice["kind"]) is not True:
+    preferences = subscription.get("preferences", {})
+    if not isinstance(preferences, dict):
+        return False
+    enabled = preferences.get(notice["kind"], True if notice["kind"] == "notice" else None)
+    if subscription.get("enabled") is not True or enabled is not True:
         return False
     try:
         created = parse_stamp(subscription["created_at"])

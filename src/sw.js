@@ -1,17 +1,17 @@
 'use strict';
 // No fetch handler or CacheStorage: schedules, tokens and private API responses
 // are always handled by the page/network, never stored in this worker.
-const TITLES = Object.freeze({deadline: '마감 알림', daily: '오늘 일정', changes: '일정 변경 반영', departure: '이동 출발 30분 전'});
+const TITLES = Object.freeze({deadline: '마감 알림', daily: '오늘 일정', changes: '일정 변경 반영', departure: '이동 출발 30분 전', notice: '학교 공지 · 확인 필요'});
 const clean = value => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120) : '';
 function notificationData(payload, scope) {
   const kind = Object.hasOwn(TITLES, payload?.kind) ? payload.kind : 'changes';
   const items = Array.isArray(payload?.items) ? payload.items.slice(0, 10) : [];
-  const body = items.map(item => [clean(item?.name), clean(item?.time), clean(item?.location)].filter(Boolean).join(' · ')).filter(Boolean).join('\n').slice(0, 1500);
+  const body = items.map(item => [clean(item?.name), clean(item?.time), clean(item?.location), item?.status === 'tentative' ? '확인 필요' : ''].filter(Boolean).join(' · ')).filter(Boolean).join('\n').slice(0, 1500);
   const base = new URL(scope);
   let url = base.href;
   try {
     const requested = new URL(payload?.url || './', base);
-    if (requested.origin === base.origin && requested.pathname.startsWith(base.pathname) && !requested.username && !requested.password) url = requested.origin + requested.pathname;
+    if (requested.origin === base.origin && requested.pathname.startsWith(base.pathname) && !requested.username && !requested.password) url = requested.origin + requested.pathname + (requested.hash === '#school' ? '#school' : '');
   } catch { /* A notification click must remain inside this app. */ }
   const tag = typeof payload?.tag === 'string' && /^[a-zA-Z0-9:_-]{1,180}$/.test(payload.tag) ? payload.tag : undefined;
   return {title: TITLES[kind], options: {body, icon: new URL('icon-192.png', base).href, badge: new URL('badge-96.png', base).href, tag, data: {url}, lang: 'ko', dir: 'auto'}};

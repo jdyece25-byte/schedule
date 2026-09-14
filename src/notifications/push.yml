@@ -14,6 +14,7 @@ on:
     paths:
       - 'results/**/*.json'
       - 'subscriptions/**/*.json'
+      - 'school/index.json'
 
 permissions:
   contents: write

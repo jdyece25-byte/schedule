@@ -21,7 +21,7 @@ if __package__ in (None, ""):
 
 from src.bridge.github import GitHub, GitHubError
 from src.notifications.scheduler import (KST, cancelled, changes, digest, display, eligible, notification,
-                                         order, parse_stamp, scheduled, snapshot, stamp)
+                                         order, parse_stamp, scheduled, school_notices, snapshot, stamp)
 
 STATE_PATH = "notification-state/state.json"
 DEVICE_RE = re.compile(r"[A-Za-z0-9_-]{1,100}\Z")
@@ -177,6 +177,16 @@ def load_subscriptions(github, queue):
     return result
 
 
+def load_school_notices(github, queue, now):
+    try:
+        index, _ = github.read_json(queue, "school/index.json")
+        return school_notices(index, now)
+    except (GitHubError, ValueError, TypeError, KeyError, AttributeError):
+        # A collector error or absent/private malformed index cannot block the
+        # independently useful daily, deadline, change and departure reminders.
+        return []
+
+
 def test_notice(subscription, events, travel, now):
     try:
         due = parse_stamp(subscription["test_requested_at"])
@@ -230,9 +240,10 @@ def run(github, transport, queue, target, changes_only=False, now=None):
     store = StateStore(github, queue, now)
     old, _ = store.read()
     clock_notices = [] if changes_only else scheduled(events, travel, started)
+    announcement_notices = load_school_notices(github, queue, started)
 
     def candidates(state, subscription):
-        result = state["outbox"] + clock_notices
+        result = state["outbox"] + clock_notices + announcement_notices
         test = test_notice(subscription, events, travel, started)
         return result + ([test] if test else [])
 
@@ -245,6 +256,9 @@ def run(github, transport, queue, target, changes_only=False, now=None):
     counts = {"status": "ok", "sent": 0, "retry": 0, "expired": 0}
     try:
         state = store.state
+        # A reviewer may have applied/ignored a notice while we waited for the
+        # shared send lease. Consume the latest private state before delivery.
+        announcement_notices = load_school_notices(github, queue, now())
         # A waiting runner may have read an older DB revision than the sender
         # that just released the lease. Refresh after acquisition before diffing.
         latest_revision = github.head(target)

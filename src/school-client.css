@@ -1,0 +1,23 @@
+#v-school{padding:16px;padding-bottom:calc(var(--bnav-h) + env(safe-area-inset-bottom) + 24px)}
+.school-panel{width:100%;max-width:860px;min-width:0;margin:0 auto}
+.school-heading{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.school-heading h2{font-size:19px}.school-heading select{width:auto;max-width:100%;min-height:40px}
+.school-home-link{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:18px;border-radius:14px;background:var(--s2);border:1px solid var(--bd);color:var(--tx);font:inherit;text-align:left;cursor:pointer;margin:4px 0 14px}
+.school-home-link strong{font-size:16px}.school-home-link small{display:block;color:var(--tx2);font-size:11px;margin-top:6px}
+.school-collectors{white-space:pre-line;font-size:12px;line-height:1.9;color:var(--tx2);padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--s1)}
+.school-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.school-actions button{min-height:42px}
+.school-panel button:disabled{opacity:.55;cursor:wait}.school-panel button:focus-visible,.school-panel a:focus-visible,.school-panel input:focus-visible,.school-home-link:focus-visible{outline:2px solid #a5b4fc;outline-offset:3px}
+.school-note,.school-empty{font-size:12px;line-height:1.7;color:var(--tx2);overflow-wrap:anywhere}.school-empty{padding:24px 0}
+.school-warning{font-size:12px;line-height:1.7;color:#fca5a5!important;overflow-wrap:anywhere}
+.school-notice{padding:16px;margin:14px 0;border:1px solid var(--bd);border-radius:14px;background:var(--s2);min-width:0}
+.school-notice-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.school-badge{color:#c4b5fd;background:#8b5cf622;padding:4px 8px;border-radius:6px;font-size:11px}
+.school-time{font-size:10px;color:var(--tx2)}.school-course{font-size:11px;color:#a5b4fc;margin-top:12px;overflow-wrap:anywhere}.school-notice h3{font-size:15px;line-height:1.6;margin:4px 0;overflow-wrap:anywhere}
+.school-source{color:#a5b4fc;font-size:12px;display:inline-flex;align-items:center;min-height:40px}
+.school-candidate{border:1px solid var(--bd2);border-radius:10px;padding:12px;min-width:0;margin-top:18px;background:var(--s1)}
+.school-candidate legend{font-size:12px;color:var(--tx);max-width:100%;padding:0 4px}.school-candidate legend label,.school-tentative{display:flex;gap:8px;align-items:center;min-height:36px}
+.school-candidate input[type=checkbox]{accent-color:var(--acc);width:18px;height:18px;flex:none}
+.school-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.school-fields label{font-size:11px;color:var(--tx2);min-width:0;display:flex;flex-direction:column;gap:7px}
+.school-fields .edit-input{width:100%;min-width:0;min-height:42px;font-size:12px}.school-wide{grid-column:1/-1}.school-tentative{font-size:12px;color:var(--tx2);margin-top:10px}
+.school-evidence{margin-top:10px;font-size:12px;color:var(--tx2)}.school-evidence summary,.school-history>summary{cursor:pointer;min-height:38px;padding:10px 0}.school-evidence p{line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:8px}
+.school-history{font-size:12px;color:var(--tx2);margin-top:20px}.school-panel #school-status{margin:10px 0;min-height:20px}
+@media(max-width:370px){.school-notice{padding:12px}.school-candidate{padding:10px}.school-fields{grid-template-columns:minmax(0,1fr)}.school-heading{align-items:flex-start;flex-direction:column}}

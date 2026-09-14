@@ -9,9 +9,9 @@
   const TARGET = 'jdyece25-byte/schedule';
   const DEVICE_KEY = 'schedule_push_device_v1';
   const STATE_KEY = 'schedule_push_settings_v1';
-  const KINDS = ['deadline', 'daily', 'changes', 'departure'];
+  const KINDS = ['deadline', 'daily', 'changes', 'departure', 'notice'];
   const defaults = () => Object.fromEntries(KINDS.map(key => [key, true]));
-  const preferences = value => Object.fromEntries(KINDS.map(key => [key, value?.[key] !== false]));
+  const preferences = value => Object.fromEntries(KINDS.map(key => [key, key === 'notice' && Object.hasOwn(value || {}, key) ? value[key] === true : value?.[key] !== false]));
   const encode = value => btoa(Array.from(new TextEncoder().encode(JSON.stringify(value, null, 2)), b => String.fromCharCode(b)).join(''));
   const decode = file => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g, '')), c => c.charCodeAt(0))));
   const keyBytes = key => Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - key.length % 4) % 4)), c => c.charCodeAt(0));
