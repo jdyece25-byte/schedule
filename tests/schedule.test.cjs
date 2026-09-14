@@ -61,7 +61,7 @@ test('biweekly labs, power-market exceptions and one-off appointments match inst
     ['2026-09-18','2026-10-02','2026-10-16','2026-10-30','2026-11-13','2026-11-27','2026-12-11','2026-12-25']);
   const power = fall.filter(e => e.series?.startsWith('2026fall-power-'));
   for (const d of ['2026-09-23','2026-09-28','2026-09-30','2026-10-14']) assert.ok(!power.some(e => e.d === d));
-  for (const d of ['2026-09-21','2026-10-05','2026-10-12']) assert.equal(power.find(e => e.d === d).e, 1170);
+  for (const d of ['2026-09-14','2026-09-21','2026-10-05','2026-10-12']) assert.equal(power.find(e => e.d === d).e, 1170);
   for (const d of ['2026-09-16','2026-10-07']) assert.equal(power.find(e => e.d === d).e, 1095);
   const gyodae = fall.filter(e => e.id.startsWith('tutor-gyodae-'));
   assert.equal(gyodae.length, 1);
