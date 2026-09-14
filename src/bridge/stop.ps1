@@ -1,98 +1,84 @@
 [CmdletBinding()]
-param([switch]$Uninstall)
-
+param(
+    [switch]$Uninstall,
+    [switch]$Permanent,
+    [ValidateRange(1,60)][int]$MaintenanceMinutes = 2,
+    [ValidateRange(1,120)][int]$WaitSeconds = 30,
+    [ValidatePattern('^[A-Za-z0-9-]{1,100}$')][string]$MaintenanceOwner = ([Guid]::NewGuid().ToString('N'))
+)
 $ErrorActionPreference = 'Stop'
+$permanentStop = $Permanent -or $Uninstall
+if ($permanentStop -and $PSBoundParameters.ContainsKey('MaintenanceMinutes')) { throw 'Permanent stop and temporary maintenance cannot be combined.' }
 if (-not $env:LOCALAPPDATA) { throw 'LOCALAPPDATA is required on Windows.' }
 $dataDir = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'ScheduleBridge'))
 $runtimeDir = Join-Path $dataDir 'runtime'
-$workerFile = Join-Path $runtimeDir 'worker.py'
 $configFile = Join-Path $dataDir 'config.json'
-$pidFile = Join-Path $dataDir 'worker.pid'
-$stopFile = Join-Path $dataDir 'stop.request'
-$startupDir = [Environment]::GetFolderPath('Startup')
-if (-not $startupDir) { throw 'The current user Startup folder could not be resolved.' }
-$startupFile = [IO.Path]::GetFullPath((Join-Path $startupDir 'ScheduleBridge.vbs'))
-
-if (-not ('ScheduleBridge.CommandLine' -as [type])) {
-    Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-namespace ScheduleBridge {
-    public static class CommandLine {
-        [DllImport("shell32.dll", SetLastError = true)]
-        static extern IntPtr CommandLineToArgvW([MarshalAs(UnmanagedType.LPWStr)] string line, out int count);
-        [DllImport("kernel32.dll")]
-        static extern IntPtr LocalFree(IntPtr pointer);
-        public static string[] Split(string line) {
-            int count;
-            IntPtr pointer = CommandLineToArgvW(line, out count);
-            if (pointer == IntPtr.Zero) throw new InvalidOperationException("Cannot inspect process arguments.");
-            try {
-                string[] result = new string[count];
-                for (int index = 0; index < count; index++)
-                    result[index] = Marshal.PtrToStringUni(Marshal.ReadIntPtr(pointer, index * IntPtr.Size));
-                return result;
-            } finally { LocalFree(pointer); }
-        }
+if (-not (Test-Path -LiteralPath $configFile)) { Write-Output 'ScheduleBridge is not installed.'; return }
+$python = (Get-Command python.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+$supervisorSource = Join-Path $PSScriptRoot 'supervisor.py'
+$startupFile = Join-Path ([Environment]::GetFolderPath('Startup')) 'ScheduleBridge.vbs'
+$taskName = 'ScheduleBridge-' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value + '-Recovery'
+$utf8 = [Text.UTF8Encoding]::new($false)
+function Write-Control([string]$Name, [string]$Content) {
+    $target = Join-Path $dataDir $Name
+    $temporary = $target + '.' + $PID + '.tmp'
+    [IO.File]::WriteAllText($temporary, $Content, $utf8)
+    if (Test-Path -LiteralPath $target) { [IO.File]::Replace($temporary, $target, [NullString]::Value) }
+    else { [IO.File]::Move($temporary, $target) }
+}
+if ($Uninstall -and (Test-Path -LiteralPath $startupFile)) {
+    $launcher = [IO.File]::ReadAllText($startupFile)
+    if (-not $launcher.Contains("' ScheduleBridge managed launcher") -or -not $launcher.Contains($runtimeDir) -or -not $launcher.Contains($configFile)) {
+        throw 'The Startup launcher is not owned by this installation; nothing was removed.'
     }
 }
-'@
-}
-
-function Get-VerifiedWorker([int]$WorkerId) {
-    $record = Get-CimInstance Win32_Process -Filter "ProcessId = $WorkerId" -ErrorAction Stop
-    if (-not $record) { return $null }
-    if (-not $record.CommandLine) { throw "Cannot inspect process $WorkerId; it was not stopped." }
-    $arguments = [ScheduleBridge.CommandLine]::Split($record.CommandLine)
-    $valid = $arguments.Count -eq 4 -and
-        $record.Name -match '^pythonw?\.exe$' -and
-        [string]::Equals($arguments[1], $workerFile, [StringComparison]::OrdinalIgnoreCase) -and
-        $arguments[2] -eq '--config' -and
-        [string]::Equals($arguments[3], $configFile, [StringComparison]::OrdinalIgnoreCase)
-    if (-not $valid) { throw "Process $WorkerId does not match this ScheduleBridge installation; it was not stopped." }
-    return $record
-}
-
-if (Test-Path -LiteralPath $pidFile -PathType Leaf) {
-    $workerId = 0
-    $pidText = [IO.File]::ReadAllText($pidFile).Trim()
-    if (-not [int]::TryParse($pidText, [ref]$workerId) -or $workerId -le 0) {
-        throw 'The ScheduleBridge PID file is invalid; no process was stopped.'
+if ($Uninstall) {
+    $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if ($task -and ($task.Description -ne 'ScheduleBridge managed recovery' -or $task.Actions.Count -ne 1 -or -not $task.Actions[0].Arguments.Contains((Join-Path $runtimeDir 'supervisor.py')) -or -not $task.Actions[0].Arguments.Contains($configFile))) {
+        throw 'An unrelated recovery task was not removed; service state was not changed.'
     }
-    $original = Get-VerifiedWorker $workerId
-    if ($original) {
-        [IO.File]::WriteAllText($stopFile, 'stop', [Text.UTF8Encoding]::new($false))
-        $deadline = [DateTime]::UtcNow.AddSeconds(15)
-        do {
-            Start-Sleep -Milliseconds 250
-            $current = Get-VerifiedWorker $workerId
-        } while ($current -and [DateTime]::UtcNow -lt $deadline)
-        if ($current) {
-            if ($current.CreationDate -ne $original.CreationDate) {
-                throw 'The worker PID was reused; the replacement process was not stopped.'
-            }
-            $taskkill = Join-Path $env:SystemRoot 'System32/taskkill.exe'
-            & $taskkill /PID ([string]$workerId) /T /F | Out-Null
-            if ($LASTEXITCODE -ne 0 -and (Get-VerifiedWorker $workerId)) {
-                throw 'The verified worker process tree could not be stopped.'
-            }
-            Wait-Process -Id $workerId -Timeout 10 -ErrorAction SilentlyContinue
-            if (Get-VerifiedWorker $workerId) { throw 'The worker did not exit; runtime files were not changed.' }
-        }
-    }
-    if (Test-Path -LiteralPath $pidFile) { Remove-Item -LiteralPath $pidFile }
 }
-
-if ($Uninstall -and (Test-Path -LiteralPath $startupFile -PathType Leaf)) {
-    $expected = [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('Startup')) 'ScheduleBridge.vbs'))
-    if (-not [string]::Equals($startupFile, $expected, [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'The Startup launcher path did not match this installation.'
-    }
-    $contents = [IO.File]::ReadAllText($startupFile)
-    if (-not $contents.Contains("' ScheduleBridge managed launcher") -or
-        -not $contents.Contains($workerFile) -or -not $contents.Contains($configFile)) {
-        throw 'The Startup launcher is not owned by this installation; it was not removed.'
-    }
-    Remove-Item -LiteralPath $startupFile
+$controlWrittenAt = [DateTime]::UtcNow
+if (-not $permanentStop) {
+    Write-Control 'maintenance.json' (@{owner=$MaintenanceOwner; resume_at=[DateTime]::UtcNow.AddMinutes($MaintenanceMinutes).ToString('o')} | ConvertTo-Json -Compress)
+} else {
+    # Explicit user stop persists; normal DB edits never call this.
+    Write-Control 'service.disabled' 'Explicit user stop'
 }
-Write-Output $(if ($Uninstall) { 'ScheduleBridge stopped and its Startup launcher removed. Configuration and history were kept.' } else { 'ScheduleBridge stopped.' })
+Write-Control 'stop.request' 'Finish current request, then stop'
+if ($Uninstall) { Write-Control 'supervisor.stop' 'Explicit uninstall' }
+$deadline = [DateTime]::UtcNow.AddSeconds($WaitSeconds)
+$pauseAcknowledged = $false
+do {
+    $rawStatus = & $python -B $supervisorSource --config $configFile --status
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect service locks; no process was killed.' }
+    $status = $rawStatus | ConvertFrom-Json
+    if ($status.errors.Count) { throw ('Cannot inspect service: ' + ($status.errors -join '; ')) }
+    if ($Uninstall) {
+        $pauseAcknowledged = -not $status.worker_running -and -not $status.supervisor_running
+    } else {
+        # A child can exist before worker.py acquires worker.lock. Require the
+        # guard to acknowledge this pause and report that no owned child remains.
+        # An old maintenance snapshot must not count as a new acknowledgement.
+        $snapshot = $status.snapshot
+        $acknowledgedAt = [DateTimeOffset]::MinValue
+        $fresh = $snapshot -and
+            [DateTimeOffset]::TryParse([string]$snapshot.updated_at, [ref]$acknowledgedAt) -and
+            $acknowledgedAt.UtcDateTime -ge $controlWrittenAt
+        $pauseAcknowledged = -not $status.worker_running -and $status.supervisor_running -and
+            $fresh -and $snapshot.state -in @('maintenance', 'stopped') -and
+            $null -eq $snapshot.worker_pid
+    }
+    if ($pauseAcknowledged) { break }
+    Start-Sleep -Milliseconds 250
+} while ([DateTime]::UtcNow -lt $deadline)
+if (-not $pauseAcknowledged) {
+    throw 'The worker is still finishing or the supervisor has not acknowledged this pause. No process was killed. Retry after checking service health.'
+}
+if ($Uninstall) {
+    if ($task) { Unregister-ScheduledTask -TaskName $taskName -Confirm:$false }
+    if (Test-Path -LiteralPath $startupFile) { Remove-Item -LiteralPath $startupFile }
+}
+Write-Output $(if ($Uninstall) { 'ScheduleBridge stopped; automatic startup/recovery removed. Data and history kept.' }
+              elseif (-not $permanentStop) { "Worker paused temporarily; automatic resume within $MaintenanceMinutes minute(s)." }
+              else { 'Request processing stopped by explicit user choice. Use supervisor.py --ensure-running --resume to resume.' })

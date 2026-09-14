@@ -2,3 +2,4 @@ __pycache__/
 *.py[cod]
 src/bridge/config.local.json
 DB/CLAUDE.md
+.claude/settings.local.json

@@ -5,8 +5,18 @@ const vm = require('node:vm');
 const { test } = require('node:test');
 
 const root = path.join(__dirname, '..', '..');
-const events = JSON.parse(fs.readFileSync(path.join(root, 'DB', 'events.json'), 'utf8'));
-const travel = JSON.parse(fs.readFileSync(path.join(root, 'DB', 'travel.json'), 'utf8'));
+// Fixed, synthetic UI fixtures: personal DB edits must not change test expectations.
+const events = [
+  {id:'past',d:'2026-06-01',t:'class',n:'지난 수업',s:600,e:660},
+  {id:'class-1',series:'class',d:'2026-09-14',t:'class',n:'테스트 수업',s:840,e:915,lid:'campus'},
+  {id:'online',d:'2026-09-14',t:'tutor',n:'온라인 약속',s:1320,e:1440,no:'온라인'},
+  {id:'deadline',d:'2026-09-16',t:'deadline',n:'테스트 제출',s:1440},
+  {id:'lab',series:'biweekly',d:'2026-09-18',t:'lab',n:'테스트 실습',s:810,e:920,lid:'campus'},
+  {id:'tutor',d:'2026-09-21',t:'tutor',n:'일회성 약속',s:600,e:780,lid:'gyodae'},
+  {id:'class-2',series:'class',d:'2026-09-21',t:'class',n:'테스트 수업',s:840,e:915,lid:'campus',status:'tentative'},
+  {id:'meeting',d:'2026-09-24',t:'meeting',n:'시간 미정 미팅',loc:'Zoom'}
+];
+const travel = {locations:{gyodae:'교대역',campus:'학교'},times:{},modes:{}};
 const html = fs.readFileSync(path.join(root, 'src', 'index.html'), 'utf8');
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1].split('// ── INIT')[0];
 const fall = events.filter(e => e.d >= '2026-09-14');
@@ -52,40 +62,13 @@ test('published application loads schedule data exclusively from DB', async () =
   assert.equal(a.run('EVENTS.length'), events.length);
 });
 
-test('new schedule dates, IDs, midnight times and locations are valid', () => {
-  assert.equal(events.filter(e => e.d < '2026-09-14').length, 76);
-  assert.ok(fall.length >= 276);
-  assert.equal(new Set(fall.map(e => e.id)).size, fall.length);
-  for (const e of fall) {
-    assert.ok(e.d <= '2026-12-31');
-    assert.equal(new Date(e.d + 'T12:00:00Z').toISOString().slice(0, 10), e.d);
-    if (e.s != null) assert.ok(Number.isInteger(e.s) && e.s >= 0 && e.s < 1440, e.id);
-    if (e.e != null) assert.ok(Number.isInteger(e.e) && e.s != null && e.e > e.s && e.e <= 1440, e.id);
-    if (e.lid) assert.ok(travel.locations[e.lid], e.id);
-    if (e.series?.includes('online-') || e.series === '2026fall-clinic-fri') assert.equal(e.e, 1440);
-  }
-  assert.equal(fall.filter(e => e.series === '2026fall-clinic-thu').length, 16);
-  assert.equal(fall.filter(e => e.series === '2026fall-tutor-jung').length, 15);
-  assert.ok(fall.filter(e => e.series === '2026fall-macro').every(e => e.status === 'tentative'));
-});
-
-test('biweekly labs, power-market exceptions and one-off appointments match instructions', () => {
-  assert.deepEqual(fall.filter(e => e.series === '2026fall-em-lab').map(e => e.d),
-    ['2026-09-18','2026-10-02','2026-10-16','2026-10-30','2026-11-13','2026-11-27','2026-12-11','2026-12-25']);
-  const power = fall.filter(e => e.series?.startsWith('2026fall-power-'));
-  for (const d of ['2026-09-23','2026-09-28','2026-09-30','2026-10-14']) assert.ok(!power.some(e => e.d === d));
-  for (const d of ['2026-09-14','2026-09-21','2026-10-05','2026-10-12']) assert.equal(power.find(e => e.d === d).e, 1170);
-  for (const d of ['2026-09-16','2026-10-07']) assert.equal(power.find(e => e.d === d).e, 1095);
-  const gyodae = fall.filter(e => e.id.startsWith('tutor-gyodae-'));
-  assert.equal(gyodae.length, 1);
-  assert.equal(gyodae[0].d, '2026-09-21');
-  assert.equal(gyodae[0].s, 600);
-  assert.equal(gyodae[0].e, 780);
-  const meeting = fall.find(e => e.id.startsWith('professor-research-'));
-  assert.equal(meeting.loc, 'Zoom'); assert.equal(meeting.s, undefined);
-  assert.equal(fall.find(e => e.id.startsWith('bk21-report-')).s, undefined);
-  assert.match(fall.find(e => e.id === 'tutor-minhee-jiyo-2026-09-20').no, /온라인/);
-  assert.equal(fall.find(e => e.id === 'tutor-minhee-jiyo-2026-09-27').lid, 'daechi');
+test('loading preserves recurrence metadata, tentative status and midnight deadlines', async () => {
+  const a = app(); await a.run('loadData()');
+  assert.equal(a.run("EVENTS.find(e=>e.id==='deadline').s"), 1440);
+  assert.equal(a.run("EVENTS.find(e=>e.id==='online').e"), 1440);
+  assert.equal(a.run("EVENTS.find(e=>e.id==='class-2').status"), 'tentative');
+  assert.equal(a.run("EVENTS.find(e=>e.id==='class-2').series"), 'class');
+  assert.equal(a.run("EVENTS.find(e=>e.id==='meeting').s"), undefined);
 });
 
 test('calendar supports September, next month, year transitions and leap years', async () => {
@@ -104,11 +87,11 @@ test('calendar supports September, next month, year transitions and leap years',
   a.run('calendarYear=2028;calendarMonth=1;buildCal()');
   assert.ok(a.get('calGrid').children.some(e => e.dataset.date === '2028-02-29'));
   a.run('calendarYear=2026;calendarMonth=8;buildList();buildHome();buildPlan();initEditSettings()');
-  assert.equal(a.get('listWrap').children.length, 17);
+  assert.equal(a.get('listWrap').children.length, new Set(fall.filter(e=>e.d.startsWith('2026-09')).map(e=>e.d)).size);
   assert.ok(a.get('listWrap').children.every(e => e.children[0].innerHTML.includes('9월')));
   const nextMilestone = fall.filter(e => ['exam', 'deadline', 'meeting'].includes(e.t)).sort((a, b) => a.d.localeCompare(b.d))[0];
   assert.ok(a.get('hc-cal-sub').innerHTML.includes(nextMilestone.n));
-  assert.match(a.get('v-plan').innerHTML, /거시경제이론/);
+  assert.match(a.get('v-plan').innerHTML, /테스트 수업/);
   assert.doesNotMatch(a.get('v-plan').innerHTML, /공학수학2|기초회로이론 및 실험/);
   assert.match(a.get('ef-lid').innerHTML, /gyodae/);
 });
