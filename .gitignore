@@ -3,3 +3,7 @@ __pycache__/
 src/bridge/config.local.json
 DB/CLAUDE.md
 .claude/settings.local.json
+subscriptions/
+notification-state/
+*.dpapi
+vapid*.pem

@@ -1,0 +1,19 @@
+.push-card{min-width:0;scroll-margin-top:20px}
+.push-card .esec-title{margin-bottom:12px}
+.push-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.push-card button,.push-card a{touch-action:manipulation}
+.push-card button{min-height:40px}
+.push-card button:disabled{opacity:.5;cursor:wait}
+.push-state{font-size:13px;font-weight:600;color:var(--tx);margin:14px 0 8px}
+.push-options{border:0;padding:0;margin:12px 0;display:grid;gap:0}
+.push-options legend{font-size:11px;color:var(--tx2);margin-bottom:6px}
+.push-option{display:flex;align-items:center;gap:12px;min-height:58px;padding:9px 0;border-bottom:1px solid var(--bd);font-size:12px;line-height:1.6;cursor:pointer}
+.push-option input{width:19px;height:19px;flex:none;accent-color:var(--acc)}
+.push-option span{min-width:0}
+.push-option small{display:block;color:var(--tx2);font-size:11px;font-weight:400}
+.push-calendar{margin-top:20px;border-top:1px solid var(--bd);padding-top:16px}
+.push-calendar h3{font-size:13px;margin-bottom:8px}
+.push-calendar input{width:100%;min-width:0;margin-top:10px;font-size:11px}
+.push-calendar a{display:inline-flex;align-items:center;min-height:40px;color:#a5b4fc;font-size:12px;line-height:1.5}
+.push-card button:focus-visible,.push-card a:focus-visible,.push-option input:focus-visible{outline:2px solid #a5b4fc;outline-offset:3px}
+@media(min-width:700px){.push-options{grid-template-columns:1fr 1fr;column-gap:24px}}

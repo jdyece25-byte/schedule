@@ -1,0 +1,59 @@
+# Deploy this template ONLY to the PRIVATE schedule-requests repository as
+# .github/workflows/push.yml. The public repository does not have VAPID secrets.
+name: Schedule push notifications
+
+on:
+  schedule:
+    - cron: '2-59/5 * * * *'
+    - cron: '30 22 * * *' # 07:30 Asia/Seoul, daily briefing
+    - cron: '0 23 * * *' # 08:00 Asia/Seoul, deadline morning
+    - cron: '0 11 * * *' # 20:00 Asia/Seoul, deadline evening
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'results/**/*.json'
+      - 'subscriptions/**/*.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: schedule-push-delivery
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    if: github.event.repository.private == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Check out public notification code
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: jdyece25-byte/schedule
+          ref: main
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: src/notifications/requirements.txt
+      - name: Install Web Push encryption library
+        run: python -m pip install --disable-pip-version-check -r src/notifications/requirements.txt
+      - name: Deliver due notifications using private state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: https://jdyece25-byte.github.io/schedule/
+        shell: bash
+        run: |
+          set +e
+          python -B src/notifications/sender.py
+          result=$?
+          if [ "$result" = 75 ]; then
+            echo 'Another sender owns delivery; the next scheduled run will retry.'
+            exit 0
+          fi
+          exit "$result"

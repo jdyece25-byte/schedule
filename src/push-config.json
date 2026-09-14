@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "vapidPublicKey": "BPj7XfK0kuzjcHm9Wvvt01Ir_h6fmSkKYu1gB1eMJ5l0UsvqAIL0VgiKFrPc6xyAY_2MkUNWDgkp_36JCTSVysw",
+  "queueRepo": "jdyece25-byte/schedule-requests",
+  "targetRepo": "jdyece25-byte/schedule",
+  "siteUrl": "https://jdyece25-byte.github.io/schedule/"
+}

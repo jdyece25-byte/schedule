@@ -60,7 +60,7 @@ Open http://localhost:8000. Browser settings belong to this origin, separately f
 | 추가 확인 필요 | 대상·날짜·시각·반복 종료일 등이 모호합니다. 요청 아래에서 답변하세요. |
 | 실패 / 접수 확인 필요 | 로그인·이용 한도·네트워크 등을 확인합니다. 접수가 불확실하면 같은 요청 재확인을 사용합니다. |
 
-앱이 보이는 동안 약 20초마다 상태를 갱신합니다. 저장된 일정은 최신 GitHub 버전으로 다시 읽어 Pages 배포 대기 중에도 확인합니다. 앱을 닫은 상태의 OS 푸시 알림은 포함하지 않습니다.
+앱이 보이는 동안 약 20초마다 요청 상태를 갱신합니다. 저장된 일정은 최신 GitHub 버전으로 다시 읽어 Pages 배포 대기 중에도 확인합니다. 아래 알림 설정을 켜면 앱이 닫혀 있을 때도 휴대폰 알림창으로 일정 알림을 받을 수 있습니다.
 
 PC가 켜져 있고 인터넷에 연결되어 있어야 처리합니다. 꺼짐·절전·로그아웃 동안 요청은 대기하고, 처리 프로그램이 다시 실행되면 이어집니다. 에이전트 실행에는 추가 시간이 걸리고, PC에 로그인된 계정의 이용 한도를 사용합니다.
 
@@ -132,3 +132,38 @@ python -B src/validate_db.py
 ```
 
 위 테스트는 모의 네트워크와 임시 파일만 사용합니다. 실제 에이전트 호출이나 GitHub 변경을 수행하지 않습니다.
+
+## 휴대폰 설치·웹 푸시·캘린더 구독
+
+앱의 **편집·설정 → 알림 설정 · 홈 화면 설치**에서 설정합니다. 이 기기의 기존 **일정 요청 연결**에 비공개 요청 저장소용 토큰을 먼저 저장합니다. 홈 화면에 설치한 앱의 브라우저 저장 공간이 기존 탭과 다르면 토큰도 그 앱에서 다시 저장해야 합니다.
+
+1. Android Chrome·삼성 인터넷: **홈 화면 설치 안내**를 누르거나 브라우저 메뉴의 앱 설치·홈 화면 추가를 선택합니다. 표준 Push API 지원 여부로 기능을 확인합니다. [삼성 인터넷 공식 안내](https://developer.samsung.com/internet/android/web-developer-guide.html)
+2. iPhone: iOS 16.4 이상에서 Safari **공유 → 홈 화면에 추가** 후 홈 화면 아이콘으로 엽니다. 홈 화면 앱에서 버튼을 눌러야 알림 권한을 요청할 수 있습니다. [WebKit 공식 안내](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)
+3. **이 기기 알림 켜기 → 허용**, 종류 선택 후 **알림 종류 저장**을 누릅니다. 설정은 기기별로 적용됩니다. **테스트 알림 보내기**는 실제 일정의 과목·시각·장소를 담은 발송을 요청하며, 버튼의 저장 성공은 휴대폰 수신 성공을 뜻하지 않습니다.
+
+한국 시간 기준으로 마감 전날 20:00·당일 08:00, 오늘 일정 07:30, 일정 변경 반영, 이동 출발 30분 전 알림을 제공합니다. 이동은 바로 앞 일정의 장소에서 다음 일정 장소까지 `DB/travel.json`에 등록된 방향별 이동시간을 사용합니다. 첫 일정·장소 미정·이동 경로 미등록은 추측하지 않고 건너뜁니다. 취소된 일정은 정기 알림에서 제외합니다.
+
+발송은 비공개 `schedule-requests`의 GitHub Actions에서 실행되어 PC가 꺼져 있어도 동작합니다. 정기 크론과 요청 처리 결과·구독 설정 변경 시 실행을 함께 사용합니다. GitHub Actions 예약 실행은 지연되거나 실행 한도의 영향을 받을 수 있으므로 정확한 시각의 도착을 보장하지 않습니다. 지연된 실행은 정해진 유효시간 안에서 재시도합니다. [GitHub 예약 실행 안내](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+
+PC의 별도 `SchedulePush` 프로그램은 약 10초마다 새 GitHub 버전을 확인하여 변경 알림을 빠르게 발송합니다. 기존 `ScheduleBridge`의 일정 반영을 감지하며, Claude가 저장한 변경도 같은 방식으로 감지합니다. 발송 프로그램의 문제는 자연어 일정 처리 프로그램을 중지시키지 않습니다. 클라우드·PC는 비공개 발송 기록과 만료되는 예약을 공유합니다. 발송 서버가 접수한 직후 기록 저장 전에 프로그램이 종료되는 경우에는 재전송될 수 있으며, 동일 알림 태그로 알림창의 중복 표시를 줄입니다.
+
+구독은 비공개 `subscriptions/<기기ID>.json`, 발송 기록·변경 대기는 비공개 `notification-state/state.json`에만 저장됩니다. `VAPID_PRIVATE_KEY`는 비공개 저장소 Secret이며, PC용 사본은 `%LOCALAPPDATA%/SchedulePush/vapid.dpapi`에 현재 Windows 계정으로 암호화되어 있습니다. 공개 `src/push-config.json`의 VAPID 공개키는 브라우저 구독용이며 발송 비밀키가 아닙니다. 푸시 본문에는 과목·시각·장소만 넣으며 요청 문장·메모·토큰을 포함하지 않습니다. Service Worker는 GitHub 응답이나 DB를 캐시하지 않습니다.
+
+캘린더 구독 주소는 `https://jdyece25-byte.github.io/schedule/events.ics`입니다. **구독 주소 복사** 또는 **캘린더 구독 열기**를 사용합니다. 주소로 구독하면 캘린더 앱의 주기에 따라 갱신되며, ICS 파일을 한 번 가져오기만 하면 이후 변경이 자동 반영되지 않습니다. ICS에는 일정명·시간·장소와 캘린더 표준 메타데이터만 포함합니다. DB에 ID가 없는 과거 일정은 날짜·제목 변경 시 새 항목으로 인식될 수 있습니다.
+
+### 발송 코드 운영
+
+`src/notifications/push.yml`은 **비공개 요청 저장소의 `.github/workflows/push.yml`에 배포하는 템플릿**입니다. 공개 사이트의 workflow로 실행하지 않습니다. `scheduler.py`는 알림 시간을 계산하고 `sender.py`는 암호화·전송·재시도·만료 구독 처리를 담당합니다. Pages 빌드의 허용 목록에는 이 백엔드 코드나 비공개 저장소 파일이 들어가지 않습니다.
+
+```powershell
+# 최초 설정: 기존 키가 있으면 재사용하며, 비밀키를 출력하지 않음
+python -B src/notifications/provision.py
+# 독립 PC 발송기 설치/업데이트. ScheduleBridge를 중지하지 않음
+powershell -NoProfile -ExecutionPolicy Bypass -File src/notifications/install-pc.ps1
+# PC 발송기 상태 (키·구독 정보 출력 없음)
+& "$env:LOCALAPPDATA\SchedulePush\.venv\Scripts\python.exe" -B "$env:LOCALAPPDATA\SchedulePush\runtime\src\notifications\pc.py" --config "$env:LOCALAPPDATA\SchedulePush\config.json" --status
+# 푸시 브라우저 회귀 테스트
+node --test src/tests/push-client.test.cjs
+```
+
+PC 발송기의 `pc.py` 업데이트는 현재 발송이 끝난 뒤 자동 재실행으로 적용되며, 매분 복구 작업과 로그인 시 자동 시작이 등록됩니다. PC 발송만 중지하려면 `%LOCALAPPDATA%/SchedulePush/disabled` 파일을 생성하며, 클라우드 발송까지 끄려면 앱에서 **이 기기 알림 끄기**를 사용합니다. 일반 일정 수정에서는 어느 서비스도 중지하지 않습니다.

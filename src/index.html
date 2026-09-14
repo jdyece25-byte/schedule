@@ -3,7 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#141418">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="일정">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="bridge-client.css?v=20260914-layout">
+<link rel="stylesheet" href="push-client.css?v=20260914-push1">
 <title>동영 스케줄</title>
 <style>
 :root{
@@ -419,7 +425,7 @@ body{
     <button class="dt-btn" id="dt-cal" onclick="sw('cal')">달력</button>
     <button class="dt-btn" id="dt-plan" onclick="sw('plan')">공부 플랜</button>
     <button class="dt-btn" id="dt-alert" onclick="sw('alert')">충돌 <span class="dt-badge" id="alrt-n2">…</span></button>
-    <button class="dt-btn" id="dt-edit" onclick="sw('edit')">편집</button>
+    <button class="dt-btn" id="dt-edit" onclick="sw('edit')">편집·설정</button>
   </div>
   <span id="sync-dot" title="GitHub 동기화 상태">⬤</span>
 </header>
@@ -530,6 +536,7 @@ body{
 <!-- EDIT VIEW -->
 <div class="view" id="v-edit">
   <div class="edit-scroll">
+    <div class="push-actions"><button type="button" class="bridge-secondary" onclick="document.getElementById('push-settings-panel').scrollIntoView({block:'start',behavior:'smooth'})">알림 설정으로 이동</button></div>
 
     <div class="edit-section">
       <div class="esec-title">자연어 일정 요청 · Codex / Claude</div>
@@ -629,6 +636,35 @@ body{
       <p class="hint">양방향으로 자동 등록됩니다. 기존 경로는 덮어씁니다.</p>
     </div>
 
+    <section class="edit-section push-card" id="push-settings-panel" aria-label="알림 설정">
+      <div class="esec-title">알림 설정 · 홈 화면 설치</div>
+      <p id="push-install-guide" class="settings-note bridge-note">iPhone은 iOS 16.4 이상에서 홈 화면에 추가한 앱으로 열어 주세요. Android Chrome·삼성 인터넷도 사용할 수 있습니다.</p>
+      <div class="push-actions"><button type="button" class="bridge-secondary" id="push-install" data-push-action="install">홈 화면 설치 안내</button></div>
+      <p class="push-state" id="push-state">이 기기 알림 확인 중…</p>
+      <fieldset class="push-options">
+        <legend>이 기기에서 받을 알림 · 한국 시간</legend>
+        <label class="push-option"><input type="checkbox" id="push-deadline" checked><span>마감 알림<small>하루 전 저녁 8시 · 당일 아침 8시</small></span></label>
+        <label class="push-option"><input type="checkbox" id="push-daily" checked><span>오늘 일정<small>매일 아침 7시 30분 요약</small></span></label>
+        <label class="push-option"><input type="checkbox" id="push-changes" checked><span>일정 변경<small>일정 반영 후 알림</small></span></label>
+        <label class="push-option"><input type="checkbox" id="push-departure" checked><span>이동 출발 알림<small>등록된 이동시간 기준 출발 30분 전</small></span></label>
+      </fieldset>
+      <div class="push-actions">
+        <button type="button" class="btn-primary" id="push-enable" data-push-action="enable">이 기기 알림 켜기</button>
+        <button type="button" class="bridge-secondary" data-push-action="save">알림 종류 저장</button>
+        <button type="button" class="bridge-secondary" data-push-action="disable">이 기기 알림 끄기</button>
+        <button type="button" class="bridge-secondary" data-push-action="refresh">상태 확인</button>
+        <button type="button" class="bridge-secondary" data-push-action="test">테스트 알림 보내기</button>
+      </div>
+      <p id="push-status" class="bridge-feedback" role="status" aria-live="polite"></p>
+      <p class="settings-note bridge-note">아래 일정 요청 연결을 이 기기에 저장한 뒤 알림을 켜세요. 종류별 설정은 이 기기에만 적용됩니다. 알림에는 일정명·시각·장소만 표시됩니다. 이동시간이 없는 경로는 출발 알림을 보내지 않습니다. 정기 알림은 PC가 꺼져 있어도 발송되지만, GitHub Actions 실행 지연이나 휴대폰 상태에 따라 늦게 도착할 수 있습니다.</p>
+      <div class="push-calendar">
+        <h3>다른 캘린더에서도 보기</h3>
+        <p class="settings-note bridge-note">캘린더 앱의 구독 기능에 아래 주소를 등록하세요. Google 캘린더는 PC 웹에서 다른 캘린더 + → URL로 추가를 이용합니다. 구독 갱신 시점은 각 캘린더 앱이 정하므로 변경 사항이 늦게 보일 수 있습니다. 파일 다운로드·가져오기는 한 번 복사되며 자동 갱신되지 않습니다.</p>
+        <input type="text" class="edit-input" id="push-calendar-url" readonly aria-label="캘린더 구독 주소">
+        <div class="push-actions"><button type="button" class="bridge-secondary" data-push-action="calendar-copy">구독 주소 복사</button><a id="push-calendar-link" href="webcal://jdyece25-byte.github.io/schedule/events.ics">캘린더 구독 열기</a><a id="push-calendar-download" href="events.ics" download>ICS 파일 다운로드</a></div>
+      </div>
+    </section>
+
     <div class="edit-section" id="bridge-settings-panel">
       <div class="esec-title">⚙ 일정 요청 연결</div>
       <p class="settings-note bridge-note"><b>지금 사용하는 기기·브라우저에 저장하는 설정입니다.</b> PC에서 연결해도 휴대폰에는 적용되지 않습니다. 휴대폰 Chrome에서도 토큰을 한 번 입력하고 저장해 주세요.</p>
@@ -687,7 +723,7 @@ body{
   </button>
   <button class="bn" id="bn-edit" onclick="sw('edit')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-    편집
+    편집·설정
   </button>
 </nav>
 
@@ -1511,5 +1547,6 @@ window.scheduleDataReady=loadData().then(()=>{
 });
 </script>
 <script src="bridge-client.js?v=20260914-layout"></script>
+<script src="push-client.js?v=20260914-push1"></script>
 </body>
 </html>
