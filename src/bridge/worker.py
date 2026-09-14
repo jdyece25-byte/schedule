@@ -25,6 +25,10 @@ KST = timezone(timedelta(hours=9))
 TERMINAL = {"completed", "needs_input", "failed"}
 ID_RE = re.compile(r"[A-Za-z0-9_-]{1,100}\Z")
 REPO_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
+EVENTS_PATH = "DB/events.json"
+TRAVEL_PATH = "DB/travel.json"
+NOTES_PATH = "DB/SCHEDULE.md"
+APPLIED_PATH = "DB/applied"
 
 
 def utcnow():
@@ -304,11 +308,14 @@ class Worker:
         return list(reversed(history))
 
     def recovered_commit(self, request_id, request_sha, base):
-        marker, _ = self.github.read_json(self.target, f".bridge/applied/{request_id}.json", base)
-        if marker:
-            if marker.get("request_sha") != request_sha:
-                raise ValueError("이미 처리된 요청의 내용이 바뀌었습니다. 새 요청으로 보내 주세요.")
-            return base
+        # Keep pre-migration receipts readable: a restarted job must never repeat
+        # an edit merely because the repository layout changed after its commit.
+        for folder in (APPLIED_PATH, ".bridge/applied"):
+            marker, _ = self.github.read_json(self.target, f"{folder}/{request_id}.json", base)
+            if marker is not None:
+                if not isinstance(marker, dict) or marker.get("request_sha") != request_sha:
+                    raise ValueError("이미 처리된 요청의 내용이 바뀌었습니다. 새 요청으로 보내 주세요.")
+                return base
         return None
 
     def process(self, request, request_sha):
@@ -326,9 +333,9 @@ class Worker:
             if recovered:
                 self.finish("completed", "이 요청은 일정에 반영되어 있습니다. 저장 완료 상태를 복구했습니다.", commit_sha=recovered)
                 return
-            events, _ = self.github.read_json(self.target, "events.json", base)
-            travel, _ = self.github.read_json(self.target, "travel.json", base)
-            notes, _ = self.github.read(self.target, "SCHEDULE.md", base)
+            events, _ = self.github.read_json(self.target, EVENTS_PATH, base)
+            travel, _ = self.github.read_json(self.target, TRAVEL_PATH, base)
+            notes, _ = self.github.read(self.target, NOTES_PATH, base)
             if not isinstance(events, list) or not isinstance(travel, dict):
                 raise ValueError("현재 일정 파일을 읽을 수 없습니다.")
             plan = self.runner.run(request, events, travel, notes or "", history, self.tick)
@@ -347,13 +354,13 @@ class Worker:
                 self.active = (request_id, value, self.save_result(request_id, value, result_sha))
                 self.finish("completed", plan["message"], warnings=warnings)
                 return
-            files = {".bridge/applied/" + request_id + ".json": json.dumps({
+            files = {APPLIED_PATH + "/" + request_id + ".json": json.dumps({
                 "version": 1, "id": request_id, "request_sha": request_sha, "applied_at": stamp(),
             }) + "\n"}
             if events != updated_events:
-                files["events.json"] = json.dumps(updated_events, ensure_ascii=False, indent=2) + "\n"
+                files[EVENTS_PATH] = json.dumps(updated_events, ensure_ascii=False, indent=2) + "\n"
             if travel != updated_travel:
-                files["travel.json"] = json.dumps(updated_travel, ensure_ascii=False, indent=2) + "\n"
+                files[TRAVEL_PATH] = json.dumps(updated_travel, ensure_ascii=False, indent=2) + "\n"
             try:
                 commit_sha = self.github.commit_files(self.target, self.branch, base, files,
                                                      f"Apply schedule request {request_id}")

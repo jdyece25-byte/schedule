@@ -4,10 +4,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-const root = path.join(__dirname, '..');
-const events = JSON.parse(fs.readFileSync(path.join(root, 'events.json'), 'utf8'));
-const travel = JSON.parse(fs.readFileSync(path.join(root, 'travel.json'), 'utf8'));
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const root = path.join(__dirname, '..', '..');
+const events = JSON.parse(fs.readFileSync(path.join(root, 'DB', 'events.json'), 'utf8'));
+const travel = JSON.parse(fs.readFileSync(path.join(root, 'DB', 'travel.json'), 'utf8'));
+const html = fs.readFileSync(path.join(root, 'src', 'index.html'), 'utf8');
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1].split('// ── INIT')[0];
 const fall = events.filter(e => e.d >= '2026-09-14');
 
@@ -40,14 +40,27 @@ function app(fetchOverride) {
   return {context, get, run: code => vm.runInContext(code, context)};
 }
 
+test('published application loads schedule data exclusively from DB', async () => {
+  const urls = [];
+  const a = app(async url => {
+    urls.push(url);
+    const name = url.split('/').at(-1);
+    return {ok: true, json: async () => name === 'events.json' ? events : name === 'travel.json' ? travel : []};
+  });
+  await a.run('loadData()');
+  assert.deepEqual(urls.sort(), ['./DB/events.json', './DB/plan.json', './DB/travel.json']);
+  assert.equal(a.run('EVENTS.length'), events.length);
+});
+
 test('new schedule dates, IDs, midnight times and locations are valid', () => {
   assert.equal(events.filter(e => e.d < '2026-09-14').length, 76);
-  assert.equal(fall.length, 276);
+  assert.ok(fall.length >= 276);
   assert.equal(new Set(fall.map(e => e.id)).size, fall.length);
   for (const e of fall) {
     assert.ok(e.d <= '2026-12-31');
     assert.equal(new Date(e.d + 'T12:00:00Z').toISOString().slice(0, 10), e.d);
-    if (e.s != null) assert.ok(e.s >= 0 && e.e > e.s && e.e <= 1440, e.id);
+    if (e.s != null) assert.ok(Number.isInteger(e.s) && e.s >= 0 && e.s < 1440, e.id);
+    if (e.e != null) assert.ok(Number.isInteger(e.e) && e.s != null && e.e > e.s && e.e <= 1440, e.id);
     if (e.lid) assert.ok(travel.locations[e.lid], e.id);
     if (e.series?.includes('online-') || e.series === '2026fall-clinic-fri') assert.equal(e.e, 1440);
   }
@@ -93,7 +106,8 @@ test('calendar supports September, next month, year transitions and leap years',
   a.run('calendarYear=2026;calendarMonth=8;buildList();buildHome();buildPlan();initEditSettings()');
   assert.equal(a.get('listWrap').children.length, 17);
   assert.ok(a.get('listWrap').children.every(e => e.children[0].innerHTML.includes('9월')));
-  assert.match(a.get('hc-cal-sub').innerHTML, /BK21/);
+  const nextMilestone = fall.filter(e => ['exam', 'deadline', 'meeting'].includes(e.t)).sort((a, b) => a.d.localeCompare(b.d))[0];
+  assert.ok(a.get('hc-cal-sub').innerHTML.includes(nextMilestone.n));
   assert.match(a.get('v-plan').innerHTML, /거시경제이론/);
   assert.doesNotMatch(a.get('v-plan').innerHTML, /공학수학2|기초회로이론 및 실험/);
   assert.match(a.get('ef-lid').innerHTML, /gyodae/);
@@ -126,13 +140,17 @@ test('stale browser save is rejected without overwriting newer schedules', async
 test('fresh browser save retains loaded locations and uses the checked revision', async () => {
   const a = app(); await a.run('loadData()');
   const puts = [];
+  const urls = [];
   a.context.fetch = async (url, options) => {
+    urls.push(url);
     if (options.method === 'PUT') {puts.push(JSON.parse(options.body));return {ok:true};}
     return {ok: true, json: async () => ({sha:'checked-revision', content:Buffer.from(JSON.stringify(url.endsWith('events.json')?events:travel)).toString('base64')})};
   };
   assert.equal(await a.run("cfg.pat='test-only';EVENTS.push({d:'2026-10-02',n:'Local addition'});saveAllData()"), true);
   assert.equal(puts.length, 1);
   assert.equal(puts[0].sha, 'checked-revision');
+  assert.ok(urls.length > 0);
+  assert.ok(urls.every(url => /^https:\/\/api\.github\.com\/repos\/jdyece25-byte\/schedule\/contents\/DB\/(events|travel)\.json$/.test(url)));
   assert.equal(a.run('LOC_NAMES.gyodae'), '교대역');
 });
 

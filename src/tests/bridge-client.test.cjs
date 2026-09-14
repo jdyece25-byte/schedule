@@ -393,6 +393,8 @@ test('completed result reads both public files at the exact commit without priva
   assert.deepEqual(snapshot, {events, travel});
   assert.equal(current.syncState, 'synced');
   assert.equal(client.syncedCommit, sha);
+  assert.deepEqual(calls.filter(call => call.url.includes('/schedule/contents/')).map(call => call.url).sort(),
+    ['events.json', 'travel.json'].map(name => 'https://api.github.com/repos/jdyece25-byte/schedule/contents/DB/' + name + '?ref=' + sha));
   const publicCount = calls.filter(call => call.url.includes('/schedule/contents/')).length;
   await client.refresh();
   assert.equal(calls.filter(call => call.url.includes('/schedule/contents/')).length, publicCount);

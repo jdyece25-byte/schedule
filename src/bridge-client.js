@@ -221,7 +221,7 @@
           const comparison = await compareResponse.json();
           if (!['ahead', 'identical'].includes(comparison.status)) throw new Error('최신 일정에 완료 요청이 포함되는지 확인할 수 없습니다.');
         }
-        const [events, travel] = await Promise.all(['events.json', 'travel.json'].map(path => this.readFile(path, {publicRead: true, ref: head.sha})));
+        const [events, travel] = await Promise.all(['DB/events.json', 'DB/travel.json'].map(path => this.readFile(path, {publicRead: true, ref: head.sha})));
         await this.onCompleted(events, travel);
         this.syncedCommit = latest.result.commit_sha;
         latest.syncState = 'synced';

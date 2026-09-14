@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<link rel="stylesheet" href="bridge-client.css?v=20260914-settings">
+<link rel="stylesheet" href="bridge-client.css?v=20260914-layout">
 <title>동영 스케줄</title>
 <style>
 :root{
@@ -733,9 +733,9 @@ async function loadData(){
   setSyncDot('loading');
   try{
     const [evRes,trRes,plRes]=await Promise.all([
-      fetch('./events.json',{cache:'no-store'}),
-      fetch('./travel.json',{cache:'no-store'}),
-      fetch('./plan.json',{cache:'no-store'})
+      fetch('./DB/events.json',{cache:'no-store'}),
+      fetch('./DB/travel.json',{cache:'no-store'}),
+      fetch('./DB/plan.json',{cache:'no-store'})
     ]);
     if(!evRes.ok||!trRes.ok) throw new Error('fetch failed');
     EVENTS=await evRes.json();
@@ -766,7 +766,7 @@ async function githubSave(filename,data){
   if(!cfg.pat)return{ok:false,msg:'PAT 미설정'};
   setSyncDot('saving');
   try{
-    const url=`https://api.github.com/repos/${GITHUB_USER}/${cfg.repo}/contents/${filename}`;
+    const url=`https://api.github.com/repos/${GITHUB_USER}/${cfg.repo}/contents/DB/${filename}`;
     const headers={'Authorization':`token ${cfg.pat}`,'Accept':'application/vnd.github.v3+json'};
     const snapshot=JSON.stringify(data);
     if(snapshot===loadedSnapshots[filename])return{ok:true};
@@ -1421,7 +1421,7 @@ function buildPlan(){
   let h=`<div style="padding:16px 16px 0">
     <div class="plan-hdr"><h2>공부 플랜 <em>과목별 현황</em></h2></div>
     ${sc}
-    ${!upcomingPlan.length?'<p style="color:var(--tx2);padding:12px 0;line-height:1.7">현재 공부 계획은 아직 등록하지 않았습니다. <a href="study_plan.html" style="color:var(--acc)">지난 6월 계획 보기</a></p>':''}
+    ${!upcomingPlan.length?'<p style="color:var(--tx2);padding:12px 0;line-height:1.7">현재 공부 계획은 아직 등록하지 않았습니다.</p>':''}
     <div style="margin-top:4px;margin-bottom:2px"></div>
   </div>
   <div id="v-plan-days" style="padding:0 16px">`;
@@ -1510,6 +1510,6 @@ window.scheduleDataReady=loadData().then(()=>{
   selDay(TODAY);closePanel();
 });
 </script>
-<script src="bridge-client.js?v=20260914-settings"></script>
+<script src="bridge-client.js?v=20260914-layout"></script>
 </body>
 </html>

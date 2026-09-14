@@ -5,8 +5,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from bridge.github import GitHubError
-from bridge.worker import Worker, WorkerLock, validate_request, stamp, utcnow, KST
+from src.bridge.github import GitHubError
+from src.bridge.worker import Worker, WorkerLock, validate_request, stamp, utcnow, KST
 
 
 def request(identifier="request-1", **overrides):
@@ -33,9 +33,9 @@ class FakeGitHub:
         self.commits = []
         self.on_commit = None
         self.puts = []
-        self.seed("owner/schedule", "events.json", [])
-        self.seed("owner/schedule", "travel.json", {"locations": {}, "times": {}, "modes": {}})
-        self.seed("owner/schedule", "SCHEDULE.md", "")
+        self.seed("owner/schedule", "DB/events.json", [])
+        self.seed("owner/schedule", "DB/travel.json", {"locations": {}, "times": {}, "modes": {}})
+        self.seed("owner/schedule", "DB/SCHEDULE.md", "")
 
     def seed(self, repo, path, value):
         self.counter += 1
@@ -109,10 +109,58 @@ class WorkerTests(unittest.TestCase):
         self.worker.process(self.req, self.req_sha)
         self.assertEqual(len(self.github.commits), 1)
         files = self.github.commits[0][1]
-        self.assertIn("events.json", files)
-        self.assertIn(".bridge/applied/request-1.json", files)
+        self.assertIn("DB/events.json", files)
+        self.assertIn("DB/applied/request-1.json", files)
+        self.assertTrue(all(path.startswith("DB/") for path in files))
         self.assertNotIn(self.req["text"], self.github.commits[0][2])
         self.assertEqual(self.worker.result("request-1")[0]["state"], "completed")
+
+    def test_relocated_database_snapshot_and_notes_are_the_only_planning_source(self):
+        expected_events = [plan()["operations"][0]["event"]]
+        expected_travel = {"locations": {}, "times": {}, "modes": {}, "reference": {"kept": True}}
+        expected_notes = "Current database rules"
+        self.github.seed("owner/schedule", "DB/events.json", expected_events)
+        self.github.seed("owner/schedule", "DB/travel.json", expected_travel)
+        self.github.seed("owner/schedule", "DB/SCHEDULE.md", expected_notes)
+        # Stale root files must not silently become the source after migration.
+        self.github.seed("owner/schedule", "events.json", [])
+        self.github.seed("owner/schedule", "travel.json", {"locations": {"old": "stale"}})
+        self.github.seed("owner/schedule", "SCHEDULE.md", "Obsolete root rules")
+        snapshots = []
+
+        def propose(request, events, travel, notes, history, tick):
+            snapshots.append(copy.deepcopy((events, travel, notes)))
+            return plan(None)
+
+        self.runner.run = propose
+        self.start()
+        self.worker.process(self.req, self.req_sha)
+        self.assertEqual(snapshots, [(expected_events, expected_travel, expected_notes)])
+        self.assertFalse(self.github.commits)
+
+    def test_missing_database_never_falls_back_to_stale_root_files(self):
+        for missing in ("DB/events.json", "DB/travel.json"):
+            with self.subTest(missing=missing):
+                value = self.github.files.pop(("owner/schedule", missing))
+                self.github.seed("owner/schedule", "events.json", [])
+                self.github.seed("owner/schedule", "travel.json", {"locations": {}, "times": {}, "modes": {}})
+                self.start()
+                with self.assertRaisesRegex(ValueError, "일정 파일"):
+                    self.worker.process(self.req, self.req_sha)
+                self.assertEqual(self.runner.calls, 0)
+                self.assertFalse(self.github.commits)
+                self.github.files["owner/schedule", missing] = value
+
+    def test_old_and_moved_recovery_markers_prevent_duplicate_processing(self):
+        for folder in ("DB/applied", ".bridge/applied"):
+            with self.subTest(folder=folder):
+                path = folder + "/request-1.json"
+                self.github.seed("owner/schedule", path, {"request_sha": self.req_sha})
+                self.assertEqual(self.worker.recovered_commit("request-1", self.req_sha, "migrated-head"), "migrated-head")
+                with self.assertRaisesRegex(ValueError, "내용이 바뀌"):
+                    self.worker.recovered_commit("request-1", "changed-request", "migrated-head")
+                self.github.files.pop(("owner/schedule", path))
+        self.assertFalse(self.github.commits)
 
     def test_restart_after_public_commit_does_not_invoke_model_or_duplicate(self):
         self.start()
@@ -126,7 +174,7 @@ class WorkerTests(unittest.TestCase):
         restarted.process(self.req, self.req_sha)
         self.assertEqual(restarted.runner.calls, 0)
         self.assertEqual(len(self.github.commits), 1)
-        self.assertEqual(len(self.github.files["owner/schedule", "events.json"]), 1)
+        self.assertEqual(len(self.github.files["owner/schedule", "DB/events.json"]), 1)
 
     def test_lost_patch_response_recovers_success(self):
         self.start()
@@ -148,7 +196,7 @@ class WorkerTests(unittest.TestCase):
 
     def test_no_change_replans_after_concurrent_deletion(self):
         existing = plan()["operations"][0]["event"]
-        self.github.seed("owner/schedule", "events.json", [existing])
+        self.github.seed("owner/schedule", "DB/events.json", [existing])
         snapshots = []
 
         def propose(request, events, travel, notes, history, tick):
@@ -156,7 +204,7 @@ class WorkerTests(unittest.TestCase):
             if len(snapshots) == 1:
                 # The event existed when planning began, then another client
                 # deleted it before the already-present decision was saved.
-                self.github.seed("owner/schedule", "events.json", [])
+                self.github.seed("owner/schedule", "DB/events.json", [])
                 self.github.head_sha = "concurrent-deletion"
                 return plan(None)
             return plan()
@@ -167,7 +215,7 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(snapshots, [[existing], []])
         self.assertEqual(len(self.github.commits), 1)
         self.assertEqual(self.github.commits[0][0], "concurrent-deletion")
-        self.assertEqual(len(self.github.files["owner/schedule", "events.json"]), 1)
+        self.assertEqual(len(self.github.files["owner/schedule", "DB/events.json"]), 1)
         self.assertEqual(self.worker.result("request-1")[0]["state"], "completed")
 
     def test_lost_lease_prevents_commit(self):
@@ -260,7 +308,7 @@ class WorkerTests(unittest.TestCase):
     def test_invalid_parent_and_changed_request_rejected(self):
         with self.assertRaises(ValueError):
             self.worker.history(request("reply", parent_id="missing"))
-        self.github.seed("owner/schedule", ".bridge/applied/request-1.json", {"request_sha": "old"})
+        self.github.seed("owner/schedule", "DB/applied/request-1.json", {"request_sha": "old"})
         self.start()
         with self.assertRaisesRegex(ValueError, "내용이 바뀌"):
             self.worker.process(self.req, self.req_sha)

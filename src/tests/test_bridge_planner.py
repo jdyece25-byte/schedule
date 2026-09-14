@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import json
 import unittest
 
-from bridge.planner import (
+from src.bridge.planner import (
     CORE_FIELDS, KST, MAX_OPERATIONS, PLAN_SCHEMA, PlanValidationError,
     apply_plan, build_prompt,
 )
