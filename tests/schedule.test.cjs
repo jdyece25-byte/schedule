@@ -165,3 +165,51 @@ test('manual midnight input is 24:00 and failed saves retain the form without du
   assert.equal(a.get('ef-name').value,'Midnight test');
   assert.equal(a.run("EVENTS.filter(e=>e.n==='Midnight test').length"),0);
 });
+
+test('untrusted event and location text stays text across calendar, details, home, alerts and previews', () => {
+  const a = app();
+  const attack = '<img src=x onerror="globalThis.stolen=localStorage.getItem(\'cfg_bridge_pat\')">';
+  a.context.attack = attack;
+  a.run(`EVENTS=[
+    {id:'evil-exam',d:TODAY,t:'exam',status:'tentative',n:attack,ti:attack,loc:attack,no:attack,lid:'one',s:0,e:1},
+    {id:'evil-tutor',d:TODAY,t:'tutor',n:attack,ti:attack,loc:attack,no:attack,lid:'two',s:2,e:1440}
+  ];TT={'one-two':5};TM={'one-two':attack};LOC_NAMES={one:attack,two:attack};PLAN=[];dataReady=true;
+  rebuildEM();buildCal();selDay(TODAY);buildToday();buildHome();buildAlerts();buildList();initEditSettings();
+  renderNLPreview({type:'event',data:EVENTS});`);
+  const walk = node => [node, ...node.children.flatMap(walk)];
+  const chips = walk(a.get('calGrid')).filter(node => node.className === 'chip');
+  assert.equal(chips.length, 2);
+  for (const chip of chips) {
+    assert.equal(chip.textContent, attack);
+    assert.equal(chip.innerHTML, '');
+  }
+  for (const id of ['panelBody','v-today','hc-today-sub','hc-cal-sub','v-alert','calendar-notes','nl-preview','ef-lid']) {
+    const markup = a.get(id).innerHTML;
+    assert.ok(!markup.includes('<img'), id);
+    assert.ok(markup.includes('&lt;img'), id);
+  }
+  for (const node of walk(a.get('listWrap'))) assert.ok(!node.innerHTML.includes('<img'));
+  a.run("renderNLPreview({type:'travel',data:[{from:'one',to:'two',min:attack,mode:attack}]})");
+  assert.ok(!a.get('nl-preview').innerHTML.includes('<img'));
+  assert.ok(a.get('nl-preview').innerHTML.includes('&lt;img'));
+  assert.equal(a.context.stolen, undefined);
+});
+
+test('plan display escapes model text and rejects color attribute injection', () => {
+  const a = app();
+  const attack = '<svg onload="globalThis.stolen=true">';
+  const colorAttack = '#fff" onmouseover="globalThis.stolen=true';
+  a.context.attack = attack;
+  a.context.colorAttack = colorAttack;
+  a.run(`EVENTS=[{d:TODAY,t:'class',n:attack,no:attack}];
+    PLAN=[{d:TODAY,date:attack,total:attack,exam:attack,alert:attack,note:attack,blocks:[{c:colorAttack,s:attack,d:attack,h:attack}]}];
+    rebuildEM();buildPlan();buildToday();buildHome();`);
+  for (const id of ['v-plan','v-today','hc-plan-sub']) {
+    const markup = a.get(id).innerHTML;
+    assert.ok(!markup.includes('<svg'), id);
+    assert.ok(!markup.includes('onmouseover='), id);
+    assert.ok(markup.includes('&lt;svg'), id);
+  }
+  assert.match(a.get('v-plan').innerHTML, /background:#888888/);
+  assert.equal(a.run("safeColor('#aabbcc')"), '#aabbcc');
+});

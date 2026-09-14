@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<link rel="stylesheet" href="bridge-client.css">
 <title>동영 스케줄</title>
 <style>
 :root{
@@ -510,10 +511,10 @@ body{
   </div><!-- /cal-wrap -->
   <!-- NL Event Input -->
   <div class="nl-section">
-    <div class="nl-label">🤖 자연어로 일정 추가</div>
+    <div class="nl-label bridge-cal-label"><span>자연어로 일정 요청</span><button class="bridge-link" id="bridge-cal-link" onclick="sw('edit')">요청 내역 · 연결 설정</button></div>
     <div class="nl-row">
       <textarea id="cal-nl-input" class="nl-ta" placeholder="예: 다음 주 월요일 오전 10시부터 1시까지 교대역 과외"></textarea>
-      <button class="nl-send" onclick="calNLParse()" title="파싱">↑</button>
+      <button class="nl-send" id="cal-nl-btn" onclick="calNLParse()" title="일정 요청 보내기" aria-label="일정 요청 보내기">↑</button>
     </div>
     <div id="cal-nl-status" style="font-size:11px;color:var(--tx2);margin-top:5px;display:none"></div>
     <div id="cal-nl-preview" class="nl-preview-inline"></div>
@@ -531,15 +532,22 @@ body{
   <div class="edit-scroll">
 
     <div class="edit-section">
-      <div class="esec-title">🤖 자연어로 추가 (Gemini AI)</div>
+      <div class="esec-title">자연어 일정 요청 · Codex / Claude</div>
       <textarea id="nl-input" class="edit-textarea" placeholder="예시:&#10;이벤트: 다음 주 월요일 오전 10시부터 1시까지 교대역 과외&#10;이동시간: 교대역 → 서울대 301동, 직접 확인한 소요시간"></textarea>
       <div class="edit-row">
-        <button class="btn-primary" id="nl-btn" onclick="parseNL()">AI 파싱</button>
+        <button class="btn-primary" id="nl-btn" onclick="parseNL()">요청 보내기</button>
         <span id="nl-status" class="status-msg"></span>
       </div>
       <div id="nl-preview" style="display:none" class="preview-area"></div>
-      <p class="hint">Gemini가 이벤트/이동시간을 자동 감지합니다. 확인 후 저장하면 GitHub에 반영돼요.</p>
+      <p class="hint">요청을 비공개 저장소에 보내면 내 PC의 Codex / Claude가 처리합니다. PC 작업기가 실행 중이어야 하며, 처리 결과와 확인 질문은 아래에 표시됩니다.</p>
     </div>
+
+    <section class="edit-section bridge-card" id="bridge-card" aria-label="일정 요청 내역">
+      <div class="bridge-card-head"><div class="esec-title">요청 내역</div><button type="button" class="bridge-secondary" data-bridge-action="refresh">새로고침</button></div>
+      <p id="bridge-worker" class="bridge-worker" role="status">연결 설정을 저장해 주세요.</p>
+      <p id="bridge-status" class="bridge-feedback" role="status" aria-live="polite"></p>
+      <details id="bridge-history-details" open><summary>최근 요청 <span id="bridge-count">0</span>개</summary><div id="bridge-history" class="bridge-history"></div></details>
+    </section>
 
     <div class="edit-section">
       <div class="esec-title">🗓 언제 잡을까? (AI 추천)</div>
@@ -622,11 +630,23 @@ body{
     </div>
 
     <div class="edit-section">
-      <div class="esec-title">⚙ 설정</div>
+      <div class="esec-title">⚙ 일정 요청 연결</div>
+      <div class="settings-grid bridge-settings">
+        <label for="cfg-bridge-repo">비공개 요청 저장소</label><input type="text" id="cfg-bridge-repo" class="edit-input" placeholder="jdyece25-byte/schedule-requests" autocapitalize="none" spellcheck="false">
+        <label for="cfg-bridge-pat">요청 전용 GitHub 토큰</label><input type="password" id="cfg-bridge-pat" class="edit-input" placeholder="github_pat_…" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <label for="cfg-bridge-agent">처리 도구</label><select id="cfg-bridge-agent" class="edit-input"><option value="codex">Codex</option><option value="claude">Claude</option></select>
+      </div>
+      <div class="edit-row bridge-actions"><button type="button" class="btn-primary" data-bridge-action="settings-save">연결 설정 저장</button><button type="button" class="bridge-secondary" data-bridge-action="connection-test">연결 테스트</button></div>
+      <p id="bridge-settings-status" class="bridge-feedback" role="status"></p>
+      <p class="settings-note bridge-note"><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Fine-grained 토큰 만들기 ↗</a>에서 본인 계정 → Only select repositories → <b>schedule-requests만</b> 선택하고 Contents를 <b>Read and write</b>로 설정하세요. 요청 저장소는 비공개여야 합니다. 토큰은 이 브라우저에만 저장됩니다. 이 토큰에는 공개 schedule 저장소 권한이 필요하지 않습니다.</p>
+    </div>
+
+    <div class="edit-section">
+      <div class="esec-title">기존 직접 편집 · Gemini 추천 설정</div>
       <div class="settings-grid">
-        <label>GitHub PAT</label>
+        <label>직접 편집 GitHub PAT</label>
         <input type="password" id="cfg-pat" class="edit-input" placeholder="ghp_xxxx (repo 권한 필요)">
-        <label>Gemini API Key</label>
+        <label>추천용 Gemini API Key</label>
         <input type="password" id="cfg-gemini" class="edit-input" placeholder="AIza...">
         <label>GitHub Repo</label>
         <input type="text" id="cfg-repo" class="edit-input" placeholder="schedule">
@@ -636,6 +656,7 @@ body{
         <span id="cfg-status" class="status-msg"></span>
       </div>
       <p class="settings-note">
+        직접 추가·이동시간 편집과 AI 추천에만 사용하는 별도 설정입니다. 자연어 일정 요청은 위 연결 설정을 사용합니다.<br>
         설정은 이 브라우저에만 저장됩니다 (localStorage). 파일에 기록되지 않습니다.<br>
         GitHub PAT: github.com → Settings → Developer settings → Personal access tokens → <b>repo</b> 권한<br>
         Gemini API: <b>aistudio.google.com</b> → Get API key (무료)
@@ -676,6 +697,8 @@ const TODAY=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${St
 let calendarYear=_d.getFullYear(),calendarMonth=_d.getMonth();
 const monthPrefix=()=>`${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}`;
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Data and model output are text; only validated hex colors enter style attributes.
+const safeColor=value=>typeof value==='string'&&/^#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/i.test(value)?value:'#888888';
 
 const DOW=['일','월','화','수','목','금','토'];
 const TCh={class:'#3b82f6',lab:'#06b6d4',seminar:'#8b5cf6',exam:'#ef4444',tutor:'#f97316',workshop:'#22c55e',travel:'#38bdf8',deadline:'#a855f7',project:'#f59e0b',clinic:'#14b8a6',meeting:'#a78bfa'};
@@ -847,29 +870,20 @@ async function recommendTime(){
 // ── NL PARSE ─────────────────────────────────────────────────────────
 let pendingParsed=null;
 async function parseNL(){
-  const text=document.getElementById('nl-input').value.trim();
-  if(!text){setStatus('nl-status','텍스트를 입력하세요','err');return;}
-  const btn=document.getElementById('nl-btn');
-  btn.disabled=true;btn.textContent='분석 중...';
-  setStatus('nl-status','','');
-  document.getElementById('nl-preview').style.display='none';
-  const r=await geminiParse(text);
-  btn.disabled=false;btn.textContent='AI 파싱';
-  if(!r.ok){setStatus('nl-status',r.msg,'err');return;}
-  pendingParsed=r.result;
-  renderNLPreview(r.result);
+  if(!window.ScheduleBridge){setStatus('nl-status','요청 연결을 불러오지 못했습니다. 새로고침해 주세요.','err');return;}
+  return window.ScheduleBridge.submitFrom('edit');
 }
 function renderNLPreview(parsed){
   const el=document.getElementById('nl-preview');
   let h='';
   if(parsed.type==='event'){
     parsed.data.forEach((ev,i)=>{
-      const col=TCh[ev.t]||'#888';
-      h+=`<div class="preview-item"><div><div class="preview-main" style="color:${col}">${ev.n}</div><div class="preview-sub">${ev.d} ${ev.ti||''} ${ev.loc?'· '+ev.loc:''} ${ev.no?'· '+ev.no:''}</div></div><div class="preview-actions"><button class="btn-primary" style="padding:4px 12px;font-size:11px" onclick="confirmEvent(${i})">추가</button></div></div>`;
+      const col=safeColor(TCh[ev.t]);
+      h+=`<div class="preview-item"><div><div class="preview-main" style="color:${col}">${esc(ev.n)}</div><div class="preview-sub">${esc(ev.d)} ${esc(ev.ti||'')} ${esc(ev.loc?'· '+ev.loc:'')} ${esc(ev.no?'· '+ev.no:'')}</div></div><div class="preview-actions"><button class="btn-primary" style="padding:4px 12px;font-size:11px" onclick="confirmEvent(${i})">추가</button></div></div>`;
     });
   } else if(parsed.type==='travel'){
     parsed.data.forEach((tt,i)=>{
-      h+=`<div class="preview-item"><div><div class="preview-main">${LOC_NAMES[tt.from]||tt.from} → ${LOC_NAMES[tt.to]||tt.to}</div><div class="preview-sub">${tt.min}분 · ${tt.mode||'지하철'} (양방향)</div></div><div class="preview-actions"><button class="btn-primary" style="padding:4px 12px;font-size:11px" onclick="confirmTravel(${i})">추가</button></div></div>`;
+      h+=`<div class="preview-item"><div><div class="preview-main">${esc(LOC_NAMES[tt.from]||tt.from)} → ${esc(LOC_NAMES[tt.to]||tt.to)}</div><div class="preview-sub">${esc(tt.min)}분 · ${esc(tt.mode||'지하철')} (양방향)</div></div><div class="preview-actions"><button class="btn-primary" style="padding:4px 12px;font-size:11px" onclick="confirmTravel(${i})">추가</button></div></div>`;
     });
   } else {
     h=`<div class="preview-item"><div class="preview-sub">알 수 없는 형식</div></div>`;
@@ -993,7 +1007,7 @@ function buildToday(){
       const done=ev.e!=null&&nowMin>ev.e;
       const active=ev.s!=null&&ev.e!=null&&nowMin>=ev.s&&nowMin<=ev.e;
       const st=done?'done':active?'active':'upcoming';
-      const col=TCh[ev.t]||'#888';
+      const col=safeColor(TCh[ev.t]);
       const isLast=i===evs.length-1;
       const nm=(ev.n||'').replace(/\[W\] /,'');
       let badge='';
@@ -1012,10 +1026,10 @@ function buildToday(){
           ${!isLast?'<div class="tl-vline"></div>':''}
         </div>
         <div class="tl-card ${st}">
-          <div class="tl-ti">${ev.ti||''}</div>
-          <div class="tl-name">${nm}</div>
-          ${ev.loc?`<div class="tl-loc">📍 ${ev.loc}</div>`:''}
-          ${ev.no?`<div class="tl-note">⚠ ${ev.no}</div>`:''}
+          <div class="tl-ti">${esc(ev.ti||'')}</div>
+          <div class="tl-name">${esc(nm)}</div>
+          ${ev.loc?`<div class="tl-loc">📍 ${esc(ev.loc)}</div>`:''}
+          ${ev.no?`<div class="tl-note">⚠ ${esc(ev.no)}</div>`:''}
           <div class="tl-badge ${st}">${badge}</div>
         </div>
       </div>`;
@@ -1034,7 +1048,7 @@ function buildToday(){
               <div class="tl-vline"></div>
             </div>
             <div class="tl-travel">
-              <div class="tl-travel-pill">🚌 ${tt}분 · ${md}</div>
+              <div class="tl-travel-pill">🚌 ${esc(tt)}분 · ${esc(md)}</div>
               <div class="tl-travel-buf" style="color:${tc}">${buf<0?`⚠ ${Math.abs(buf)}분 부족`:`여유 +${buf}분`}</div>
             </div>
           </div>`;
@@ -1058,22 +1072,22 @@ function buildToday(){
   if(planDay&&!planDay.rest){
     h+=`<div class="today-plan-sec">
       <div class="today-plan-hdr">오늘의 공부 플랜</div>`;
-    if(planDay.alert)h+=`<div class="today-plan-alert">⚠ ${planDay.alert}</div>`;
+    if(planDay.alert)h+=`<div class="today-plan-alert">⚠ ${esc(planDay.alert)}</div>`;
     if(planDay.blocks)planDay.blocks.forEach(b=>{
       h+=`<div class="today-blk">
-        <div class="today-blk-bar" style="background:${b.c}"></div>
+        <div class="today-blk-bar" style="background:${safeColor(b.c)}"></div>
         <div>
-          <div class="today-blk-slot">${b.s}</div>
-          <div class="today-blk-desc">${b.d}</div>
-          <div class="today-blk-hrs">${b.h}</div>
+          <div class="today-blk-slot">${esc(b.s)}</div>
+          <div class="today-blk-desc">${esc(b.d)}</div>
+          <div class="today-blk-hrs">${esc(b.h)}</div>
         </div>
       </div>`;
     });
-    if(planDay.total)h+=`<div style="font-size:11px;color:var(--tx2);margin-top:6px">총 목표: <b style="color:var(--tx)">${planDay.total}</b></div>`;
-    if(planDay.note)h+=`<div class="today-plan-note">📌 ${planDay.note}</div>`;
+    if(planDay.total)h+=`<div style="font-size:11px;color:var(--tx2);margin-top:6px">총 목표: <b style="color:var(--tx)">${esc(planDay.total)}</b></div>`;
+    if(planDay.note)h+=`<div class="today-plan-note">📌 ${esc(planDay.note)}</div>`;
     h+=`</div>`;
   } else if(planDay&&planDay.rest){
-    h+=`<div class="today-no-plan">💪 오늘은 공부 없이 체력 관리의 날<br><span style="font-size:11px;opacity:.6">${planDay.note||''}</span></div>`;
+    h+=`<div class="today-no-plan">💪 오늘은 공부 없이 체력 관리의 날<br><span style="font-size:11px;opacity:.6">${esc(planDay.note||'')}</span></div>`;
   }
 
   el.innerHTML=h;
@@ -1107,7 +1121,7 @@ function buildCal(){
     const MX=window.innerWidth>=769?3:2;
     evs.slice(0,MX).forEach(ev=>{
       const c=document.createElement('div');c.className='chip';
-      c.style.background=TCh[ev.t];c.textContent=(ev.n||'').replace(/\[W\] /,'');
+      c.style.background=safeColor(TCh[ev.t]);c.textContent=(ev.n||'').replace(/\[W\] /,'');
       cell.appendChild(c);
     });
     if(evs.length>MX){const m=document.createElement('div');m.className='more';m.textContent=`+${evs.length-MX}개`;cell.appendChild(m);}
@@ -1132,7 +1146,7 @@ function goToToday(){
 function buildCalendarNotes(){
   const seen=new Set();
   const notes=EVENTS.filter(e=>e.d>=TODAY&&e.d.startsWith(monthPrefix())&&(e.t==='deadline'||e.t==='meeting'||e.status==='tentative'||(e.no||'').includes('지속 여부'))).filter(e=>{const key=e.series||e.id||e.n;if(seen.has(key))return false;seen.add(key);return true;}).slice(0,5);
-  document.getElementById('calendar-notes').innerHTML='<div class="pat">일정 안내</div>'+notes.map(e=>`<div class="pai"><div class="pad" style="background:${TCh[e.t]||'#888'}"></div><div class="pax"><b>${e.d.slice(5).replace('-','/')}</b> ${esc(e.n)}${e.no?`<br>${esc(e.no)}`:''}</div></div>`).join('')+'<div class="pax">반복 일정은 12/31까지 등록했습니다. 별도 공지 없는 공휴일·종강 이후 일정은 확인이 필요합니다.</div>';
+  document.getElementById('calendar-notes').innerHTML='<div class="pat">일정 안내</div>'+notes.map(e=>`<div class="pai"><div class="pad" style="background:${safeColor(TCh[e.t])}"></div><div class="pax"><b>${esc(e.d.slice(5).replace('-','/'))}</b> ${esc(e.n)}${e.no?`<br>${esc(e.no)}`:''}</div></div>`).join('')+'<div class="pax">반복 일정은 12/31까지 등록했습니다. 별도 공지 없는 공휴일·종강 이후 일정은 확인이 필요합니다.</div>';
 }
 
 function selDay(ds){
@@ -1151,12 +1165,12 @@ function selDay(ds){
     let html='',lt=null;
     for(let i=0;i<evs.length;i++){
       const ev=evs[i];
-      if(ev.t!==lt){html+=`<div class="etl" style="color:${TCh[ev.t]}">${TL[ev.t]||ev.t}</div>`;lt=ev.t;}
+      if(ev.t!==lt){html+=`<div class="etl" style="color:${safeColor(TCh[ev.t])}">${esc(TL[ev.t]||ev.t)}</div>`;lt=ev.t;}
       const nm=(ev.n||'').replace(/\[W\] /,'');
-      html+=`<div class="ec" style="border-left-color:${TCh[ev.t]}">
-        <div class="ect">${nm}</div>
-        <div class="ecm">${ev.ti?`<span>🕐 ${ev.ti}</span> `:''}${ev.loc?`<span>📍 ${ev.loc}</span>`:''}</div>
-        ${ev.no?`<div class="ecn">⚠ ${ev.no}</div>`:''}
+      html+=`<div class="ec" style="border-left-color:${safeColor(TCh[ev.t])}">
+        <div class="ect">${esc(nm)}</div>
+        <div class="ecm">${ev.ti?`<span>🕐 ${esc(ev.ti)}</span> `:''}${ev.loc?`<span>📍 ${esc(ev.loc)}</span>`:''}</div>
+        ${ev.no?`<div class="ecn">⚠ ${esc(ev.no)}</div>`:''}
       </div>`;
       const nx=evs[i+1];
       if(nx&&ev.lid&&nx.lid&&ev.lid!==nx.lid&&ev.e!=null&&nx.s!=null){
@@ -1165,7 +1179,7 @@ function selDay(ds){
           const md=gmd(ev.lid,nx.lid);const gap=nx.s-ev.e;const buf=gap-tt;
           const col=buf<0?'#ef4444':buf<30?'#f97316':'#22c55e';
           html+=`<div class="tc"><div class="tcl"></div>
-            <div class="tcp" style="background:${col}18;color:${col};border:.5px solid ${col}40">↓ ${tt}분 · ${md}</div>
+            <div class="tcp" style="background:${col}18;color:${col};border:.5px solid ${col}40">↓ ${esc(tt)}분 · ${esc(md)}</div>
             <div class="tcb" style="color:${col}">${buf<0?`여유 ${buf}분 ⚠`:`+${buf}분`}</div>
             <div class="tcl"></div></div>`;
           lt=null;
@@ -1200,10 +1214,10 @@ function buildList(){
     g2.appendChild(h);
     evs.forEach(ev=>{
       const r=document.createElement('div');r.className='lrow';
-      const b=document.createElement('div');b.className='lbar';b.style.background=TCh[ev.t];
+      const b=document.createElement('div');b.className='lbar';b.style.background=safeColor(TCh[ev.t]);
       const info=document.createElement('div');
       const nm=(ev.n||'').replace(/\[W\] /,'');
-      info.innerHTML=`<div class="lt">${nm}</div><div class="lm2">${[ev.ti,ev.loc,ev.no].filter(Boolean).join(' · ')||TL[ev.t]||ev.t}</div>`;
+      info.innerHTML=`<div class="lt">${esc(nm)}</div><div class="lm2">${esc([ev.ti,ev.loc,ev.no].filter(Boolean).join(' · ')||TL[ev.t]||ev.t)}</div>`;
       r.appendChild(b);r.appendChild(info);g2.appendChild(r);
     });
     lw.appendChild(g2);
@@ -1223,6 +1237,7 @@ function sw(v){
   if(v==='plan')buildPlan();
   if(v==='alert')buildAlerts();
   if(v==='edit')initEditSettings();
+  if(window.ScheduleBridge)window.ScheduleBridge.onView(v);
 }
 
 // ── HOME VIEW ────────────────────────────────────────────────────────
@@ -1242,8 +1257,8 @@ function buildHome(){
   } else {
     const active=todayEvs.find(e=>e.s!=null&&e.e!=null&&nowMin>=e.s&&nowMin<=e.e);
     const next=todayEvs.find(e=>e.s!=null&&e.s>nowMin);
-    if(active) todaySub=`진행 중: ${active.n.replace('[W] ','')}`;
-    else if(next) todaySub=`다음: ${next.n.replace('[W] ','')} (${m2t(next.s)})`;
+    if(active) todaySub=`진행 중: ${esc(active.n.replace('[W] ',''))}`;
+    else if(next) todaySub=`다음: ${esc(next.n.replace('[W] ',''))} (${m2t(next.s)})`;
     else todaySub=todayEvs.some(e=>e.e==null)?'시간 미정 일정이나 마감을 확인해 주세요':`오늘 총 ${todayEvs.length}개 일정 (모두 완료)`;
     todaySub+=`<br><span style="font-size:11px;opacity:.7">일정 ${todayEvs.length}개</span>`;
   }
@@ -1255,7 +1270,7 @@ function buildHome(){
   if(exams.length){
     const ex=exams[0];
     const diff=Math.ceil((new Date(ex.d)-new Date(TODAY))/(1000*60*60*24));
-    calSub=`${TL[ex.t]||'일정'}: ${ex.n.replace('기말고사','기말').replace('이론 및 실험','')}<br><span style="font-size:11px;opacity:.7;color:#f87171">D-${diff} · ${ex.ti||''}</span>`;
+    calSub=`${esc(TL[ex.t]||'일정')}: ${esc(ex.n.replace('기말고사','기말').replace('이론 및 실험',''))}<br><span style="font-size:11px;opacity:.7;color:#f87171">D-${diff} · ${esc(ex.ti||'')}</span>`;
   } else {
     calSub='이번 달 일정 보기';
   }
@@ -1265,7 +1280,7 @@ function buildHome(){
   const planDay=PLAN?PLAN.find(p=>p.d===TODAY):null;
   let planSub='';
   if(planDay&&!planDay.rest&&planDay.blocks){
-    planSub=`오늘 목표: ${planDay.total||''}<br><span style="font-size:11px;opacity:.7">${planDay.blocks.map(b=>b.d).join(' · ')}</span>`;
+    planSub=`오늘 목표: ${esc(planDay.total||'')}<br><span style="font-size:11px;opacity:.7">${esc(planDay.blocks.map(b=>b.d).join(' · '))}</span>`;
   } else if(planDay&&planDay.rest){
     planSub='오늘은 공부 없이 체력 관리의 날 💪';
   } else {
@@ -1332,14 +1347,14 @@ function buildAlerts(){
         h+=`<div class="ac red"><div class="adate">${fmtDate(c.ds)} · ${c.buf}분 겹침</div><div class="aroute">${esc(c.a.n)} ↔ ${esc(c.b.n)}</div><div class="adetail">${esc(c.a.ti)} / ${esc(c.b.ti)}</div></div>`;return;
       }
       const md=gmd(c.a.lid,c.b.lid);
-      h+=`<div class="ac ${c.cls}"><div class="adate">${fmtDate(c.ds)} · 여유 ${c.buf}분</div><div class="aroute">${c.a.n.replace('[W] ','')} → ${c.b.n.replace('[W] ','')}</div><div class="adetail">${fmtMin(c.a.e)} 종료 → 이동 ${c.tt}분(${md}) → ${fmtMin(c.b.s)} 시작<br>여유: <span class="buf">${c.buf<0?`${Math.abs(c.buf)}분 초과 ⚠`:`${c.buf}분`}</span></div></div>`;
+      h+=`<div class="ac ${c.cls}"><div class="adate">${fmtDate(c.ds)} · 여유 ${c.buf}분</div><div class="aroute">${esc(c.a.n.replace('[W] ',''))} → ${esc(c.b.n.replace('[W] ',''))}</div><div class="adetail">${fmtMin(c.a.e)} 종료 → 이동 ${esc(c.tt)}분(${esc(md)}) → ${fmtMin(c.b.s)} 시작<br>여유: <span class="buf">${c.buf<0?`${Math.abs(c.buf)}분 초과 ⚠`:`${c.buf}분`}</span></div></div>`;
     });
     h+='</div>';
   }
   if(unk.length){
     h+=`<div class="asec">이동시간 미확인</div><div class="ag">`;
     unk.forEach(c=>{
-      h+=`<div class="ac unk"><div class="adate">${fmtDate(c.ds)}</div><div class="aroute">${c.a.n.replace('[W] ','')} → ${c.b.n.replace('[W] ','')}</div><div class="adetail">${fmtMin(c.a.e)} 종료, ${fmtMin(c.b.s)} 시작 (여유 ${c.gap}분)<br><span class="buf">이동시간 DB 미등록 — 편집 탭에서 추가</span></div></div>`;
+      h+=`<div class="ac unk"><div class="adate">${fmtDate(c.ds)}</div><div class="aroute">${esc(c.a.n.replace('[W] ',''))} → ${esc(c.b.n.replace('[W] ',''))}</div><div class="adetail">${fmtMin(c.a.e)} 종료, ${fmtMin(c.b.s)} 시작 (여유 ${c.gap}분)<br><span class="buf">이동시간 DB 미등록 — 편집 탭에서 추가</span></div></div>`;
     });
     h+='</div>';
   }
@@ -1349,27 +1364,8 @@ function buildAlerts(){
 // ── CAL NL HANDLER ────────────────────────────────────────────────────
 let calPending=null;
 async function calNLParse(){
-  const text=document.getElementById('cal-nl-input').value.trim();
-  if(!text)return;
-  const st=document.getElementById('cal-nl-status');
-  const prev=document.getElementById('cal-nl-preview');
-  st.textContent='분석 중...';st.style.display='block';st.style.color='var(--tx2)';
-  prev.style.display='none';prev.innerHTML='';
-  const r=await geminiParse(text);
-  if(!r.ok){st.textContent=r.msg;st.style.color='#ef4444';return;}
-  calPending=r.result;st.textContent='확인 후 추가하세요';st.style.color='var(--acc)';
-  let h='';
-  if(r.result.type==='event'){
-    r.result.data.forEach((ev,i)=>{
-      const col=TCh[ev.t]||'#888';
-      h+=`<div class="nl-pi"><div><div class="nl-pi-main" style="color:${col}">${ev.n}</div><div class="nl-pi-sub">${ev.d} ${ev.ti||''} ${ev.loc?'· '+ev.loc:''}</div></div><button class="btn-primary" style="font-size:11px;padding:4px 11px;flex-shrink:0" onclick="calConfirmEvent(${i})">추가</button></div>`;
-    });
-  } else if(r.result.type==='travel'){
-    r.result.data.forEach((tt,i)=>{
-      h+=`<div class="nl-pi"><div><div class="nl-pi-main">${LOC_NAMES[tt.from]||tt.from} → ${LOC_NAMES[tt.to]||tt.to}</div><div class="nl-pi-sub">${tt.min}분 · ${tt.mode}</div></div><button class="btn-primary" style="font-size:11px;padding:4px 11px;flex-shrink:0" onclick="calConfirmTravel(${i})">추가</button></div>`;
-    });
-  }
-  prev.innerHTML=h;prev.style.display='block';
+  if(!window.ScheduleBridge){const st=document.getElementById('cal-nl-status');st.textContent='요청 연결을 불러오지 못했습니다. 새로고침해 주세요.';st.style.display='block';return;}
+  return window.ScheduleBridge.submitFrom('cal');
 }
 async function calConfirmEvent(i){
   const ev=calPending.data[i];
@@ -1403,18 +1399,18 @@ function buildPlan(){
   currentSubjects().forEach(sub=>{
     const daysLeft=sub.examDate?Math.ceil((new Date(sub.examDate)-new Date(TODAY))/(1000*60*60*24)):null;
     const dLabel=daysLeft!=null?(daysLeft<=0?'<span style="color:#ef4444;font-weight:700">오늘!</span>':`<span style="color:${daysLeft<=3?'#ef4444':daysLeft<=7?'#f59e0b':'#22c55e'};font-weight:700">D-${daysLeft}</span>`):null;
-    sc+=`<div style="background:var(--s2);border:1.5px solid ${sub.color}30;border-radius:14px;padding:14px 15px;margin-bottom:10px">
+    sc+=`<div style="background:var(--s2);border:1.5px solid ${safeColor(sub.color)}30;border-radius:14px;padding:14px 15px;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
-        <span style="font-size:20px">${sub.icon}</span>
+        <span style="font-size:20px">${esc(sub.icon)}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:800;color:${sub.color}">${sub.name}</div>
-          <div style="font-size:11px;color:var(--tx2);margin-top:1px">${sub.examLabel}</div>
+          <div style="font-size:13px;font-weight:800;color:${safeColor(sub.color)}">${esc(sub.name)}</div>
+          <div style="font-size:11px;color:var(--tx2);margin-top:1px">${esc(sub.examLabel)}</div>
         </div>
         ${dLabel?`<div style="font-size:13px">${dLabel}</div>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <div style="background:${sub.color}15;border:1px solid ${sub.color}30;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:${sub.color}">${sub.totalHours}</div>
-        <div style="font-size:11px;color:var(--tx2);flex:1;line-height:1.5">${sub.strategy}</div>
+        <div style="background:${safeColor(sub.color)}15;border:1px solid ${safeColor(sub.color)}30;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:${safeColor(sub.color)}">${esc(sub.totalHours)}</div>
+        <div style="font-size:11px;color:var(--tx2);flex:1;line-height:1.5">${esc(sub.strategy)}</div>
       </div>
     </div>`;
   });
@@ -1429,23 +1425,23 @@ function buildPlan(){
   </div>
   <div id="v-plan-days" style="padding:0 16px">`;
   phases.forEach(p=>{
-    h+=`<div class="phase">${p.label}</div><div class="day-grid">`;
+    h+=`<div class="phase">${esc(p.label)}</div><div class="day-grid">`;
     p.days.forEach(day=>{
       const isToday=day.d===TODAY;
       const cls='dc2'+(day.exam?' exam-day':day.rest?' rest-day':day.free?' free-day':'')+(day.grid?' full':'')+(isToday?' tod-day':'');
       h+=`<div class="${cls}">
         <div class="dch">
-          <span class="dcn">${day.date}${isToday?' <span class="tbadge">오늘</span>':''}</span>
-          <span class="dct">${day.total||''}</span>
+          <span class="dcn">${esc(day.date)}${isToday?' <span class="tbadge">오늘</span>':''}</span>
+          <span class="dct">${esc(day.total||'')}</span>
         </div>`;
-      if(day.exam)h+=`<div class="pbadge exam">🎯 ${day.exam}</div>`;
-      if(day.alert)h+=`<div class="pbadge alert">⚠ ${day.alert}</div>`;
-      if(day.note&&!day.rest)h+=`<div class="pbadge note">${day.note}</div>`;
-      if(day.rest)h+=`<div class="pbadge rest">${day.note}</div>`;
+      if(day.exam)h+=`<div class="pbadge exam">🎯 ${esc(day.exam)}</div>`;
+      if(day.alert)h+=`<div class="pbadge alert">⚠ ${esc(day.alert)}</div>`;
+      if(day.note&&!day.rest)h+=`<div class="pbadge note">${esc(day.note)}</div>`;
+      if(day.rest)h+=`<div class="pbadge rest">${esc(day.note)}</div>`;
       if(day.blocks&&day.blocks.length){
         h+=`<div class="${day.grid?'blocks-grid':'blocks'}">`;
         day.blocks.forEach(b=>{
-          h+=`<div class="blk"><div class="blkbar" style="background:${b.c}"></div><div><div class="blkslot">${b.s}</div><div class="blkdesc">${b.d}</div><div class="blkhrs">${b.h}</div></div></div>`;
+          h+=`<div class="blk"><div class="blkbar" style="background:${safeColor(b.c)}"></div><div><div class="blkslot">${esc(b.s)}</div><div class="blkdesc">${esc(b.d)}</div><div class="blkhrs">${esc(b.h)}</div></div></div>`;
         });
         h+='</div>';
       }
@@ -1488,12 +1484,31 @@ async function planNLQuery(){
   res.textContent=r.text;res.style.display='block';
 }
 
+// Apply the worker's exact public commit so Pages deployment lag cannot hide an edit.
+function applyBridgeSnapshot(events,travel){
+  if(!Array.isArray(events)||!travel||typeof travel.locations!=='object'||!travel.times)throw new Error('완료된 일정 데이터 형식이 올바르지 않습니다.');
+  const selected=document.querySelector('.dc.sel');
+  const selectedDate=selected?selected.dataset.date:null;
+  const panelOpen=document.getElementById('calPanel').classList.contains('open');
+  EVENTS=events;LOC_NAMES={...travel.locations};TT={...travel.times};TM={...travel.modes};
+  loadedSnapshots['events.json']=JSON.stringify(events);
+  loadedSnapshots['travel.json']=JSON.stringify(travel);
+  dataReady=true;rebuildEM();buildCal();buildHome();updateAlertBadge();
+  if(document.getElementById('v-plan').classList.contains('on'))buildPlan();
+  if(document.getElementById('v-alert').classList.contains('on'))buildAlerts();
+  if(document.getElementById('v-today').classList.contains('on'))buildToday();
+  if(selectedDate)selDay(selectedDate);
+  if(!panelOpen)closePanel();
+  setSyncDot('ok');
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────
-loadData().then(()=>{
+window.scheduleDataReady=loadData().then(()=>{
   buildCal();
   buildHome();
   selDay(TODAY);closePanel();
 });
 </script>
+<script src="bridge-client.js"></script>
 </body>
 </html>

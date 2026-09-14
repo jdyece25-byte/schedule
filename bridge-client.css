@@ -1,0 +1,37 @@
+/* Request controls stay outside the calendar grid's height allocation. */
+.bridge-cal-label{display:flex;align-items:center;justify-content:space-between;gap:8px;letter-spacing:0}
+.bridge-link{background:none;border:0;padding:0;color:#a5b4fc;font:inherit;cursor:pointer;white-space:nowrap}
+.bridge-card{min-width:0}
+.bridge-card-head,.bridge-request-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.bridge-card-head .esec-title{margin-bottom:0}
+.bridge-secondary{background:var(--s3);border:1px solid var(--bd2);color:var(--tx);border-radius:8px;padding:8px 10px;font:inherit;font-size:11px;cursor:pointer}
+.bridge-worker,.bridge-feedback{font-size:11px;line-height:1.65;color:var(--tx2);margin-top:8px;overflow-wrap:anywhere}
+.bridge-error{color:#fca5a5!important}
+.bridge-history{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.bridge-card summary{font-size:12px;color:var(--tx);cursor:pointer;padding-top:12px}
+.bridge-request{border:1px solid var(--bd);border-radius:11px;padding:12px;background:var(--s1);min-width:0}
+.bridge-badge{font-size:10px;font-weight:700;line-height:1.5;padding:3px 8px;border-radius:6px;color:#c4b5fd;background:#8b5cf622}
+.bridge-completed{color:#86efac;background:#22c55e22}
+.bridge-processing{color:#93c5fd;background:#3b82f622}
+.bridge-needs_input,.bridge-uncertain{color:#fcd34d;background:#f59e0b22}
+.bridge-failed{color:#fca5a5;background:#ef444422}
+.bridge-meta,.bridge-empty{font-size:10px;color:var(--tx2);line-height:1.6;overflow-wrap:anywhere}
+.bridge-request-text,.bridge-result{margin-top:8px;font-size:12px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.bridge-result{color:var(--tx2)}
+.bridge-questions,.bridge-warnings{padding-left:18px;margin:8px 0;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.bridge-questions{color:#fde68a}.bridge-warnings{color:#fcd34d}
+.bridge-reply{display:flex;flex-direction:column;gap:8px;margin-top:10px;align-items:flex-start}
+.bridge-reply label{font-size:11px;color:var(--tx2)}
+.bridge-reply textarea{width:100%;min-height:64px}
+.bridge-request>.bridge-secondary{margin-top:10px}
+.bridge-settings{grid-template-columns:minmax(0,1fr)!important;gap:7px!important}
+.bridge-settings label{margin-top:5px}
+.bridge-settings .edit-input{width:100%;min-width:0}
+.settings-grid .edit-input{min-width:0}
+#v-edit .edit-scroll{padding-bottom:calc(var(--bnav-h) + env(safe-area-inset-bottom) + 16px)}
+.bridge-actions{flex-wrap:wrap}
+.bridge-note{color:var(--tx2)!important;overflow-wrap:anywhere}
+.bridge-note a{color:#a5b4fc}
+.bridge-card button:disabled,.nl-send:disabled,#nl-btn:disabled,.bridge-actions button:disabled{opacity:.5;cursor:wait}
+.bridge-card button:focus-visible,.bridge-link:focus-visible,.bridge-card summary:focus-visible{outline:2px solid #a5b4fc;outline-offset:3px}
+@media(max-width:360px){.bridge-cal-label{gap:4px;font-size:9px}.bridge-request{padding:10px}.bridge-request-head{align-items:flex-start;flex-direction:column;gap:5px}}
