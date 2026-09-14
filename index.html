@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<link rel="stylesheet" href="bridge-client.css">
+<link rel="stylesheet" href="bridge-client.css?v=20260914-settings">
 <title>동영 스케줄</title>
 <style>
 :root{
@@ -511,7 +511,7 @@ body{
   </div><!-- /cal-wrap -->
   <!-- NL Event Input -->
   <div class="nl-section">
-    <div class="nl-label bridge-cal-label"><span>자연어로 일정 요청</span><button class="bridge-link" id="bridge-cal-link" onclick="sw('edit')">요청 내역 · 연결 설정</button></div>
+    <div class="nl-label bridge-cal-label"><span>자연어로 일정 요청</span><button type="button" class="bridge-link" id="bridge-cal-link" data-bridge-action="open-requests">요청 내역 · 연결 설정</button></div>
     <div class="nl-row">
       <textarea id="cal-nl-input" class="nl-ta" placeholder="예: 다음 주 월요일 오전 10시부터 1시까지 교대역 과외"></textarea>
       <button class="nl-send" id="cal-nl-btn" onclick="calNLParse()" title="일정 요청 보내기" aria-label="일정 요청 보내기">↑</button>
@@ -629,14 +629,15 @@ body{
       <p class="hint">양방향으로 자동 등록됩니다. 기존 경로는 덮어씁니다.</p>
     </div>
 
-    <div class="edit-section">
+    <div class="edit-section" id="bridge-settings-panel">
       <div class="esec-title">⚙ 일정 요청 연결</div>
+      <p class="settings-note bridge-note"><b>지금 사용하는 기기·브라우저에 저장하는 설정입니다.</b> PC에서 연결해도 휴대폰에는 적용되지 않습니다. 휴대폰 Chrome에서도 토큰을 한 번 입력하고 저장해 주세요.</p>
       <div class="settings-grid bridge-settings">
         <label for="cfg-bridge-repo">비공개 요청 저장소</label><input type="text" id="cfg-bridge-repo" class="edit-input" placeholder="jdyece25-byte/schedule-requests" autocapitalize="none" spellcheck="false">
         <label for="cfg-bridge-pat">요청 전용 GitHub 토큰</label><input type="password" id="cfg-bridge-pat" class="edit-input" placeholder="github_pat_…" autocomplete="off" autocapitalize="none" spellcheck="false">
         <label for="cfg-bridge-agent">처리 도구</label><select id="cfg-bridge-agent" class="edit-input"><option value="codex">Codex</option><option value="claude">Claude</option></select>
       </div>
-      <div class="edit-row bridge-actions"><button type="button" class="btn-primary" data-bridge-action="settings-save">연결 설정 저장</button><button type="button" class="bridge-secondary" data-bridge-action="connection-test">연결 테스트</button></div>
+      <div class="edit-row bridge-actions"><button type="button" class="btn-primary" data-bridge-action="settings-save">연결 설정 저장</button><button type="button" class="bridge-secondary" data-bridge-action="connection-test">저장하고 연결 확인</button></div>
       <p id="bridge-settings-status" class="bridge-feedback" role="status"></p>
       <p class="settings-note bridge-note"><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Fine-grained 토큰 만들기 ↗</a>에서 본인 계정 → Only select repositories → <b>schedule-requests만</b> 선택하고 Contents를 <b>Read and write</b>로 설정하세요. 요청 저장소는 비공개여야 합니다. 토큰은 이 브라우저에만 저장됩니다. 이 토큰에는 공개 schedule 저장소 권한이 필요하지 않습니다.</p>
     </div>
@@ -1509,6 +1510,6 @@ window.scheduleDataReady=loadData().then(()=>{
   selDay(TODAY);closePanel();
 });
 </script>
-<script src="bridge-client.js"></script>
+<script src="bridge-client.js?v=20260914-settings"></script>
 </body>
 </html>

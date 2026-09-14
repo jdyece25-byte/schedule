@@ -42,6 +42,18 @@
       this.refreshing = false;
     }
     read(key) { try { return this.storage.getItem(key) || ''; } catch { return ''; } }
+    reloadSettings() {
+      // Keep every request on the credentials/repository with which it started.
+      if (this.sending || this.refreshing) return false;
+      const settings = {repo: this.read('cfg_bridge_repo') || DEFAULT_REPO, pat: this.read('cfg_bridge_pat'), agent: this.read('cfg_bridge_agent') === 'claude' ? 'claude' : 'codex'};
+      if (Object.keys(settings).every(key => settings[key] === this.settings[key])) return false;
+      this.settings = settings;
+      this.worker = null;
+      this.lastError = '';
+      this.syncedCommit = '';
+      this.onChange(this);
+      return true;
+    }
     get rows() { return this.history.filter(row => row.repo.toLowerCase() === this.settings.repo.toLowerCase()).sort((a, b) => b.request.id.localeCompare(a.request.id)).slice(0, 20); }
     get configured() { return Boolean(this.settings.pat && this.settings.repo); }
     changed() {
@@ -58,10 +70,7 @@
       this.storage.setItem('cfg_bridge_repo', repo);
       this.storage.setItem('cfg_bridge_pat', pat);
       this.storage.setItem('cfg_bridge_agent', settings.agent === 'claude' ? 'claude' : 'codex');
-      this.settings = {repo, pat, agent: settings.agent === 'claude' ? 'claude' : 'codex'};
-      this.worker = null;
-      this.lastError = '';
-      this.syncedCommit = '';
+      this.reloadSettings();
       this.onChange(this);
     }
     async api(path, options = {}, publicRead = false) {
@@ -74,14 +83,16 @@
       } finally { clearTimeout(timer); }
     }
     async validate() {
-      if (!this.settings.pat) throw new Error('편집 탭의 일정 요청 연결에 토큰을 저장해 주세요.');
+      this.reloadSettings();
+      const settings = this.settings;
+      if (!settings.pat) throw new Error('이 기기·브라우저에 요청 토큰이 없습니다. 연결 설정에서 저장해 주세요. PC에 저장한 토큰은 휴대폰으로 공유되지 않습니다.');
       if (!this.settings.pat.startsWith('github_pat_')) throw new Error('요청 저장소 전용 Fine-grained 토큰이 필요합니다.');
       if (!/^[\w-]+\/[\w.-]+$/.test(this.settings.repo) || this.settings.repo.toLowerCase() === TARGET_REPO.toLowerCase()) throw new Error('비공개 요청 저장소 주소를 확인하세요.');
       const responses = await Promise.all([this.api('/user'), this.api('/repos/' + this.settings.repo)]);
       if (!responses[0].ok || !responses[1].ok) throw new Error('GitHub 연결 실패: 토큰, 저장소 선택 및 Contents 권한을 확인하세요.');
       const [user, repo] = await Promise.all(responses.map(response => response.json()));
       if (repo.private !== true) throw new Error('요청은 비공개 저장소에만 보낼 수 있습니다. 저장소를 Private으로 설정하세요.');
-      if (!user.login || user.login.toLowerCase() !== String(repo.owner?.login).toLowerCase() || user.login.toLowerCase() !== this.settings.repo.split('/')[0].toLowerCase()) throw new Error('현재 GitHub 계정이 요청 저장소의 소유자여야 합니다.');
+      if (!user.login || user.login.toLowerCase() !== String(repo.owner?.login).toLowerCase() || user.login.toLowerCase() !== settings.repo.split('/')[0].toLowerCase()) throw new Error('현재 GitHub 계정이 요청 저장소의 소유자여야 합니다.');
       if (repo.permissions?.push === false) throw new Error('요청 저장소 Contents 쓰기 권한이 필요합니다.');
       return user.login;
     }
@@ -137,13 +148,16 @@
       }
     }
     receipt(row) { row.delivery = 'queued'; row.error = ''; this.changed(); return row; }
-    async submit(text, parentId = null, agent = this.settings.agent) {
+    async submit(text, parentId = null, agent = null) {
+      this.reloadSettings();
+      agent = agent ?? this.settings.agent;
       text = text.trim();
       if (!text) throw new Error('요청 내용을 입력하세요.');
       if ([...text].length > 6000) throw new Error('요청은 6,000자 이내로 입력하세요.');
       if (parentId && !ID_PATTERN.test(parentId)) throw new Error('원래 요청 ID를 확인할 수 없습니다.');
       if (!['codex', 'claude'].includes(agent)) throw new Error('처리 도구 설정을 확인하세요.');
       if (this.sending) throw new Error('요청을 보내는 중입니다.');
+      if (this.refreshing) throw new Error('연결 확인 중입니다. 잠시 후 다시 보내 주세요.');
       this.sending = true;
       this.onChange(this);
       try {
@@ -156,19 +170,22 @@
         this.history.unshift(row);
         this.changed(); // Persist the immutable ID before any network write.
         return await this.deliver(row);
-      } finally { this.sending = false; this.onChange(this); }
+      } finally { this.sending = false; this.reloadSettings(); this.onChange(this); }
     }
     async retry(id) {
+      this.reloadSettings();
       if (this.sending) throw new Error('요청을 보내는 중입니다.');
+      if (this.refreshing) throw new Error('연결 확인 중입니다. 잠시 후 다시 보내 주세요.');
       const row = this.rows.find(row => row.request.id === id);
       if (!row) throw new Error('요청 내역을 찾을 수 없습니다.');
       if (!['sending', 'uncertain', 'rejected'].includes(row.delivery)) throw new Error('접수된 요청은 같은 ID로 다시 처리하지 않습니다.');
       this.sending = true;
       this.onChange(this);
       try { await this.validate(); return await this.deliver(row, true); }
-      finally { this.sending = false; this.onChange(this); }
+      finally { this.sending = false; this.reloadSettings(); this.onChange(this); }
     }
     async resend(id) {
+      this.reloadSettings();
       const row = this.rows.find(row => row.request.id === id);
       if (!row || row.result?.state !== 'failed') throw new Error('처리에 실패한 요청만 새 요청으로 다시 보낼 수 있습니다.');
       return this.submit(row.request.text, row.request.parent_id || null, row.request.agent);
@@ -212,6 +229,7 @@
       } catch (error) { latest.syncState = 'failed'; latest.syncError = '일정 화면 동기화 대기: ' + messageFor(error); }
     }
     async refresh({discover = false} = {}) {
+      this.reloadSettings();
       if (!this.configured || this.refreshing || this.sending) return;
       this.refreshing = true;
       this.onChange(this);
@@ -233,12 +251,12 @@
         await this.syncCompleted();
         this.changed();
       } catch (error) { this.lastError = messageFor(error); }
-      finally { this.refreshing = false; this.onChange(this); }
+      finally { this.refreshing = false; this.reloadSettings(); this.onChange(this); }
     }
   }
 
   function workerStatus(client) {
-    if (!client.configured) return '연결 설정을 저장해 주세요.';
+    if (!client.configured) return '이 기기에서 연결 설정이 필요합니다. PC와 휴대폰에 각각 저장해 주세요.';
     if (client.lastError) return '연결 확인 필요 · ' + client.lastError;
     const worker = client.worker;
     if (!worker || worker.version !== 1 || worker.target_repo !== TARGET_REPO || !['codex', 'claude'].includes(worker.agent)) return 'PC 작업기 연결 미확인 · PC에서 작업기를 실행해야 처리됩니다.';
@@ -294,8 +312,16 @@
     let view = document.querySelector('.view.on')?.id?.replace('v-', '') || 'home';
     let timer;
     let renderSignature = '';
+    let renderedSettings;
     function render() {
       if (!client) return;
+      if (renderedSettings !== client.settings) {
+        renderedSettings = client.settings;
+        byId('cfg-bridge-repo').value = client.settings.repo;
+        byId('cfg-bridge-pat').value = client.settings.pat;
+        byId('cfg-bridge-agent').value = client.settings.agent;
+        notify('bridge-settings-status', '');
+      }
       notify('bridge-worker', workerStatus(client));
       byId('bridge-count').textContent = client.rows.length;
       const history = renderHistory(client.rows);
@@ -309,12 +335,12 @@
         if (focusedId && byId(focusedId)) { byId(focusedId).focus(); byId(focusedId).setSelectionRange(...selection); }
         renderSignature = history;
       }
-      byId('nl-btn').disabled = client.sending;
-      byId('cal-nl-btn').disabled = client.sending;
+      byId('nl-btn').disabled = client.sending || client.refreshing;
+      byId('cal-nl-btn').disabled = client.sending || client.refreshing;
       document.querySelectorAll('[data-bridge-action="reply"],[data-bridge-action="retry"],[data-bridge-action="resend"],[data-bridge-action="settings-save"],[data-bridge-action="connection-test"]').forEach(el => { el.disabled = client.sending || client.refreshing; });
       document.querySelectorAll('[data-bridge-action="refresh"]').forEach(el => { el.disabled = client.refreshing || client.sending; });
       const count = client.rows.filter(row => row.delivery === 'queued' && !['completed', 'failed'].includes(row.result?.state)).length;
-      byId('bridge-cal-link').textContent = count ? '요청 ' + count + '건 · 내역 보기' : '요청 내역 · 연결 설정';
+      byId('bridge-cal-link').textContent = !client.configured ? '이 기기 연결 설정' : count ? '요청 ' + count + '건 · 내역 보기' : '요청 내역 · 연결 설정';
     }
     try {
       client = new BridgeClient({fetch: root.fetch.bind(root), storage: root.localStorage, onChange: render,
@@ -323,16 +349,15 @@
       notify('bridge-status', '브라우저 저장소를 사용할 수 없습니다. 브라우저의 사이트 저장 설정을 확인하세요.', true);
       return {submitFrom: async () => notify('bridge-status', '요청 연결을 사용할 수 없습니다.', true), onView() {}};
     }
-    byId('cfg-bridge-repo').value = client.settings.repo;
-    byId('cfg-bridge-pat').value = client.settings.pat;
-    byId('cfg-bridge-agent').value = client.settings.agent;
+    const formSettings = () => ({repo: byId('cfg-bridge-repo').value, pat: byId('cfg-bridge-pat').value, agent: byId('cfg-bridge-agent').value});
     function schedule() {
       clearInterval(timer);
       if (!document.hidden && client.configured && ['edit', 'cal'].includes(view)) timer = setInterval(() => client.refresh(), 20000);
     }
     async function refresh(discover = true) {
       await client.refresh({discover});
-      if (client.lastError) notify('bridge-status', client.lastError, true);
+      if (!client.configured) notify('bridge-status', '이 기기에서 연결 설정을 먼저 저장해 주세요.');
+      else if (client.lastError) notify('bridge-status', client.lastError, true);
       else notify('bridge-status', '요청 상태를 확인했습니다.');
     }
     async function submitFrom(source) {
@@ -356,15 +381,27 @@
       const status = action.startsWith('settings') || action === 'connection-test' ? 'bridge-settings-status' : 'bridge-status';
       try {
         if (action === 'settings-save') {
-          client.saveSettings({repo: byId('cfg-bridge-repo').value, pat: byId('cfg-bridge-pat').value, agent: byId('cfg-bridge-agent').value});
-          notify(status, '이 브라우저에 연결 설정을 저장했습니다.');
+          client.saveSettings(formSettings());
+          notify(status, client.configured ? '이 기기·브라우저에 저장했습니다. 다른 기기에서는 별도로 저장해 주세요.' : '요청 토큰이 비어 있습니다. 이 기기에 토큰을 입력하고 저장해 주세요.', !client.configured);
           schedule();
         } else if (action === 'connection-test') {
-          button.disabled = true;
-          notify(status, '저장된 연결 설정 확인 중…');
-          const user = await client.validate();
+          client.saveSettings(formSettings());
+          const checkedSettings = client.settings;
+          client.refreshing = true;
+          render();
+          notify(status, '입력한 설정을 이 브라우저에 저장하고 연결 확인 중…');
+          let user;
+          try { user = await client.validate(); }
+          finally { client.refreshing = false; client.reloadSettings(); render(); }
           await client.refresh();
-          notify(status, user + ' · 비공개 요청 저장소 읽기 연결 확인. 실제 쓰기 권한은 요청 전송 시 확인합니다.');
+          if (client.settings !== checkedSettings) notify(status, '다른 탭에서 설정이 변경되었습니다. 연결 확인을 다시 눌러 주세요.');
+          else if (client.lastError) notify(status, client.lastError, true);
+          else notify(status, user + ' · 이 기기·브라우저에서 저장 및 읽기 연결 확인. 쓰기 권한은 첫 요청 전송 시 확인합니다. 다른 기기에서는 별도로 설정해 주세요.');
+          schedule();
+        } else if (action === 'open-requests') {
+          client.reloadSettings();
+          root.sw('edit');
+          if (!client.configured) byId('bridge-settings-panel').scrollIntoView({block: 'start', behavior: 'smooth'});
         } else if (action === 'refresh') await refresh();
         else if (action === 'resend') {
           await client.resend(button.dataset.requestId);
@@ -387,10 +424,21 @@
       } catch (error) { notify(status, messageFor(error), true); }
       finally { button.disabled = false; render(); }
     });
-    document.addEventListener('visibilitychange', () => { schedule(); if (!document.hidden && ['edit', 'cal'].includes(view)) refresh(false); });
+    function resume() {
+      client.reloadSettings();
+      schedule();
+      if (!document.hidden && ['edit', 'cal'].includes(view)) refresh(false);
+    }
+    root.addEventListener('storage', event => { if (event.key === null || ['cfg_bridge_repo', 'cfg_bridge_pat', 'cfg_bridge_agent'].includes(event.key)) resume(); });
+    root.addEventListener('focus', resume);
+    root.addEventListener('pageshow', resume);
+    document.addEventListener('visibilitychange', resume);
+    document.addEventListener('input', event => {
+      if (['cfg-bridge-repo', 'cfg-bridge-pat', 'cfg-bridge-agent'].includes(event.target.id)) notify('bridge-settings-status', '설정이 변경되었습니다. 저장하고 연결 확인을 눌러 주세요.');
+    });
     render();
     schedule();
-    return {client, submitFrom, onView(next) { view = next; schedule(); if (!document.hidden && ['edit', 'cal'].includes(view)) refresh(true); }};
+    return {client, submitFrom, onView(next) { view = next; client.reloadSettings(); schedule(); if (!document.hidden && ['edit', 'cal'].includes(view)) refresh(true); }};
   }
   return {BridgeClient, todayKST, requestId, rowStatus, workerStatus, renderHistory, mount};
 });

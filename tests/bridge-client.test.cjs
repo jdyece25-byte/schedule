@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const {BridgeClient, todayKST, renderHistory, workerStatus, rowStatus} = require('../bridge-client.js');
+const {BridgeClient, todayKST, renderHistory, workerStatus, rowStatus, mount} = require('../bridge-client.js');
 
 const repo = 'jdyece25-byte/schedule-requests';
 const token = 'github_pat_test_queue_only';
@@ -29,7 +29,223 @@ function setup(handler, options = {}) {
     }});
   return {client, calls, storage, uuidCount: () => uuids};
 }
+function setupUI(handler = () => response(404), storage = memory({cfg_bridge_pat: token})) {
+  const elements = new Map();
+  const documentListeners = new Map();
+  const windowListeners = new Map();
+  const calls = [];
+  const document = {
+    hidden: true,
+    activeElement: null,
+    getElementById(id) {
+      if (!elements.has(id)) {
+        const classes = new Set();
+        elements.set(id, {id, value: '', textContent: '', style: {}, querySelectorAll: () => [],
+          classList: {toggle: (name, enabled) => enabled ? classes.add(name) : classes.delete(name), contains: name => classes.has(name)}});
+      }
+      return elements.get(id);
+    },
+    querySelector: () => ({id: 'v-edit'}),
+    querySelectorAll: () => [],
+    addEventListener: (name, listener) => documentListeners.set(name, listener)
+  };
+  const root = {document, localStorage: storage, addEventListener: (name, listener) => windowListeners.set(name, listener), fetch: async (url, init) => {
+    calls.push({url, init});
+    if (url.endsWith('/user')) return response(200, {login: 'jdyece25-byte'});
+    if (url === 'https://api.github.com/repos/' + repo) return response(200, {private: true, owner: {login: 'jdyece25-byte'}, permissions: {push: true}});
+    return handler(url, init);
+  }};
+  return {mounted: mount(root), document, documentListeners, windowListeners, storage, calls};
+}
 const puts = calls => calls.filter(call => call.init.method === 'PUT');
+
+test('a previously blank tab submits with settings saved by another tab', async () => {
+  const storage = memory();
+  const stale = setup(() => response(201), {storage});
+  const settingsTab = setup(() => {throw new Error('unexpected network');}, {storage});
+  settingsTab.client.saveSettings({repo, pat: token, agent: 'claude'});
+
+  const row = await stale.client.submit('request from the previously blank tab');
+
+  assert.equal(row.delivery, 'queued');
+  assert.equal(row.request.agent, 'claude');
+  assert.equal(row.repo, repo);
+  assert.ok(stale.calls.length > 0);
+  assert.ok(stale.calls.every(call => call.init.headers.Authorization === 'Bearer ' + token));
+  assert.equal(settingsTab.calls.length, 0);
+});
+
+test('a new request adopts another tab\'s replacement repository, token and agent', async () => {
+  const storage = memory({cfg_bridge_pat: token});
+  const nextRepo = 'jdyece25-byte/other-private-requests';
+  const nextToken = 'github_pat_test_replacement';
+  const stale = setup((url, init) => {
+    if (url === 'https://api.github.com/repos/' + nextRepo) return response(200, {private: true, owner: {login: 'jdyece25-byte'}, permissions: {push: true}});
+    assert.equal(init.method, 'PUT');
+    return response(201);
+  }, {storage});
+  const settingsTab = setup(() => response(404), {storage});
+  settingsTab.client.saveSettings({repo: nextRepo, pat: nextToken, agent: 'claude'});
+
+  const row = await stale.client.submit('request with replacement settings');
+
+  assert.equal(row.repo, nextRepo);
+  assert.equal(row.request.agent, 'claude');
+  assert.ok(stale.calls.every(call => call.init.headers.Authorization === 'Bearer ' + nextToken));
+  assert.equal(puts(stale.calls)[0].url, 'https://api.github.com/repos/' + nextRepo + '/contents/requests/' + row.request.id + '.json');
+});
+
+test('retry reloads a replacement token and preserves the immutable request', async () => {
+  const storage = memory({cfg_bridge_pat: token});
+  const nextToken = 'github_pat_test_retry_replacement';
+  let rejectWrite = true;
+  const stale = setup((url, init) => init.method === 'PUT' ? response(rejectWrite ? 403 : 201) : response(404), {storage});
+  await assert.rejects(stale.client.submit('retry after replacing credentials'));
+  const original = stale.client.rows[0].request;
+  const beforeRetry = stale.calls.length;
+  const settingsTab = setup(() => response(404), {storage});
+  settingsTab.client.saveSettings({repo, pat: nextToken, agent: 'claude'});
+  rejectWrite = false;
+
+  const row = await stale.client.retry(original.id);
+
+  assert.equal(row.delivery, 'queued');
+  assert.deepEqual(row.request, original);
+  assert.equal(row.request.agent, 'codex');
+  assert.equal(stale.uuidCount(), 1);
+  assert.ok(stale.calls.slice(beforeRetry).every(call => call.init.headers.Authorization === 'Bearer ' + nextToken));
+  assert.equal(puts(stale.calls)[0].init.body, puts(stale.calls)[1].init.body);
+});
+
+test('refresh in a previously blank tab reads settings saved by another tab', async () => {
+  const storage = memory();
+  const heartbeat = {version: 1, target_repo: 'jdyece25-byte/schedule', agent: 'codex', agents: ['codex', 'claude'], updated_at: date.toISOString()};
+  const stale = setup(url => url.endsWith('/worker.json') ? file(heartbeat) : response(404), {storage});
+  const settingsTab = setup(() => response(404), {storage});
+  settingsTab.client.saveSettings({repo, pat: token, agent: 'claude'});
+
+  await stale.client.refresh();
+
+  assert.deepEqual(stale.client.worker, heartbeat);
+  assert.equal(stale.client.settings.agent, 'claude');
+  assert.ok(stale.calls.length > 0);
+  assert.ok(stale.calls.every(call => call.init.headers.Authorization === 'Bearer ' + token));
+});
+
+test('cleared browser settings prevent submit, retry and refresh from using cached credentials', async () => {
+  const {client, calls, storage} = setup(() => response(403));
+  await assert.rejects(client.submit('request before clearing settings'));
+  const originalId = client.rows[0].request.id;
+  const beforeClear = calls.length;
+  storage.map.clear();
+
+  await assert.rejects(client.submit('request after clearing settings'));
+  await assert.rejects(client.retry(originalId));
+  await client.refresh();
+
+  assert.equal(calls.length, beforeClear);
+  assert.equal(client.configured, false);
+});
+
+test('settings saved on another device do not configure an isolated browser', async () => {
+  const phone = setup(() => {throw new Error('unexpected phone network');}, {storage: memory()});
+  const desktop = setup(() => {throw new Error('unexpected desktop network');}, {storage: memory()});
+  desktop.client.saveSettings({repo, pat: token, agent: 'claude'});
+
+  await assert.rejects(phone.client.submit('request from an unconfigured device'));
+
+  assert.equal(phone.calls.length, 0);
+  assert.equal(phone.client.configured, false);
+  assert.equal(desktop.client.configured, true);
+});
+
+test('settings changes cannot redirect an in-flight request or its receipt verification', async () => {
+  const nextRepo = 'jdyece25-byte/next-private-requests';
+  const nextToken = 'github_pat_test_next_request';
+  let releaseWrite;
+  let writeStarted;
+  const pendingWrite = new Promise(resolve => {releaseWrite = resolve;});
+  const started = new Promise(resolve => {writeStarted = resolve;});
+  let original;
+  const {client, calls} = setup(async (url, init) => {
+    if (url === 'https://api.github.com/repos/' + nextRepo) return response(200, {private: true, owner: {login: 'jdyece25-byte'}, permissions: {push: true}});
+    if (init.method === 'PUT' && !original) {
+      original = JSON.parse(Buffer.from(JSON.parse(init.body).content, 'base64').toString('utf8'));
+      writeStarted();
+      await pendingWrite;
+      throw new TypeError('response lost after write');
+    }
+    if (init.method === 'PUT') return response(201);
+    assert.equal(url, 'https://api.github.com/repos/' + repo + '/contents/requests/' + original.id + '.json');
+    return file(original);
+  });
+  const first = client.submit('request already in flight');
+  await started;
+  client.saveSettings({repo: nextRepo, pat: nextToken, agent: 'claude'});
+  await client.refresh();
+  releaseWrite();
+  const received = await first;
+  const originalCalls = calls.slice();
+
+  assert.equal(received.delivery, 'queued');
+  assert.equal(received.repo, repo);
+  assert.equal(received.request.agent, 'codex');
+  assert.ok(originalCalls.every(call => call.init.headers.Authorization === 'Bearer ' + token));
+  const next = await client.submit('request after the settings changed');
+  assert.equal(next.repo, nextRepo);
+  assert.equal(next.request.agent, 'claude');
+  assert.ok(calls.slice(originalCalls.length).every(call => call.init.headers.Authorization === 'Bearer ' + nextToken));
+});
+
+test('connection test saves and checks the currently displayed form settings', async () => {
+  const {mounted, document, documentListeners, storage, calls} = setupUI();
+  const inputToken = 'github_pat_test_current_form';
+  document.getElementById('cfg-bridge-pat').value = inputToken;
+  document.getElementById('cfg-bridge-agent').value = 'claude';
+  const button = {disabled: false, dataset: {bridgeAction: 'connection-test'}};
+
+  await documentListeners.get('click')({target: {closest: () => button}});
+
+  assert.equal(storage.getItem('cfg_bridge_pat'), inputToken);
+  assert.equal(storage.getItem('cfg_bridge_agent'), 'claude');
+  assert.equal(mounted.client.settings.pat, inputToken);
+  assert.ok(calls.length > 0);
+  assert.ok(calls.every(call => call.init.headers.Authorization === 'Bearer ' + inputToken));
+  assert.equal(button.disabled, false);
+});
+
+test('connection test reports Contents read failure instead of successful connection', async () => {
+  const {mounted, document, documentListeners} = setupUI(() => response(403));
+  const button = {disabled: false, dataset: {bridgeAction: 'connection-test'}};
+
+  await documentListeners.get('click')({target: {closest: () => button}});
+
+  const status = document.getElementById('bridge-settings-status');
+  assert.match(mounted.client.lastError, /HTTP 403/);
+  assert.equal(status.textContent, mounted.client.lastError);
+  assert.equal(status.classList.contains('bridge-error'), true);
+});
+
+test('storage and focus events synchronize saved settings without erasing an unchanged form draft', () => {
+  const storage = memory();
+  const {mounted, document, windowListeners} = setupUI(undefined, storage);
+  const otherTab = setup(() => response(404), {storage});
+  otherTab.client.saveSettings({repo, pat: token, agent: 'claude'});
+
+  windowListeners.get('storage')({key: 'cfg_bridge_pat'});
+
+  const patInput = document.getElementById('cfg-bridge-pat');
+  assert.equal(patInput.value, token);
+  assert.equal(document.getElementById('cfg-bridge-agent').value, 'claude');
+  assert.equal(mounted.client.configured, true);
+  patInput.value = 'github_pat_test_unsaved_draft';
+  windowListeners.get('focus')();
+  assert.equal(patInput.value, 'github_pat_test_unsaved_draft');
+  storage.map.clear();
+  windowListeners.get('storage')({key: null});
+  assert.equal(patInput.value, '');
+  assert.equal(mounted.client.configured, false);
+});
 
 test('missing authentication and non-fine-grained tokens never create a request', async () => {
   for (const pat of ['', 'ghp_classic']) {

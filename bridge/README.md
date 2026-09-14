@@ -7,10 +7,10 @@
 1. 본인 GitHub 계정으로 [Fine-grained 토큰 만들기](https://github.com/settings/personal-access-tokens/new)를 엽니다.
 2. Repository access는 **Only select repositories**, 저장소는 **schedule-requests**만 선택합니다. Repository permissions에서 **Contents → Read and write**를 설정합니다. 만료일은 본인이 관리할 수 있는 기간으로 정합니다.
 3. 생성된 토큰을 [달력](https://jdyece25-byte.github.io/schedule/)의 **편집 → 일정 요청 연결 → 요청 전용 GitHub 토큰**에 붙여넣습니다. 채팅이나 저장소에는 올리지 않습니다.
-4. 저장소 `jdyece25-byte/schedule-requests`, 처리 도구 **Codex** 또는 **Claude**를 고르고 **연결 설정 저장 → 연결 테스트**를 누릅니다.
+4. 저장소 `jdyece25-byte/schedule-requests`, 처리 도구 **Codex** 또는 **Claude**를 고르고 **저장하고 연결 확인**을 누릅니다.
 5. `9월 21일 교대역 과외는 몇 시야? 일정은 변경하지 말고 알려줘.`처럼 조회 요청으로 확인합니다.
 
-연결 테스트는 읽기 권한과 비공개 저장소를 확인합니다. 쓰기 권한은 실제 요청 접수 때 확인합니다. 토큰은 해당 브라우저에 저장되므로 다른 브라우저를 쓰거나 사이트 데이터를 삭제하면 다시 등록합니다. 이 기능에는 Gemini 키가 필요하지 않습니다. 기존 직접 편집·AI 추천 설정과는 별개입니다.
+연결 확인은 화면에 입력한 설정을 저장한 뒤 읽기 권한과 비공개 저장소를 확인합니다. 쓰기 권한은 실제 요청 접수 때 확인합니다. **PC에서 연결해도 휴대폰은 별도로 설정해야 합니다.** 토큰은 해당 기기·브라우저에 저장되므로 다른 브라우저를 쓰거나 사이트 데이터를 삭제하면 다시 등록합니다. 같은 브라우저의 다른 탭에서 저장한 설정은 자동으로 다시 읽으며, 이미 전송 중인 요청은 원래 연결로 마무리합니다. 이 기능에는 Gemini 키가 필요하지 않습니다. 기존 직접 편집·AI 추천 설정과는 별개입니다.
 
 ## 요청과 답변
 
