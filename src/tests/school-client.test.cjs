@@ -1,6 +1,6 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {SchoolClient, cleanEvent, safeSourceURL, collectorText, render, noticeHTML} = require('../school-client.js');
+const {SchoolClient, cleanEvent, safeSourceURL, collectorText, render, noticeHTML, mount} = require('../school-client.js');
 const REPO = 'jdyece25-byte/schedule-requests';
 const ID = '12345678-1234-4123-8123-123456789abc';
 const NOW = new Date('2026-09-14T04:00:00Z');
@@ -25,6 +25,51 @@ function fixture(handler = () => response(404), options = {}) {
 }
 const puts = f => f.calls.filter(call => call.init.method === 'PUT');
 const decisionBody = call => JSON.parse(Buffer.from(JSON.parse(call.init.body).content, 'base64').toString('utf8'));
+const tick = () => new Promise(resolve => setImmediate(resolve));
+function deferred() { let resolve; const promise = new Promise(done => {resolve = done;}); return {promise, resolve}; }
+function mountedFixture(handler = url => url.endsWith('/school/index.json') ? file(index) : response(404), options = {}) {
+  const f = fixture(handler, options);
+  const elements = new Map(), windowListeners = new Map(), documentListeners = new Map(), intervals = new Map(), timers = [];
+  let now = NOW.getTime(), currentView = options.view || 'home', redraws = 0, closed = 0;
+  const add = (map, name, fn) => map.set(name, [...(map.get(name) || []), fn]);
+  const element = id => {
+    const classes = new Set(); const listeners = new Map();
+    return {id, textContent: '', value: id === 'school-filter' ? 'review' : '', dataset: {}, disabled: false, focused: false, scrolled: false,
+      classList: {toggle: (key, value) => value ? classes.add(key) : classes.delete(key), add: key => classes.add(key), contains: key => classes.has(key)},
+      addEventListener: (name, fn) => add(listeners, name, fn),
+      querySelectorAll: () => [], querySelector: () => null,
+      focus() {this.focused = true; document.activeElement = this;}, scrollIntoView() {this.scrolled = true;}};
+  };
+  const document = {hidden: options.hidden || false, activeElement: null,
+    getElementById(id) {if (!elements.has(id)) elements.set(id, element(id)); return elements.get(id);},
+    querySelector: selector => selector === '.view.on' ? {id: 'v-' + currentView} : null,
+    addEventListener: (name, fn) => add(documentListeners, name, fn)};
+  const list = document.getElementById('school-list'); let html = '', articles = [];
+  Object.defineProperty(list, 'innerHTML', {get: () => html, set: value => {
+    html = value; articles = [...value.matchAll(/<article[^>]+data-source-index="(\d+)"/g)].map(match => {
+      const node = element('article-' + match[1]); node.dataset.sourceIndex = match[1]; return node;
+    });
+  }});
+  list.querySelectorAll = selector => selector === '[data-source-index]' ? articles : [];
+  const root = {...f.root, document, location: {hash: options.hash || ''}, scheduleDataReady: options.scheduleDataReady || Promise.resolve(),
+    history: {replaceState: (a, b, hash) => {root.location.hash = hash;}},
+    addEventListener: (name, fn) => add(windowListeners, name, fn),
+    setTimeout: fn => {timers.push(fn); return timers.length;},
+    setInterval: (fn, ms) => {intervals.set(1, {fn, ms}); return 1;}, clearInterval: id => intervals.delete(id),
+    closePanel: () => {closed++;},
+    sw: view => {currentView = view; return root.ScheduleSchool?.onView(view);},
+    refreshSchoolCalendar: () => {redraws++; root.ScheduleSchool?.getCalendar([]);},
+    SchoolCalendar: {project: (data, events) => ({byDate: {'2026-09-20': [{source_id: data.items[0]?.id, eventCount: events.length}]}, undatedCount: 0})}
+  };
+  root.ScheduleSchool = mount(root, {now: () => new Date(now)});
+  const fire = async (map, name, event = {}) => {for (const fn of map.get(name) || []) await fn(event); await tick();};
+  return {...f, root, document, elements, api: root.ScheduleSchool, client: root.ScheduleSchool.client,
+    advance: ms => {now += ms;}, redraws: () => redraws, closed: () => closed, articles: () => articles,
+    fireWindow: (name, event) => fire(windowListeners, name, event), fireDocument: (name, event) => fire(documentListeners, name, event),
+    poll: () => intervals.get(1)?.fn(), intervals,
+    runTimers: async () => {while (timers.length) {await timers.shift()(); await tick();}},
+  };
+}
 
 test('private school index refresh uses current browser settings and never caches notice bodies or tokens', async () => {
   const f = fixture(url => url.endsWith('/school/index.json') ? file(index) : response(404));
@@ -223,4 +268,119 @@ test('untrusted notice fields stay text, prior history is collapsed, and links r
   const link = safeSourceURL('https://etl.snu.ac.kr/mod/forum/discuss.php?d=42&token=secret&sesskey=private#auth');
   assert.equal(link, 'https://etl.snu.ac.kr/mod/forum/discuss.php?d=42');
   for (const url of ['https://snu.ac.kr.evil.test/', 'https://evilsnu.ac.kr/', 'http://etl.snu.ac.kr/', 'https://u:p@etl.snu.ac.kr/', 'https://etl.snu.ac.kr:8443/']) assert.equal(safeSourceURL(url), '');
+});
+
+test('failed private refresh and cleared credentials immediately invalidate previously loaded data', async () => {
+  let fail = false;
+  const f = fixture(url => fail ? response(503) : file(index));
+  await f.client.refresh(); assert.ok(f.client.index);
+  fail = true; await assert.rejects(f.client.refresh(), /읽기 실패/);
+  assert.equal(f.client.index, null); assert.equal(f.client.indexCredentials, null);
+  fail = false; await f.client.refresh(); f.store.delete('cfg_bridge_pat');
+  await assert.rejects(f.client.refresh(), /토큰/);
+  assert.equal(f.client.index, null);
+});
+
+test('an in-flight private response cannot restore data after the token changed', async () => {
+  const started = deferred(), finish = deferred();
+  const f = fixture(async url => {started.resolve(); await finish.promise; return file(index);});
+  const loading = f.client.refresh(); await started.promise;
+  f.store.set('cfg_bridge_pat', 'github_pat_replacement'); finish.resolve();
+  await assert.rejects(loading, /연결 설정이 변경/);
+  assert.equal(f.client.index, null); assert.equal(f.client.indexCredentials, null);
+});
+
+test('calendar autoload waits for scheduleDataReady and exposes private projection plus collector warnings', async () => {
+  const ready = deferred(); const f = mountedFixture(undefined, {scheduleDataReady: ready.promise});
+  await tick(); await f.poll(); await f.api.onView('cal'); assert.equal(f.calls.length, 0);
+  ready.resolve(); await f.api.initialization;
+  assert.equal(f.api.getCalendarStatus().state, 'ready');
+  assert.match(f.api.getCalendarStatus().text, /eTL 다시 로그인 필요/);
+  assert.deepEqual(f.api.getCalendar([{}]).byDate['2026-09-20'][0], {source_id: item.id, eventCount: 1});
+  assert.ok(f.redraws() >= 2);
+  assert.equal(f.store.size, 2);
+  f.api.dispose(); assert.equal(f.intervals.size, 0);
+});
+
+test('missing configuration never makes automatic auth requests and returns an empty projection', async () => {
+  const f = mountedFixture(undefined, {storage: {cfg_bridge_pat: ''}});
+  await f.api.initialization; await f.poll(); await f.fireWindow('focus'); await f.api.onView('school');
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(f.api.getCalendar([]), {byDate: {}, undatedCount: 0});
+  assert.equal(f.api.getCalendarStatus().state, 'unconfigured');
+  assert.match(f.elements.get('school-list').innerHTML, /연결 설정/);
+});
+
+test('polling runs only in visible calendar/home/school and respects the sixty-second refresh interval', async () => {
+  const f = mountedFixture(); await f.api.initialization;
+  const reads = () => f.calls.filter(c => c.url.endsWith('/school/index.json')).length;
+  assert.equal(reads(), 1); await f.api.onView('cal'); await f.poll(); assert.equal(reads(), 1);
+  f.advance(61000); f.document.hidden = true; await f.poll(); assert.equal(reads(), 1);
+  f.document.hidden = false; await f.fireDocument('visibilitychange'); assert.equal(reads(), 2);
+  await f.api.onView('edit'); f.advance(61000); await f.poll(); assert.equal(reads(), 2);
+  await f.api.onView('home'); assert.equal(reads(), 3);
+  await f.api.onView('school'); assert.equal(reads(), 4);
+});
+
+test('read failure clears calendar rows and school markup, reports error and throttles automatic retries', async () => {
+  let fail = false;
+  const f = mountedFixture(url => fail ? response(503) : file(index)); await f.api.initialization;
+  fail = true; await f.api.refresh();
+  assert.equal(f.api.getCalendarStatus().state, 'error');
+  assert.deepEqual(f.api.getCalendar([]), {byDate: {}, undatedCount: 0});
+  assert.ok(!f.elements.get('school-list').innerHTML.includes(item.title));
+  const count = f.calls.length; await f.api.onView('cal'); await f.fireWindow('focus'); await f.poll();
+  assert.equal(f.calls.length, count);
+  fail = false; f.advance(61000); await f.poll(); assert.equal(f.api.getCalendarStatus().state, 'ready');
+});
+
+test('storage logout clears private views even while hidden, and same-tab login is adopted on focus', async () => {
+  const f = mountedFixture(); await f.api.initialization;
+  f.document.hidden = true; f.store.delete('cfg_bridge_pat');
+  await f.fireWindow('storage', {key: 'cfg_bridge_pat'});
+  assert.equal(f.api.getCalendarStatus().state, 'unconfigured');
+  assert.deepEqual(f.api.getCalendar([]).byDate, {});
+  assert.ok(!f.elements.get('school-list').innerHTML.includes(item.title));
+  const before = f.calls.length; await f.poll(); assert.equal(f.calls.length, before);
+  f.store.set('cfg_bridge_pat', 'github_pat_next'); f.document.hidden = false;
+  await f.fireWindow('focus');
+  assert.equal(f.api.getCalendarStatus().state, 'ready');
+  assert.equal(f.calls.at(-1).init.headers.Authorization, 'Bearer github_pat_next');
+});
+
+test('changed credentials during loading discard the old response and queue a fresh authenticated read', async () => {
+  const entered = deferred(), finish = deferred(); let first = true;
+  const f = mountedFixture(async () => {if (first) {first = false; entered.resolve(); await finish.promise;} return file(index);});
+  await entered.promise;
+  f.store.set('cfg_bridge_pat', 'github_pat_changed'); await f.fireWindow('storage', {key: 'cfg_bridge_pat'});
+  assert.deepEqual(f.api.getCalendar([]), {byDate: {}, undatedCount: 0});
+  finish.resolve(); await f.api.initialization;
+  assert.equal(f.client.index, null);
+  await f.runTimers();
+  assert.equal(f.api.getCalendarStatus().state, 'ready');
+  const reads = f.calls.filter(c => c.url.endsWith('/school/index.json'));
+  assert.equal(reads.length, 2);
+  assert.equal(reads[1].init.headers.Authorization, 'Bearer github_pat_changed');
+});
+
+test('calendar source action opens and focuses a notice older than the latest one hundred without injecting its ID', async () => {
+  const sourceId = 'older-source"] [onclick="bad';
+  const older = {...item, id: sourceId, updated_at: '2026-01-01T00:00:00Z', title: 'older target'};
+  const many = {...index, items: [...Array.from({length: 105}, (_, i) => ({...item, id: 'source-' + i})), older]};
+  const f = mountedFixture(() => file(many)); await f.api.initialization;
+  const button = {disabled: false, dataset: {schoolAction: 'calendar-source', schoolSource: sourceId}, closest: selector => selector === '[data-school-action]' ? button : null};
+  await f.fireDocument('click', {target: button});
+  assert.equal(f.closed(), 1); assert.equal(f.elements.get('school-filter').value, 'latest');
+  const focused = f.articles().find(article => article.dataset.sourceIndex === '105');
+  assert.ok(focused && focused.focused && focused.scrolled);
+  assert.equal(focused.tabIndex, -1); assert.ok(focused.classList.contains('school-source-focus'));
+  assert.ok(!f.elements.get('school-list').innerHTML.includes(sourceId));
+  assert.match(f.elements.get('school-list').innerHTML, /older target/);
+});
+
+test('404 school index is waiting, not an authentication error or a successful collection', async () => {
+  const f = mountedFixture(() => response(404)); await f.api.initialization;
+  assert.equal(f.api.getCalendarStatus().state, 'waiting');
+  assert.match(f.api.getCalendarStatus().text, /수집 대기/);
+  assert.deepEqual(f.api.getCalendar([]), {byDate: {}, undatedCount: 0});
 });

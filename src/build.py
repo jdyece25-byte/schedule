@@ -14,7 +14,7 @@ FRONTEND_FILES = (
     "index.html", "bridge-client.js", "bridge-client.css",
     "push-client.js", "push-client.css", "manifest.webmanifest", "sw.js",
     "push-config.json", "icon-192.png", "icon-512.png", "badge-96.png",
-    "school-client.js", "school-client.css",
+    "school-client.js", "school-client.css", "school-calendar.js",
 )
 
 

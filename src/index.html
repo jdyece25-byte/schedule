@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="bridge-client.css?v=20260914-layout">
 <link rel="stylesheet" href="push-client.css?v=20260914-push1">
-<link rel="stylesheet" href="school-client.css?v=20260914-school1">
+<link rel="stylesheet" href="school-client.css?v=20260915-calendar1">
 <title>동영 스케줄</title>
 <style>
 :root{
@@ -482,6 +482,11 @@ body{
       <strong id="calendar-month" aria-live="polite"></strong>
       <button type="button" onclick="changeMonth(1)" aria-label="다음 달">›</button>
       <button type="button" onclick="goToToday()">오늘</button>
+    </div>
+    <div class="calendar-school-bar">
+      <button type="button" data-school-action="open">학교 공지</button>
+      <span id="calendar-school-status" role="status" aria-live="polite">공지 연결 확인 중</span>
+      <button type="button" data-school-action="refresh" aria-label="달력의 학교 공지 새로고침">↻</button>
     </div>
     <div class="dow-row">
       <div class="dow s">일</div><div class="dow">월</div><div class="dow">화</div>
@@ -1146,8 +1151,35 @@ function buildToday(){
 }
 
 // ── CALENDAR BUILD ────────────────────────────────────────────────────
+let calendarSelectedDate=null;
+function schoolCalendar(){
+  return window.ScheduleSchool?.getCalendar(EVENTS)||{byDate:{},undatedCount:0};
+}
+function schoolCalendarCards(rows){
+  if(!rows.length)return '';
+  return '<section class="calendar-school-details" aria-label="이 날짜의 학교 공지"><h3>학교 공지 · 과제</h3>'+rows.map(row=>
+    `<button type="button" class="calendar-school-card${row.review?' needs-review':''}" data-school-action="calendar-source" data-school-source="${esc(row.sourceId)}">
+      <span class="calendar-school-meta">${esc(row.dateLabel)}${row.review?' · 확인 필요':''}${row.eventId?' · 기존 일정 연결':''}</span>
+      <strong>${esc(row.title)}</strong>
+      <span>${esc([row.course,row.time,row.location].filter(Boolean).join(' · '))}</span>
+      <span class="calendar-school-open">공지·원문 확인 ›</span>
+    </button>`).join('')+'</section>';
+}
+function refreshSchoolCalendar(){
+  const opened=document.getElementById('calPanel').classList.contains('open');
+  buildCal();
+  if(calendarSelectedDate)selDay(calendarSelectedDate);
+  if(!opened)closePanel();
+}
 function buildCal(){
   const g=document.getElementById('calGrid');g.innerHTML='';
+  const school=schoolCalendar();
+  const schoolState=window.ScheduleSchool?.getCalendarStatus();
+  const summary=document.getElementById('calendar-school-status');
+  const monthNotices=new Set(Object.entries(school.byDate).filter(([ds])=>ds.startsWith(monthPrefix())).flatMap(([,rows])=>rows.map(row=>row.sourceId)));
+  const collectorWarning=schoolState?.state==='ready'&&/일부 수집|로그인 필요|수집 확인 필요/.test(schoolState.text||'');
+  summary.textContent=schoolState?.state==='ready'?`이달 ${monthNotices.size}건${school.undatedCount?' · 날짜 미정 '+school.undatedCount+'건':''}${collectorWarning?' · 수집 상태 확인':' · 날짜를 눌러 확인'}`:schoolState?.text||'공지 연결 확인 중';
+  summary.title=[summary.textContent,schoolState?.text].filter(Boolean).join(' · ');
   document.getElementById('calendar-month').textContent=`${calendarYear}년 ${calendarMonth+1}월`;
   document.getElementById('hdr-month').textContent=`${calendarMonth+1}월`;
   const fd=new Date(calendarYear,calendarMonth,1).getDay();
@@ -1160,6 +1192,7 @@ function buildCal(){
   for(let d=1;d<=days;d++){
     const ds=`${monthPrefix()}-${String(d).padStart(2,'0')}`;
     const dow=(fd+d-1)%7;const evs=EM[ds]||[];
+    const notices=school.byDate[ds]||[];
     const cell=document.createElement('div');cell.className='dc';
     if(ds===TODAY)cell.classList.add('tod');
     if(evs.some(e=>e.t==='exam'))cell.classList.add('ebg');
@@ -1170,6 +1203,12 @@ function buildCal(){
     dn.className='dn'+(dow===0?' s':dow===6?' sa':'');
     dn.innerHTML=d+(ds===TODAY?' <span class="tb">오늘</span>':'');
     cell.appendChild(dn);
+    if(notices.length){
+      const badge=document.createElement('div');badge.className='calendar-school-chip';
+      const count=new Set(notices.map(row=>row.sourceId)).size;
+      badge.textContent=`공지 ${count}`;badge.title=notices.map(row=>`${row.dateLabel} · ${row.title}${row.review?' · 확인 필요':''}`).join('\n');
+      cell.appendChild(badge);
+    }
     const MX=window.innerWidth>=769?3:2;
     evs.slice(0,MX).forEach(ev=>{
       const c=document.createElement('div');c.className='chip';
@@ -1202,15 +1241,17 @@ function buildCalendarNotes(){
 }
 
 function selDay(ds){
+  calendarSelectedDate=ds;
   document.querySelectorAll('.dc').forEach(c=>c.classList.remove('sel'));
   const cl=document.querySelector(`[data-date="${ds}"]`);if(cl)cl.classList.add('sel');
   const d=new Date(ds+'T00:00:00');
   document.getElementById('panelDate').textContent=`${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]})`;
   const evs=EM[ds]||[];
+  const notices=schoolCalendar().byDate[ds]||[];
   const pb=document.getElementById('panelBody');
   if(!evs.length){
-    pb.innerHTML='<div class="pmt">🌿 여유 있는 날</div>';
-    document.getElementById('panelSub').textContent='일정 없음';
+    pb.innerHTML=notices.length?'':'<div class="pmt">🌿 여유 있는 날</div>';
+    document.getElementById('panelSub').textContent=notices.length?'등록된 일정 없음':'일정 없음';
   } else {
     const cnt={};evs.forEach(e=>cnt[e.t]=(cnt[e.t]||0)+1);
     document.getElementById('panelSub').textContent=`총 ${evs.length}개 · `+Object.entries(cnt).map(([t,c])=>`${TL[t]||t} ${c}`).join(' · ');
@@ -1240,6 +1281,10 @@ function selDay(ds){
     }
     pb.innerHTML=html;
   }
+  if(notices.length){
+    document.getElementById('panelSub').textContent+=` · 학교 공지 ${new Set(notices.map(row=>row.sourceId)).size}건`;
+    pb.innerHTML+=schoolCalendarCards(notices);
+  }
   // Open panel (slide in on mobile, already visible on desktop)
   document.getElementById('calPanel').classList.add('open');
 }
@@ -1258,8 +1303,9 @@ function toggleList(){
 }
 function buildList(){
   const lw=document.getElementById('listWrap');lw.innerHTML='';
-  Object.keys(EM).filter(ds=>ds.startsWith(monthPrefix())).sort().forEach(ds=>{
-    const d=new Date(ds+'T00:00:00');const evs=EM[ds];
+  const school=schoolCalendar();
+  [...new Set([...Object.keys(EM),...Object.keys(school.byDate)])].filter(ds=>ds.startsWith(monthPrefix())).sort().forEach(ds=>{
+    const d=new Date(ds+'T00:00:00');const evs=EM[ds]||[];
     const g2=document.createElement('div');g2.className='lg2';
     const h=document.createElement('div');h.className='lgh'+(ds===TODAY?' tr':'');
     h.innerHTML=`<span class="n">${d.getDate()}</span>${d.getMonth()+1}월 ${DOW[d.getDay()]}요일${ds===TODAY?' · 오늘':''}`;
@@ -1272,6 +1318,8 @@ function buildList(){
       info.innerHTML=`<div class="lt">${esc(nm)}</div><div class="lm2">${esc([ev.ti,ev.loc,ev.no].filter(Boolean).join(' · ')||TL[ev.t]||ev.t)}</div>`;
       r.appendChild(b);r.appendChild(info);g2.appendChild(r);
     });
+    const notices=school.byDate[ds]||[];
+    if(notices.length){const content=document.createElement('div');content.innerHTML=schoolCalendarCards(notices);g2.appendChild(content);}
     lw.appendChild(g2);
   });
 }
@@ -1564,6 +1612,7 @@ window.scheduleDataReady=loadData().then(()=>{
 </script>
 <script src="bridge-client.js?v=20260914-layout"></script>
 <script src="push-client.js?v=20260914-push2"></script>
-<script src="school-client.js?v=20260914-school1"></script>
+<script src="school-calendar.js?v=20260915-calendar1"></script>
+<script src="school-client.js?v=20260915-calendar1"></script>
 </body>
 </html>

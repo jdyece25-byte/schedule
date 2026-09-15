@@ -90,15 +90,17 @@
     constructor(root, options = {}) {
       this.root = root; this.storage = options.storage || root.localStorage; this.fetch = options.fetch || root.fetch.bind(root);
       this.now = options.now || (() => new Date()); this.uuid = options.uuid || (() => root.crypto.randomUUID());
-      this.timeoutMs = options.timeoutMs || 15000; this.index = null; this.busy = false; this.pending = new Map(); this.onChange = options.onChange || (() => {});
+      this.timeoutMs = options.timeoutMs || 15000; this.index = null; this.indexCredentials = null; this.epoch = 0; this.busy = false; this.pending = new Map(); this.onChange = options.onChange || (() => {});
     }
     read(key) { try { return this.storage.getItem(key) || ''; } catch { return ''; } }
     credentials() {
       if ((this.read('cfg_bridge_repo') || REPO).toLowerCase() !== REPO.toLowerCase()) throw new Error('학교 공지는 비공개 schedule-requests 저장소를 사용합니다. 편집·설정의 일정 요청 연결을 확인해 주세요.');
       const pat = this.read('cfg_bridge_pat').trim();
       if (!pat.startsWith('github_pat_')) throw new Error('이 기기의 편집·설정 → 일정 요청 연결에 요청 전용 GitHub 토큰을 저장해 주세요.');
-      return {pat};
+      return {pat, repo: REPO};
     }
+    credentialsMatch(credentials) { try { const current = this.credentials(); return current.pat === credentials.pat && current.repo === credentials.repo; } catch { return false; } }
+    invalidate() { this.index = null; this.indexCredentials = null; this.epoch++; }
     async api(path, credentials, options = {}) {
       const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), this.timeoutMs);
       try { return await this.fetch('https://api.github.com' + path, {...options, cache: 'no-store', signal: controller.signal, headers: {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', Authorization: 'Bearer ' + credentials.pat, ...options.headers}}); }
@@ -121,21 +123,30 @@
     }
     async refresh() {
       if (this.busy) throw new Error('학교 공지 처리 요청을 확인 중입니다.');
-      const credentials = this.credentials(); this.busy = true;
+      this.busy = true; const epoch = this.epoch;
       try {
+        const credentials = this.credentials();
+        const assertCurrent = () => { if (epoch !== this.epoch || !this.credentialsMatch(credentials)) throw new Error('학교 공지 연결 설정이 변경되었습니다. 새 설정으로 다시 확인해 주세요.'); };
         await this.validate(credentials);
+        assertCurrent();
         const index = await this.file('school/index.json', credentials);
         if (index && (index.version !== 1 || !Array.isArray(index.items))) throw new Error('학교 공지 목록 형식을 확인할 수 없습니다.');
-        this.index = index;
+        assertCurrent();
+        const resolved = [];
         if (index) for (const [source, row] of this.pending) {
           const current = index.items.find(item => item.id === source);
-          if (current && (current.content_hash !== row.decision.source_hash || !ACTIVE.has(current.state))) this.pending.delete(source);
+          if (current && (current.content_hash !== row.decision.source_hash || !ACTIVE.has(current.state))) resolved.push(source);
           else if (row.state === 'accepted') {
             const outcome = await this.file('school/decision-results/' + row.decision.id + '.json', credentials);
-            if (outcome?.version === 1 && ['completed', 'conflict'].includes(outcome.state)) this.pending.delete(source);
+            assertCurrent();
+            if (outcome?.version === 1 && ['completed', 'conflict'].includes(outcome.state)) resolved.push(source);
           }
         }
+        assertCurrent();
+        this.index = index; this.indexCredentials = credentials;
+        resolved.forEach(source => this.pending.delete(source));
         return index;
+      } catch (error) { this.invalidate(); throw error;
       } finally { this.busy = false; }
     }
     makeDecision(item, action, choices = []) {
@@ -234,38 +245,163 @@
       (row ? '<button type="button" class="bridge-secondary" data-school-action="retry">같은 요청 상태 확인</button>' : (candidates.length ? '<button type="button" class="btn-primary" data-school-action="approve">선택한 일정 반영 요청</button>' : '') + '<button type="button" class="bridge-secondary" data-school-action="ignore">' + (candidates.length ? '반영하지 않고 확인 완료' : '확인했어요') + '</button>') +
       '<button type="button" class="bridge-secondary" data-school-action="ask">자연어 일정 요청으로 열기</button></div>' : '') + '</article>';
   }
-  function render(index, pending, filter = 'review') {
+  function render(index, pending, filter = 'review', focusedSourceId = '') {
     if (!index) return '<p class="school-empty">수집 대기 · 아직 학교 공지 목록이 없습니다. 수집기가 공지를 확인하면 여기에 표시됩니다.</p>';
     const items = index.items.map((item, index) => ({item, index})).sort((a, b) => String(b.item.updated_at || '').localeCompare(String(a.item.updated_at || '')));
     const current = items.filter(row => ACTIVE.has(row.item.state));
     const history = items.filter(row => !ACTIVE.has(row.item.state));
-    if (filter === 'latest') return items.length ? items.slice(0, 100).map(row => noticeHTML(row.item, row.index, pending.get(row.item.id), !ACTIVE.has(row.item.state))).join('') : '<p class="school-empty">수집된 공지가 없습니다.</p>';
+    if (filter === 'latest') {
+      let latest = items.slice(0, 100);
+      const focused = items.find(row => row.item.id === focusedSourceId);
+      if (focused && !latest.includes(focused)) latest = [focused, ...latest.slice(0, 99)];
+      return latest.length ? latest.map(row => noticeHTML(row.item, row.index, pending.get(row.item.id), !ACTIVE.has(row.item.state))).join('') : '<p class="school-empty">수집된 공지가 없습니다.</p>';
+    }
     return (current.length ? current.map(row => noticeHTML(row.item, row.index, pending.get(row.item.id))).join('') : '<p class="school-empty">새로 확인할 공지가 없습니다.</p>') +
       '<details class="school-history"><summary>지난 공지·기준 자료 ' + history.length + '개</summary>' + history.slice(0, 100).map(row => noticeHTML(row.item, row.index, null, true)).join('') + '</details>';
   }
-  function mount(root) {
+  function mount(root, options = {}) {
     const document = root.document; const panel = document.getElementById('school-panel'); if (!panel) return null;
-    const byId = id => document.getElementById(id); const client = new SchoolClient(root); let loading = false;
+    const byId = id => document.getElementById(id); const client = new SchoolClient(root, options);
+    const relevantViews = new Set(['cal', 'home', 'school']);
+    const connection = () => ({repo: (client.read('cfg_bridge_repo') || REPO).toLowerCase(), pat: client.read('cfg_bridge_pat').trim()});
+    const equalConnection = (a, b) => a.repo === b.repo && a.pat === b.pat;
+    const configured = () => { try { client.credentials(); return true; } catch { return false; } };
+    let observed = connection();
+    let view = document.querySelector('.view.on')?.id?.replace(/^v-/, '') || 'home';
+    let loading = null, refreshAgain = false, lastSuccess = null, lastAttempt = null, renderedIndex = null, focusedSourceId = '', scheduleReady = false;
+    let calendarStatus = {state: configured() ? 'waiting' : 'unconfigured', text: configured() ? '학교 공지 확인 대기' : '학교 공지 연결 설정이 필요합니다.'};
     const notify = (message, error = false) => { byId('school-status').textContent = message; byId('school-status').classList.toggle('school-warning', error); };
-    const paint = () => {
-      byId('school-collectors').textContent = collectorText(client.index);
-      byId('school-list').innerHTML = render(client.index, client.pending, byId('school-filter').value);
+    const announce = (state, text, redraw = true) => {
+      calendarStatus = {state, text};
+      const status = byId('calendar-school-status');
+      if (status) status.textContent = text;
+      if (redraw) root.refreshSchoolCalendar?.();
+    };
+    const draftKey = (item, candidate) => JSON.stringify([item?.id, item?.content_hash, candidate?.id]);
+    const draftFields = ['selected', 'd', 'n', 's', 'e', 'loc', 'tentative'];
+    const paint = ({preserveDrafts = false} = {}) => {
+      const drafts = new Map(); let activeDraft = null;
+      if (preserveDrafts && renderedIndex) {
+        byId('school-list').querySelectorAll('[data-source-index]').forEach(article => {
+          const item = renderedIndex.items[Number(article.dataset.sourceIndex)];
+          article.querySelectorAll('[data-candidate-index]').forEach(fieldset => {
+            const candidate = item?.candidates?.[Number(fieldset.dataset.candidateIndex)];
+            if (!candidate) return;
+            const key = draftKey(item, candidate); const values = {};
+            draftFields.forEach(field => {
+              const input = fieldset.querySelector('[data-school-field="' + field + '"]');
+              if (!input) return;
+              values[field] = ['selected', 'tentative'].includes(field) ? input.checked : input.value;
+              if (document.activeElement === input) activeDraft = {key, field};
+            });
+            drafts.set(key, values);
+          });
+        });
+      }
+      byId('school-collectors').textContent = client.index ? collectorText(client.index) : ['error', 'unconfigured'].includes(calendarStatus.state) ? calendarStatus.text : collectorText(null);
+      byId('school-list').innerHTML = !client.index && ['error', 'unconfigured'].includes(calendarStatus.state) ? '<p class="school-empty">' + esc(calendarStatus.text) + '</p>' : render(client.index, client.pending, byId('school-filter').value, focusedSourceId);
+      renderedIndex = client.index;
+      if (drafts.size && client.index) byId('school-list').querySelectorAll('[data-source-index]').forEach(article => {
+        const item = client.index.items[Number(article.dataset.sourceIndex)];
+        article.querySelectorAll('[data-candidate-index]').forEach(fieldset => {
+          const candidate = item?.candidates?.[Number(fieldset.dataset.candidateIndex)]; const key = draftKey(item, candidate); const values = drafts.get(key);
+          if (!values) return;
+          draftFields.forEach(field => {
+            const input = fieldset.querySelector('[data-school-field="' + field + '"]');
+            if (!input || !(field in values)) return;
+            if (['selected', 'tentative'].includes(field)) input.checked = values[field]; else input.value = values[field];
+            if (activeDraft?.key === key && activeDraft.field === field) input.focus({preventScroll: true});
+          });
+        });
+      });
       const count = client.index?.items.filter(item => ACTIVE.has(item.state)).length;
       byId('school-home-summary').textContent = count === undefined ? '새 공지·시험·과제 확인' : count ? '확인할 공지 ' + count + '개' : '확인할 새 공지 없음';
     };
-    const buttons = () => { panel.querySelectorAll('button').forEach(button => { button.disabled = loading || client.busy; }); byId('school-filter').disabled = loading || client.busy; };
-    const refresh = async () => {
-      if (loading || client.busy) return;
-      loading = true; buttons(); notify('비공개 학교 공지 확인 중…');
-      try { await client.refresh(); paint(); notify(client.index ? '공지 목록을 확인했습니다. 수집기별 상태와 마지막 확인 시각을 함께 확인해 주세요.' : '아직 수집된 목록이 없습니다. 수집 대기 중입니다.'); }
-      catch (error) { byId('school-collectors').textContent = '연결 확인 필요 · 최신 공지 확인 실패'; notify(error.name === 'AbortError' ? '학교 공지 응답 시간이 초과됐습니다. 다시 확인해 주세요.' : error.message, true); }
-      finally { loading = false; buttons(); }
+    const buttons = () => {
+      panel.querySelectorAll('button').forEach(button => { button.disabled = Boolean(loading || client.busy); });
+      byId('school-filter').disabled = Boolean(loading || client.busy);
+    };
+    const syncConnection = (redraw = true) => {
+      const current = connection();
+      if (equalConnection(current, observed)) return false;
+      observed = current; client.invalidate(); lastSuccess = null; lastAttempt = null; focusedSourceId = '';
+      refreshAgain = Boolean(loading && configured());
+      announce(configured() ? 'waiting' : 'unconfigured', configured() ? '새 연결로 학교 공지 확인 대기' : '학교 공지 연결 설정이 필요합니다.', false);
+      paint();
+      if (redraw) root.refreshSchoolCalendar?.();
+      return true;
+    };
+    const readyText = () => {
+      const warnings = Object.entries(client.index?.collectors || {}).filter(([, collector]) => ['auth_required', 'error', 'partial'].includes(collector.state)).map(([key, collector]) => (COLLECTORS[key] || '수집기') + (collector.state === 'auth_required' ? ' 다시 로그인 필요' : collector.state === 'partial' ? ' 일부 수집' : ' 수집 확인 필요'));
+      return warnings.length ? '학교 공지 확인됨 · ' + warnings.join(' · ') : '학교 공지 확인됨';
+    };
+    const refresh = ({force = true} = {}) => {
+      const changed = syncConnection();
+      if (!configured()) {
+        client.invalidate();
+        announce('unconfigured', '학교 공지 연결 설정이 필요합니다.'); paint();
+        if (force) notify('이 기기의 편집·설정 → 일정 요청 연결을 저장해 주세요.', true);
+        return Promise.resolve(null);
+      }
+      if (loading) { if (changed) refreshAgain = true; return loading; }
+      if (client.busy) { refreshAgain = true; return Promise.resolve(null); }
+      const now = client.now().getTime();
+      if (!force && ((lastSuccess !== null && now - lastSuccess < 60000) || (lastAttempt !== null && now - lastAttempt < 60000))) return Promise.resolve(client.index);
+      lastAttempt = now;
+      announce('loading', '학교 공지 확인 중…'); notify('비공개 학교 공지 확인 중…');
+      const started = connection();
+      loading = (async () => {
+        try {
+          const index = await client.refresh();
+          if (!equalConnection(started, connection())) { syncConnection(); return null; }
+          lastSuccess = client.now().getTime();
+          announce(index ? 'ready' : 'waiting', index ? readyText() : '학교 공지 수집 대기', false);
+          paint({preserveDrafts: true}); root.refreshSchoolCalendar?.();
+          notify(index ? '공지 목록을 확인했습니다. 수집기별 상태와 마지막 확인 시각을 함께 확인해 주세요.' : '아직 수집된 목록이 없습니다. 수집 대기 중입니다.');
+          return index;
+        } catch (error) {
+          client.invalidate(); lastSuccess = null;
+          const changed = syncConnection(false) || !equalConnection(started, connection());
+          if (!configured()) announce('unconfigured', '학교 공지 연결 설정이 필요합니다.', false);
+          else if (changed) announce('waiting', '새 연결로 학교 공지 확인 대기', false);
+          else if (!changed) announce('error', '학교 공지를 불러오지 못했습니다. 연결을 확인하세요.', false);
+          paint(); root.refreshSchoolCalendar?.();
+          notify(changed ? calendarStatus.text : error.name === 'AbortError' ? '학교 공지 응답 시간이 초과됐습니다. 다시 확인해 주세요.' : error.message, true);
+          return null;
+        } finally {
+          loading = null; buttons();
+          if (refreshAgain) {
+            refreshAgain = false;
+            if (configured() && !document.hidden && relevantViews.has(view)) root.setTimeout(() => refresh({force: true}), 0);
+          }
+        }
+      })();
+      buttons();
+      return loading;
+    };
+    const resume = () => {
+      const changed = syncConnection();
+      if (scheduleReady && !document.hidden && relevantViews.has(view)) return refresh({force: changed});
+      return Promise.resolve(null);
     };
     const open = () => { root.sw('school'); if (root.location.hash !== '#school') root.history.replaceState(null, '', '#school'); };
+    const openSource = async sourceId => {
+      if (typeof sourceId !== 'string' || !sourceId) return false;
+      root.closePanel?.(); open(); await refresh({force: true});
+      if (!client.index) return false;
+      const position = client.index.items.findIndex(item => item.id === sourceId);
+      if (position === -1) { notify('이 공지를 현재 목록에서 찾지 못했습니다. 최신 공지를 확인해 주세요.', true); return false; }
+      focusedSourceId = sourceId; byId('school-filter').value = 'latest'; paint({preserveDrafts: true});
+      const article = Array.from(byId('school-list').querySelectorAll('[data-source-index]')).find(element => Number(element.dataset.sourceIndex) === position);
+      if (!article) return false;
+      article.tabIndex = -1; article.classList.add('school-source-focus'); article.focus({preventScroll: true}); article.scrollIntoView({block: 'start', behavior: 'smooth'});
+      return true;
+    };
     document.addEventListener('click', async event => {
       const button = event.target.closest('[data-school-action]'); if (!button || button.disabled) return;
       const action = button.dataset.schoolAction;
       if (action === 'open') { open(); return; }
+      if (action === 'calendar-source') { await openSource(button.dataset.schoolSource); return; }
       if (action === 'settings') { root.sw('edit'); byId('bridge-settings-panel').scrollIntoView({block: 'start', behavior: 'smooth'}); return; }
       if (action === 'refresh') { await refresh(); return; }
       const article = button.closest('[data-source-index]'); const item = client.index?.items[Number(article?.dataset.sourceIndex)];
@@ -281,13 +417,28 @@
         buttons(); notify('처리 요청 전송 중…'); await operation; paint();
         notify('처리 요청이 접수되었습니다. 목록 새로고침으로 실제 반영 결과를 확인해 주세요.');
       } catch (error) { if (client.pending.has(item.id)) paint(); notify(error.name === 'AbortError' ? '접수 여부 확인이 필요합니다. 같은 요청 상태 확인을 눌러 주세요.' : error.message, true); }
-      finally { buttons(); }
+      finally { buttons(); if (refreshAgain) { refreshAgain = false; root.setTimeout(resume, 0); } }
     });
-    byId('school-filter').addEventListener('change', paint);
+    byId('school-filter').addEventListener('change', () => { focusedSourceId = ''; paint({preserveDrafts: true}); });
     root.addEventListener('hashchange', () => { if (root.location.hash === '#school') open(); });
-    paint();
-    if (root.location.hash === '#school') root.setTimeout(open, 0);
-    return {client, refresh, onView: view => { if (view === 'school') refresh(); }};
+    root.addEventListener('storage', event => { if (event.key === null || ['cfg_bridge_repo', 'cfg_bridge_pat'].includes(event.key)) resume(); });
+    root.addEventListener('focus', resume);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) resume(); });
+    document.addEventListener('click', event => { const button = event.target.closest('[data-bridge-action]'); if (button && ['settings-save', 'connection-test'].includes(button.dataset.bridgeAction)) root.setTimeout(resume, 0); });
+    const poll = root.setInterval?.(resume, 60000);
+    paint(); announce(calendarStatus.state, calendarStatus.text, false);
+    const initialization = Promise.resolve(root.scheduleDataReady).catch(() => {}).then(() => {
+      scheduleReady = true;
+      if (root.location.hash === '#school') open();
+      return resume();
+    });
+    return {
+      client, refresh, initialization, openSource,
+      onView: next => { view = next; syncConnection(); if ((scheduleReady || view === 'school') && !document.hidden && relevantViews.has(view)) return refresh({force: view === 'school'}); },
+      getCalendar: events => { syncConnection(false); return client.index && root.SchoolCalendar?.project ? root.SchoolCalendar.project(client.index, events) : {byDate: {}, undatedCount: 0}; },
+      getCalendarStatus: () => { syncConnection(false); return {...calendarStatus}; },
+      dispose: () => { if (poll !== undefined) root.clearInterval?.(poll); }
+    };
   }
   return {SchoolClient, cleanEvent, safeSourceURL, collectorText, render, noticeHTML, mount};
 });

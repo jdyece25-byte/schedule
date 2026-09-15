@@ -23,8 +23,9 @@ const fall = events.filter(e => e.d >= '2026-09-14');
 
 function element() {
   let content = '';
+  const classes = new Set();
   const el = {children: [], dataset: {}, style: {}, className: '', textContent: '', value: '',
-    classList: { add() {}, remove() {} },
+    classList: { add(...names) { names.forEach(name => classes.add(name)); }, remove(...names) { names.forEach(name => classes.delete(name)); }, contains(name) { return classes.has(name); } },
     appendChild(child) { this.children.push(child); return child; }
   };
   Object.defineProperty(el, 'innerHTML', {get() { return content; }, set(v) { content = v; el.children = []; }});
@@ -213,4 +214,51 @@ test('plan display escapes model text and rejects color attribute injection', ()
   }
   assert.match(a.get('v-plan').innerHTML, /background:#888888/);
   assert.equal(a.run("safeColor('#aabbcc')"), '#aabbcc');
+});
+
+test('private school notices appear in calendar dates, day details and list without becoming DB events', async () => {
+  const a = app(); await a.run('loadData()');
+  const before = a.run('JSON.stringify(EVENTS)');
+  const row = {sourceId:'private-source',title:'과제 제출 안내',course:'테스트 과목',date:'2026-09-17',dateLabel:'마감',review:true,time:'23:59',location:'eTL'};
+  a.context.window.ScheduleSchool = {
+    getCalendar: () => ({byDate:{'2026-09-17':[row], '2026-09-16':[{...row,sourceId:'linked-source',eventId:'deadline',date:'2026-09-16'}]},undatedCount:1}),
+    getCalendarStatus: () => ({state:'ready',text:'공지 연결됨'})
+  };
+  a.run('buildCal();selDay("2026-09-17");buildList()');
+  const cell = a.get('calGrid').children.find(node => node.dataset.date === row.date);
+  assert.equal(cell.children.find(node => node.className === 'calendar-school-chip').textContent, '공지 1');
+  assert.equal(cell.children.filter(node => node.className === 'chip').length, 0);
+  assert.match(a.get('panelBody').innerHTML, /과제 제출 안내/);
+  assert.match(a.get('panelBody').innerHTML, /확인 필요/);
+  assert.match(a.get('panelBody').innerHTML, /data-school-source="private-source"/);
+  assert.match(a.get('panelSub').textContent, /등록된 일정 없음 · 학교 공지 1건/);
+  assert.match(a.get('calendar-school-status').textContent, /이달 2건 · 날짜 미정 1건/);
+  assert.ok(a.get('listWrap').children.some(group => group.children.some(child => child.innerHTML.includes('data-school-source="private-source"'))));
+  a.run('selDay("2026-09-16")');
+  assert.match(a.get('panelBody').innerHTML, /기존 일정 연결/);
+  assert.equal(a.run('JSON.stringify(EVENTS)'), before);
+  assert.equal(a.run('computeConflicts().length'), 1);
+});
+
+test('school refresh preserves selected date and does not reopen the mobile panel', async () => {
+  const a = app(); await a.run('loadData()');
+  a.context.window.ScheduleSchool = {getCalendar: () => ({byDate:{},undatedCount:0}),getCalendarStatus: () => ({state:'error',text:'학교 공지 연결 확인 필요'})};
+  a.run('selDay("2026-09-21");closePanel();refreshSchoolCalendar()');
+  assert.match(a.get('panelDate').textContent, /9월 21일/);
+  assert.equal(a.get('calPanel').classList.contains('open'), false);
+  assert.equal(a.get('calendar-school-status').textContent, '학교 공지 연결 확인 필요');
+  assert.equal(a.get('calGrid').children.some(cell => cell.children.some(child => child.className === 'calendar-school-chip')), false);
+  a.run('selDay("2026-09-21");refreshSchoolCalendar()');
+  assert.equal(a.get('calPanel').classList.contains('open'), true);
+});
+
+test('calendar notice titles and source identifiers cannot inject markup or handlers', () => {
+  const a = app();
+  const evil = '\"><img src=x onerror="globalThis.stolen=true">';
+  a.context.rows = [{sourceId:evil,title:evil,course:evil,dateLabel:evil,location:evil,time:evil,review:true}];
+  const rendered = a.run('schoolCalendarCards(rows)');
+  assert.doesNotMatch(rendered, /<img/);
+  assert.match(rendered, /&lt;img/);
+  assert.match(rendered, /data-school-source="&quot;&gt;&lt;img/);
+  assert.equal(a.context.stolen, undefined);
 });

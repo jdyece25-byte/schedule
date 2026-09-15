@@ -129,7 +129,7 @@ python -B "$env:LOCALAPPDATA\ScheduleBridge\runtime\supervisor.py" --config "$en
 ## 개발 검증
 
 ```powershell
-node --test src/tests/schedule.test.cjs src/tests/bridge-client.test.cjs src/tests/push-client.test.cjs src/tests/school-client.test.cjs
+node --test src/tests/schedule.test.cjs src/tests/bridge-client.test.cjs src/tests/push-client.test.cjs src/tests/school-client.test.cjs src/tests/school-calendar.test.cjs
 python -B -m unittest discover -s src/tests -p 'test_*.py' -v
 python -B src/validate_db.py
 ```
@@ -195,6 +195,14 @@ PC 발송기의 `pc.py` 업데이트는 현재 발송이 끝난 뒤 자동 재�
 도입 당시 검증된 일정 392건은 초기 수집에서 변경하지 않고, 기존 자료를 관찰 기준으로 등록합니다. 이후 DB의 실제 일정 수는 늘거나 줄 수 있습니다. eTL에서 가져온 일정 ID·중복 방지 기록·수동 수정은 보존합니다. 주차만 적힌 자료에서 날짜를 만들거나 공휴일이라는 이유만으로 반복 수업을 삭제하지 않습니다. HWP·이미지·텍스트가 없는 PDF처럼 내용을 읽을 수 없는 자료는 확인 대상 정보로 남기며, 일정이 추출됐다고 가정하지 않습니다.
 
 eTL 최초 연결에서 읽은 과거 공지·과제는 공지함에 검토 대상으로 넣고, 기존 일정 DB에 곧바로 추가하거나 과거 알림을 한꺼번에 발송하지 않습니다. 이후 새로 올라온 명확한 마감은 자동 반영할 수 있으며, 제목이 달라도 같은 과목·날짜·시각의 기존 마감이 있으면 중복 여부를 확인합니다. 최초 자료의 변경도 검토가 끝나기 전까지 자동으로 덮어쓰지 않습니다.
+
+### 달력에서 학교 공지 확인
+
+이 기기의 **일정 요청 연결**을 설정하면 달력에서도 학교 공지를 자동으로 읽습니다. 날짜 칸의 **공지 N**을 보고 날짜를 누르면 공지·과제 카드가 일정 아래에 나옵니다. 카드의 **공지·원문 확인**으로 해당 공지를 바로 열어 원문 확인이나 반영 요청을 할 수 있습니다. **목록 보기**에도 같은 항목이 표시됩니다.
+
+추출한 마감·시험 날짜가 있으면 그 날짜에, 연결된 기존 일정은 해당 일정 날짜에 표시합니다. 날짜가 없는 일반 공지는 **공지 게시·수정일** 기준으로 구분하고 날짜 정보가 전혀 없으면 상단에 날짜 미정 건수를 안내합니다. 검토 전 후보와 휴강·변경 제안은 **확인 필요** 표시를 유지합니다. 달력 표시는 DB 반영 완료를 뜻하지 않습니다. 기존 일정과 검토 전 후보를 합쳐 저장하거나 충돌·이동 계산에 넣지 않습니다.
+
+비공개 공지 목록은 인증된 브라우저 메모리에서만 표시하며 공개 DB·ICS·브라우저 캐시에 저장하지 않습니다. Google 캘린더 구독에는 실제 DB에 반영한 일정만 포함됩니다. 화면을 보는 동안 약 1분마다 목록을 다시 확인하며 달력 상단 **↻**으로 직접 갱신할 수도 있습니다. 수집기 자체의 약 15분 주기와는 별개입니다.
 
 ### eTL 최초 연결·운영
 
