@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from src.bridge.github import GitHubError
 from src.school.reconcile import digest, prepare
-from src.school.runner import Importer, INDEX, LEASE, QUEUE, TARGET, run_once
+from src.school.runner import CollectorBusy, Importer, INDEX, LEASE, QUEUE, TARGET, run_once
 from src.school.sources import normalized_source
 
 
@@ -315,6 +315,231 @@ class SchoolRunnerTests(unittest.TestCase):
         self.assertEqual(report["collectors"]["etl"], "auth_required")
         self.assertEqual(self.github.read_json(QUEUE, "school/decision-results/decision-1.json")[0]["state"], "completed")
         self.assertEqual(len(self.github.public_commits()), 1)
+
+    def test_cloud_decision_only_resolves_ignore_without_collecting_or_public_write(self):
+        item = self.make_review_item()
+        self.decision(item, action='ignore')
+        with patch('src.school.runner.collect_etl', side_effect=AssertionError('must not collect')):
+            report = run_once(CONFIG, collect=False, github=self.github, inbox_only=True)
+        outcome = self.github.read_json(QUEUE, 'school/decision-results/decision-1.json')[0]
+        self.assertEqual(report['status'], 'ok')
+        self.assertEqual(outcome['state'], 'completed')
+        self.assertEqual(outcome['source_id'], item['id'])
+        self.assertEqual(outcome['source_hash'], item['content_hash'])
+        self.assertEqual(outcome['action'], 'ignore')
+        self.assertEqual(self.github.read_json(QUEUE, INDEX)[0]['items'][0]['review']['state'], 'completed')
+        self.assertEqual(self.github.public_commits(), [])
+
+    def test_cloud_acknowledges_approval_but_keeps_it_pending_for_pc(self):
+        item = self.make_review_item()
+        self.decision(item)
+        cloud = self.importer(inbox_only=True)
+        self.assertTrue(cloud.decisions())
+        current = self.github.read_json(QUEUE, INDEX)[0]['items'][0]
+        self.assertEqual(current['review']['state'], 'queued')
+        self.assertEqual(current['state'], 'needs_review')
+        self.assertIsNone(self.github.read_json(QUEUE, 'school/decision-results/decision-1.json')[0])
+        self.assertFalse(cloud.decisions())
+        self.assertEqual(self.github.public_commits(), [])
+        cloud.release()
+        self.importer().decisions()
+        self.assertEqual(self.github.read_json(QUEUE, 'school/decision-results/decision-1.json')[0]['state'], 'completed')
+
+    def test_transient_approval_failure_does_not_block_later_ignore_or_create_conflict(self):
+        item = self.make_review_item()
+        self.decision(item, identifier='a-approval')
+        other = deepcopy(item); other['id'] = 'other-source'
+        index = self.github.read_json(QUEUE, INDEX)[0]; index['items'].append(other)
+        self.github.seed(QUEUE, INDEX, index)
+        self.decision(other, identifier='b-ignore', action='ignore')
+        importer = self.importer()
+        with patch.object(importer, 'publish', side_effect=GitHubError(503, 'provider response must stay private')):
+            importer.decisions()
+        self.assertTrue(importer.retry_pending)
+        self.assertIsNone(self.github.read_json(QUEUE, 'school/decision-results/a-approval.json')[0])
+        self.assertEqual(self.github.read_json(QUEUE, 'school/decision-results/b-ignore.json')[0]['state'], 'completed')
+        self.assertEqual(importer.index['items'][0]['state'], 'needs_review')
+
+    def test_terminal_outcome_is_durable_before_a_later_decision_read_fails(self):
+        item = self.make_review_item()
+        self.decision(item, identifier='a-ignore', action='ignore')
+        self.decision(item, identifier='b-ignore', action='ignore')
+        importer = self.importer()
+        real_read = self.github.read_json
+        def read(repo, path, ref='main'):
+            if path == 'school/decisions/b-ignore.json':
+                raise GitHubError(401, 'auth failed')
+            return real_read(repo, path, ref)
+        with patch.object(self.github, 'read_json', side_effect=read):
+            with self.assertRaises(GitHubError):
+                importer.decisions()
+        self.assertEqual(real_read(QUEUE, 'school/decision-results/a-ignore.json')[0]['state'], 'completed')
+
+    def test_lease_reservation_cas_race_is_busy_not_workflow_failure(self):
+        other = {'owner': 'other-owner', 'until': '2099-01-01T00:00:00Z'}
+        real_put = self.github.put_json
+        def put(repo, path, value, sha=None, **kwargs):
+            if path == LEASE:
+                self.github.seed(QUEUE, LEASE, other)
+                raise GitHubError(409, 'race')
+            return real_put(repo, path, value, sha, **kwargs)
+        with patch.object(self.github, 'put_json', side_effect=put):
+            with self.assertRaises(CollectorBusy):
+                run_once(CONFIG, collect=False, github=self.github)
+        self.assertEqual(self.github.read_json(QUEUE, LEASE)[0], other)
+
+    def test_lost_lease_reservation_response_recovers_ownership_and_releases(self):
+        self.github.lose_response_for = QUEUE
+        report = run_once(CONFIG, collect=False, github=self.github)
+        self.assertEqual(report['status'], 'ok')
+        self.assertIsNone(self.github.read_json(QUEUE, LEASE)[0]['owner'])
+
+    def test_collection_reads_do_not_hold_the_decision_lease(self):
+        def collect(*args, **kwargs):
+            self.assertIsNone(self.github.read_json(QUEUE, LEASE)[0])
+            return result()
+        with patch('src.school.runner.collect_etl', side_effect=collect):
+            run_once(CONFIG, github=self.github)
+
+    def test_partial_approval_review_receipt_preserves_remaining_count(self):
+        item = self.make_review_item()
+        self.decision(item, [item['candidates'][0]])
+        importer = self.importer(); importer.decisions()
+        outcome = self.github.read_json(QUEUE, 'school/decision-results/decision-1.json')[0]
+        self.assertEqual(outcome['remaining_count'], 1)
+        self.assertEqual(importer.index['items'][0]['review']['remaining_count'], 1)
+
+    def test_analysis_upgrade_enriches_acknowledged_sources_without_reopening_or_db_writes(self):
+        for state in ('ignored', 'applied', 'baseline'):
+            with self.subTest(state=state):
+                api = MemoryGitHub()
+                document = source()
+                old = {'id': document['id'], 'content_hash': document['content_hash'], 'state': state,
+                       'candidates': [], 'event_ids': ['manual-existing'], 'first_seen_at': STAMP,
+                       'review': {'state': 'completed', 'source_hash': document['content_hash']}}
+                api.seed(QUEUE, INDEX, {'version': 1, 'collectors': {'etl': {'initialized': True}}, 'items': [old]})
+                importer = Importer(api, CONFIG); importer.acquire()
+                try:
+                    importer.consume({'etl': result(document)})
+                    current = importer.index['items'][0]
+                    self.assertEqual(current['state'], state)
+                    self.assertEqual(current['event_ids'], old['event_ids'])
+                    self.assertEqual(current['review'], old['review'])
+                    self.assertEqual(current['candidates'], [])
+                    self.assertEqual(current['analysis_version'], 2)
+                    self.assertIn('excerpts', current['knowledge'])
+                    self.assertTrue(current['notify'])  # Same-version migration preserves prior eligibility.
+                    from src.notifications.scheduler import school_notices
+                    self.assertEqual(school_notices(importer.index, datetime.now(timezone.utc)), [])
+                    self.assertEqual(api.public_commits(), [])
+                finally:
+                    importer.release()
+
+    def test_new_historical_files_require_review_and_do_not_replay_notifications(self):
+        importer = self.importer()
+        importer.index['collectors']['etl'] = {'initialized': True, 'last_checked': '2026-09-15T00:00:00Z'}
+        document = source(kind='etl_file', content='9/22 23:59 HW1 제출 마감', updated_at=STAMP)
+        importer.consume({'etl': result(document)})
+        current = importer.index['items'][0]
+        self.assertTrue(current['initial_review'])
+        self.assertFalse(current['notify'])
+        self.assertTrue(all(not c['auto_eligible'] for c in current['candidates']))
+        self.assertEqual(self.github.public_commits(), [])
+
+    def test_parser_changed_hash_keeps_ignored_choice_but_a_real_new_version_can_notify(self):
+        importer = self.importer()
+        importer.index['collectors']['etl'] = {'initialized': True}
+        original = source(extraction_version=4, raw_content_hash='original-bytes')
+        importer.consume({'etl': result(original)})
+        importer.index['items'][0]['state'] = 'ignored'
+        upgraded = {**original, 'content_hash': 'parser-hash', 'extraction_upgrade': True, 'extraction_version': 5}
+        importer.consume({'etl': result(upgraded)})
+        self.assertEqual(importer.index['items'][0]['state'], 'ignored')
+        self.assertTrue(importer.index['items'][0]['notify'])
+        self.assertEqual(importer.index['items'][0]['notice_hash'], original['content_hash'])
+        actual = {**upgraded, 'content_hash': 'real-new-version', 'raw_content_hash': 'new-bytes', 'content': 'New teacher announcement'}
+        importer.consume({'etl': result(actual)})
+        self.assertTrue(importer.index['items'][0]['notify'])
+        self.assertEqual(importer.index['items'][0]['notice_hash'], actual['content_hash'])
+
+    def test_same_hash_active_analysis_migration_preserves_a_real_undelivered_notification(self):
+        document = source()
+        first_seen = datetime.now(timezone.utc).isoformat()
+        old = {'id': document['id'], 'content_hash': document['content_hash'], 'state': 'needs_review',
+               'candidates': [], 'event_ids': [], 'first_seen_at': first_seen, 'notify': True}
+        self.github.seed(QUEUE, INDEX, {'version': 1, 'collectors': {'etl': {'initialized': True}}, 'items': [old]})
+        importer = self.importer(); importer.consume({'etl': result(document)})
+        self.assertTrue(importer.index['items'][0]['notify'])
+        self.assertEqual(importer.index['items'][0]['first_seen_at'], first_seen)
+        from src.notifications.scheduler import school_notices
+        self.assertEqual(len(school_notices(importer.index, datetime.now(timezone.utc))), 1)
+
+    def test_queued_approval_keeps_its_source_contract_during_parser_upgrade_until_pc_applies(self):
+        item = self.make_review_item()
+        self.decision(item)
+        cloud = self.importer(inbox_only=True); cloud.decisions()
+        original = deepcopy(cloud.index['items'][0])
+        enhanced = {**source(kind='local'), 'id': item['id'], 'content_hash': 'upgraded-parser-hash',
+                    'extraction_version': 5, 'raw_content_hash': 'legacy-original-bytes'}
+        cloud.consume({'local': result(enhanced)})
+        self.assertEqual(cloud.index['items'][0], original)
+        self.assertIsNone(self.github.read_json(QUEUE, 'school/decision-results/decision-1.json')[0])
+        cloud.release()
+        pc = self.importer(); pc.decisions()
+        self.assertEqual(self.github.read_json(QUEUE, 'school/decision-results/decision-1.json')[0]['state'], 'completed')
+        self.assertEqual(len(self.github.public_commits()), 1)
+        pc.consume({'local': result(enhanced)})
+        self.assertEqual(pc.index['items'][0]['state'], 'applied')
+        self.assertEqual(pc.index['items'][0]['extraction_version'], 5)
+
+    def test_pending_explicit_approval_blocks_automatic_ready_fallback_after_transient_failure(self):
+        item = self.make_review_item()
+        item['state'] = 'ready'
+        for candidate in item['candidates']:
+            candidate['auto_eligible'] = True
+        self.github.seed(QUEUE, INDEX, {'version': 1, 'collectors': {}, 'items': [item]})
+        self.decision(item, [item['candidates'][0]])
+        importer = self.importer()
+        with patch.object(importer, 'publish', side_effect=GitHubError(503, 'temporary')) as publish:
+            importer.decisions()
+            importer.ready()
+        self.assertEqual(publish.call_count, 1, 'ready must not apply the unedited automatic candidate')
+        self.assertTrue(importer.retry_pending)
+        self.assertEqual(self.github.read_json(QUEUE, INDEX)[0]['items'][0]['review']['state'], 'queued')
+        self.assertIsNone(self.github.read_json(QUEUE, 'school/decision-results/decision-1.json')[0])
+        self.assertEqual(self.github.public_commits(), [])
+
+    def test_new_raw_bytes_are_not_silenced_even_when_parser_version_changes_together(self):
+        importer = self.importer(inbox_only=True)
+        original = source(kind='local', extraction_version=4, raw_content_hash='old-bytes')
+        importer.consume({'local': result(original)})
+        self.assertEqual(importer.index['items'][0]['state'], 'baseline')
+        changed = {**original, 'content_hash': 'new-hash', 'raw_content_hash': 'new-bytes', 'extraction_version': 5, 'extraction_upgrade': True}
+        importer.consume({'local': result(changed)})
+        self.assertNotEqual(importer.index['items'][0]['state'], 'baseline')
+        self.assertTrue(importer.index['items'][0]['notify'])
+
+    def test_changed_parser_hash_preserves_undelivered_notice_and_original_delivery_key(self):
+        from src.notifications.scheduler import school_notices
+        document = source(kind='local', extraction_version=4, raw_content_hash='same-original-bytes')
+        first_seen = datetime.now(timezone.utc).isoformat()
+        old = {'id': document['id'], 'content_hash': document['content_hash'], 'state': 'needs_review',
+               'course': '논리설계 및 실험', 'candidates': [], 'event_ids': [], 'first_seen_at': first_seen,
+               'notify': True, 'extraction_version': 4, 'raw_content_hash': 'same-original-bytes', 'analysis_version': 2}
+        self.github.seed(QUEUE, INDEX, {'version': 1, 'collectors': {'local': {'initialized': True}}, 'items': [old]})
+        before = school_notices({'version': 1, 'items': [old]}, datetime.now(timezone.utc))[0]
+        upgraded = {**document, 'content_hash': 'parser-v5-hash', 'extraction_version': 5}
+        importer = self.importer(inbox_only=True); importer.consume({'local': result(upgraded)})
+        after = school_notices(importer.index, datetime.now(timezone.utc))[0]
+        self.assertEqual(before['id'], after['id'])
+        self.assertEqual(before['due'], after['due'])
+        self.assertTrue(importer.index['items'][0]['notify'])
+        # Successive parser migrations keep the original key rather than the
+        # immediately preceding parser hash. Real bytes changes get a new key.
+        importer.consume({'local': result({**upgraded, 'content_hash': 'parser-v6-hash', 'extraction_version': 6})})
+        self.assertEqual(school_notices(importer.index, datetime.now(timezone.utc))[0]['id'], before['id'])
+        importer.consume({'local': result({**upgraded, 'content_hash': 'teacher-new-content', 'raw_content_hash': 'new-bytes'})})
+        self.assertNotEqual(school_notices(importer.index, datetime.now(timezone.utc))[0]['id'], before['id'])
 
 
 if __name__ == "__main__":

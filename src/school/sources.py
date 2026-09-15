@@ -14,6 +14,7 @@ import logging
 import os
 from pathlib import Path, PurePosixPath
 import re
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -60,6 +61,8 @@ class _Text(HTMLParser):
             self.hidden += 1
         if tag in {"p", "div", "br", "li", "tr", "h1", "h2", "h3"}:
             self.parts.append("\n")
+        if tag in {"td", "th"}:
+            self.parts.append("\t")
 
     def handle_endtag(self, tag):
         if tag in {"script", "style"}:
@@ -84,7 +87,7 @@ def safe_source_url(value):
         if (parts.scheme == "https" and parts.hostname in
                 {"etl.snu.ac.kr", "myetl.snu.ac.kr", "newetl.snu.ac.kr", "oldetl.snu.ac.kr"}
                 and not parts.username and not parts.password and parts.port in (None, 443)
-                and re.fullmatch(r"/courses/\d+(?:/(?:assignments|quizzes|discussion_topics)/\d+)?/?", parts.path)):
+                and re.fullmatch(r"/courses/\d+(?:/(?:assignments|quizzes|discussion_topics|files)/\d+|/assignments/syllabus|/modules/items/\d+|/pages/[A-Za-z0-9_%.-]+)?/?", parts.path)):
             return "https://" + parts.hostname + parts.path
     except (TypeError, ValueError):
         pass
@@ -103,7 +106,8 @@ def normalized_source(kind, course, external_id, title, content, updated_at,
     if len(content) > MAX_TEXT:
         result.update(extraction_status="truncated", needs_review=True)
     # Timestamps alone do not make an unchanged notice a new revision.
-    relevant = {key: value for key, value in result.items() if key not in {"id", "updated_at"}}
+    relevant = {key: value for key, value in result.items() if key not in
+                {"id", "updated_at", "historical_import", "extraction_upgrade", "extraction_version"}}
     result["content_hash"] = digest(relevant)
     return result
 
@@ -164,7 +168,66 @@ def _read_document(path):
         return _json_text(json.loads(text)) if suffix == ".json" else text
     if suffix in OFFICE_TYPES:
         return _office_text(path)
+    if suffix == '.hwp':
+        from .documents import hwp_text
+        return hwp_text(path)
+    if suffix == '.zip':
+        with zipfile.ZipFile(path) as archive:
+            entries = [e for e in archive.infolist() if not e.is_dir()]
+            if len(entries) > 100 or sum(e.file_size for e in entries) > 40 * 1024 * 1024:
+                raise ValueError('archive_limit')
+            if any(PurePosixPath(e.filename.replace('\\', '/')).is_absolute()
+                   or '..' in PurePosixPath(e.filename.replace('\\', '/')).parts for e in entries):
+                raise ValueError('unsafe_archive_path')
+            parts, unsupported = [], []
+            with tempfile.TemporaryDirectory(prefix='school-unpack-', dir=path.parent) as directory:
+                for number, entry in enumerate(entries):
+                    extension = Path(entry.filename).suffix.lower()
+                    if extension not in TEXT_TYPES | OFFICE_TYPES | {'.pdf', '.hwp'} or entry.file_size > MAX_FILE_BYTES or entry.flag_bits & 1:
+                        unsupported.append(entry.filename)
+                        continue
+                    extracted = Path(directory) / (str(number) + extension)
+                    extracted.write_bytes(archive.read(entry))
+                    try:
+                        text = _read_document(extracted)
+                        if text.strip(): parts.append('[ARCHIVE: ' + entry.filename + ']\n' + text)
+                        else: unsupported.append(entry.filename)
+                    except Exception: unsupported.append(entry.filename)
+                    if sum(map(len, parts)) > MAX_TEXT:
+                        unsupported.extend(e.filename for e in entries[number + 1:])
+                        break
+            if unsupported:
+                parts.insert(0, '[UNREADABLE ARCHIVE MEMBERS: ' + ' | '.join(unsupported) + ']')
+            return '\n\n'.join(parts)
     if suffix == ".pdf":
+        try:
+            import pymupdf
+        except ImportError:
+            pymupdf = None
+        if pymupdf is not None:
+            parts, missing = [], []
+            errors = pymupdf.TOOLS.mupdf_display_errors()
+            warnings = pymupdf.TOOLS.mupdf_display_warnings()
+            pymupdf.TOOLS.mupdf_display_errors(False)
+            pymupdf.TOOLS.mupdf_display_warnings(False)
+            try:
+                with pymupdf.open(path) as document:
+                    if document.needs_pass or len(document) > 150:
+                        raise ValueError('pdf_encrypted_or_page_limit')
+                    for number, page in enumerate(document, 1):
+                        text = page.get_text('text', sort=True)
+                        if text.strip():
+                            parts.append(f'[PAGE {number}]\n' + text)
+                        else:
+                            missing.append(number)
+                        if sum(map(len, parts)) > MAX_TEXT:
+                            break
+                if missing and parts:
+                    parts.insert(0, '[UNREADABLE PDF PAGES: ' + ','.join(map(str, missing)) + ']')
+                return '\n\f\n'.join(parts)
+            finally:
+                pymupdf.TOOLS.mupdf_display_errors(errors)
+                pymupdf.TOOLS.mupdf_display_warnings(warnings)
         from pypdf import PdfReader  # Optional: missing dependency becomes an explicit review issue.
         # Parser diagnostics may contain original object values; do not expose
         # them in service logs. Extraction failures become generic review issues.
@@ -232,20 +295,24 @@ def collect_local(root, config):
         try:
             stat = path.stat()
             updated = datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat()
-            metadata = {"extraction_status": "summary" if summary else "parsed", "needs_review": summary}
+            metadata = {"extraction_status": "summary" if summary else "parsed", "needs_review": summary,
+                        "extraction_version": 5}
             if stat.st_size > MAX_FILE_BYTES:
                 content = ""
                 metadata.update(extraction_status="too_large", needs_review=True, size=stat.st_size)
             else:
                 metadata["file_hash"] = hashlib.sha256(path.read_bytes()).hexdigest()
+                metadata['raw_content_hash'] = metadata['file_hash']
                 try:
                     content = _read_document(path)
                     if not content.strip():
                         metadata.update(extraction_status="no_text", needs_review=True)
+                    elif '[UNREADABLE ' in content:
+                        metadata.update(extraction_status='partial_document', needs_review=True)
                 except Exception:
                     content = ""
                     metadata.update(extraction_status="unsupported" if path.suffix.lower() not in
-                                    TEXT_TYPES | OFFICE_TYPES | {".pdf"} else "unreadable", needs_review=True)
+                                    TEXT_TYPES | OFFICE_TYPES | {".pdf", ".hwp", '.zip'} else "unreadable", needs_review=True)
             title, due_at = path.name, None
             if path.suffix.lower() == ".json" and metadata["extraction_status"] == "parsed":
                 document = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -258,6 +325,12 @@ def collect_local(root, config):
                     except (AttributeError, ValueError, TypeError):
                         metadata.update(extraction_status="invalid_due_at", needs_review=True)
             encoded = content[:MAX_TEXT].encode("utf-8")
+            if config.get('term', {}).get('start'):
+                begin = date.fromisoformat(config['term']['start'])
+                expected = (begin.year, 1 if begin.month < 7 else 2)
+                if _source_terms(title) - {expected}:
+                    metadata.update(term_conflict=True, needs_review=True)
+                    if metadata['extraction_status'] == 'parsed': metadata['extraction_status'] = 'prior_term'
             if len(encoded) > remaining_text_bytes:
                 content = encoded[:remaining_text_bytes].decode("utf-8", errors="ignore")
                 metadata.update(extraction_status="truncated", needs_review=True)
@@ -450,8 +523,9 @@ def probe_etl(config, token, fetch=None):
         return {"status": "error", "issues": [{"code": "api_unavailable"}]}
 
 
-def collect_etl(config, token=None, fetch=None):
-    result = {"status": "ok", "sources": [], "issues": [], "courses": []}
+def collect_etl(config, token=None, fetch=None, *, cache_dir=None, download_fetch=None):
+    from .documents import DocumentCache, collect_documents
+    result = {"status": "ok", "sources": [], "issues": [], "courses": [], "coverage": {}}
     remaining_text_bytes = MAX_TOTAL_TEXT_BYTES
     token = token if token is not None else os.environ.get("ETL_API_TOKEN", "")
     if not token:
@@ -460,6 +534,7 @@ def collect_etl(config, token=None, fetch=None):
     try:
         origin = validated_origin(config.get("etl", {}).get("base_url", DEFAULT_ETL_URL))
         fetch = fetch or _fetch
+        document_cache = DocumentCache(cache_dir, transport=download_fetch)
         catalog = _pages(origin, "/api/v1/courses", {"per_page": 100, "enrollment_type": "student",
                          "enrollment_state": "active", "include[]": "term"}, token, fetch)
         for course in config.get("courses", []):
@@ -473,6 +548,7 @@ def collect_etl(config, token=None, fetch=None):
                 continue
             course_id, key = str(matches[0]["id"]), course["key"]
             result["courses"].append({"key": key, "canvas_id": course_id})
+            references = []
             endpoints = [
                 ("etl_assignment", f"/api/v1/courses/{course_id}/assignments",
                  {"per_page": 100, "override_assignment_dates": "true"}),
@@ -489,6 +565,7 @@ def collect_etl(config, token=None, fetch=None):
                             raise CollectionError("api_source_count_limit")
                         try:
                             source = _api_source(origin, kind, key, course_id, item)
+                            references.append({'kind': kind, 'item': item})
                             encoded = source["content"].encode("utf-8")
                             if len(encoded) > remaining_text_bytes:
                                 source.update(content=encoded[:remaining_text_bytes].decode("utf-8", errors="ignore"),
@@ -505,6 +582,21 @@ def collect_etl(config, token=None, fetch=None):
                     result["issues"].append({"code": error.code, "course": key, "kind": kind})
                 except (ValueError, TypeError, AttributeError):
                     result["issues"].append({"code": "invalid_notice_fields", "course": key, "kind": kind})
+            documents = collect_documents(origin, key, course_id, token, fetch, document_cache, references=references, term=config['term'])
+            result['coverage'][key] = documents['coverage']
+            result['issues'].extend(documents['issues'])
+            for source in documents['sources']:
+                if len(result['sources']) >= MAX_FILES:
+                    raise CollectionError('api_source_count_limit')
+                encoded = source['content'].encode('utf-8')
+                if len(encoded) > remaining_text_bytes:
+                    source.update(content=encoded[:remaining_text_bytes].decode('utf-8', errors='ignore'),
+                                  extraction_status='truncated', needs_review=True)
+                    source['content_hash'] = digest({k: v for k, v in source.items() if k not in
+                        {'id', 'updated_at', 'content_hash', 'historical_import', 'extraction_upgrade', 'extraction_version'}})
+                    result['issues'].append({'code': 'truncated', 'source_id': source['id']})
+                remaining_text_bytes -= min(len(encoded), remaining_text_bytes)
+                result['sources'].append(source)
     except CollectionError as error:
         result["issues"].append({"code": error.code})
     except (KeyError, TypeError, ValueError, AttributeError):

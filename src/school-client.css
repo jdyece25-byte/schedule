@@ -20,6 +20,11 @@
 .school-fields .edit-input{width:100%;min-width:0;min-height:42px;font-size:12px}.school-wide{grid-column:1/-1}.school-tentative{font-size:12px;color:var(--tx2);margin-top:10px}
 .school-evidence{margin-top:10px;font-size:12px;color:var(--tx2)}.school-evidence summary,.school-history>summary{cursor:pointer;min-height:38px;padding:10px 0}.school-evidence p{line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:8px}
 .school-history{font-size:12px;color:var(--tx2);margin-top:20px}.school-panel #school-status{margin:10px 0;min-height:20px}
+.school-processing{margin:16px 0;padding:0 12px;border:1px solid #818cf855;border-radius:10px;background:#818cf80a;font-size:12px;color:#c7d2fe}
+.school-processing>summary{padding:14px 0;min-height:44px;cursor:pointer;font-weight:600}
+.school-processing>summary:focus-visible{outline:2px solid #a5b4fc;outline-offset:2px}
+.school-toast{position:fixed;z-index:1000;left:50%;bottom:calc(var(--bnav-h) + env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);width:max-content;max-width:calc(100% - 28px);padding:13px 16px;border:1px solid #818cf8;border-radius:12px;background:#272745;color:#f5f3ff;box-shadow:0 6px 24px #0008;font-size:13px;line-height:1.6;pointer-events:none;overflow-wrap:anywhere}
+.school-toast[hidden]{display:none}.school-toast-error{border-color:#fca5a5;background:#3b2529;color:#fee2e2}
 @media(max-width:370px){.school-notice{padding:12px}.school-candidate{padding:10px}.school-fields{grid-template-columns:minmax(0,1fr)}.school-heading{align-items:flex-start;flex-direction:column}}
 .calendar-school-bar{display:flex;align-items:center;gap:6px;flex-shrink:0;min-width:0;margin-bottom:5px;color:var(--tx2);font-size:10px}
 .calendar-school-bar button{flex:none;min-height:32px;padding:3px 8px;border:1px solid #818cf855;border-radius:7px;background:#818cf812;color:#c7d2fe;font:inherit;cursor:pointer}

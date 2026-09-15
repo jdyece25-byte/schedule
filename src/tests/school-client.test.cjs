@@ -1,8 +1,9 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {SchoolClient, cleanEvent, safeSourceURL, collectorText, render, noticeHTML, mount} = require('../school-client.js');
+const {SchoolClient, cleanEvent, safeSourceURL, collectorText, render, noticeHTML, pendingReview, mount} = require('../school-client.js');
 const REPO = 'jdyece25-byte/schedule-requests';
 const ID = '12345678-1234-4123-8123-123456789abc';
+const REVISION = 'a'.repeat(40);
 const NOW = new Date('2026-09-14T04:00:00Z');
 const candidate = {id: 'candidate-one', kind: 'deadline', event: {id: 'event-one', d: '2026-09-20', n: '수업 보고서', t: 'deadline', s: 1440, loc: 'eTL'}, confidence: 'review', auto_eligible: false, evidence: '9월 20일까지 보고서를 제출하세요.', action: 'add'};
 const item = {id: 'source-one', content_hash: 'a'.repeat(64), course: '테스트 수업', title: '보고서 제출 안내', source_url: 'https://etl.snu.ac.kr/mod/forum/discuss.php?d=42', updated_at: '2026-09-14T03:00:00Z', state: 'needs_review', candidates: [candidate], event_ids: []};
@@ -18,7 +19,9 @@ function fixture(handler = () => response(404), options = {}) {
     calls.push({url, init});
     if (url.endsWith('/user')) return response(200, {login: options.login || 'jdyece25-byte'});
     if (url === 'https://api.github.com/repos/' + REPO) return response(200, {private: options.private !== false, owner: {login: 'jdyece25-byte'}, permissions: {push: true}});
-    return handler(url, init, calls);
+    if (url.endsWith('/git/ref/heads/main')) return response(200, {object: {sha: REVISION}});
+    if (url.endsWith('/git/trees/' + REVISION + '?recursive=1')) return typeof options.tree === 'function' ? options.tree() : response(200, {tree: options.tree || []});
+    return handler(url.replace('?ref=' + REVISION, ''), init, calls);
   }};
   const client = new SchoolClient(root, {now: () => NOW});
   return {client, root, calls, store, uuids: () => uuids};
@@ -37,10 +40,11 @@ function mountedFixture(handler = url => url.endsWith('/school/index.json') ? fi
     return {id, textContent: '', value: id === 'school-filter' ? 'review' : '', dataset: {}, disabled: false, focused: false, scrolled: false,
       classList: {toggle: (key, value) => value ? classes.add(key) : classes.delete(key), add: key => classes.add(key), contains: key => classes.has(key)},
       addEventListener: (name, fn) => add(listeners, name, fn),
-      querySelectorAll: () => [], querySelector: () => null,
+      querySelectorAll: () => [], querySelector: () => null, setAttribute() {},
       focus() {this.focused = true; document.activeElement = this;}, scrollIntoView() {this.scrolled = true;}};
   };
   const document = {hidden: options.hidden || false, activeElement: null,
+    body: {appendChild: node => {elements.set('toast', node);}}, createElement: name => element(name),
     getElementById(id) {if (!elements.has(id)) elements.set(id, element(id)); return elements.get(id);},
     querySelector: selector => selector === '.view.on' ? {id: 'v-' + currentView} : null,
     addEventListener: (name, fn) => add(documentListeners, name, fn)};
@@ -59,7 +63,7 @@ function mountedFixture(handler = url => url.endsWith('/school/index.json') ? fi
     closePanel: () => {closed++;},
     sw: view => {currentView = view; return root.ScheduleSchool?.onView(view);},
     refreshSchoolCalendar: () => {redraws++; root.ScheduleSchool?.getCalendar([]);},
-    SchoolCalendar: {project: (data, events) => ({byDate: {'2026-09-20': [{source_id: data.items[0]?.id, eventCount: events.length}]}, undatedCount: 0})}
+    SchoolCalendar: {project: (data, events) => ({byDate: data.items.length ? {'2026-09-20': [{source_id: data.items[0].id, eventCount: events.length}]} : {}, undatedCount: 0})}
   };
   root.ScheduleSchool = mount(root, {now: () => new Date(now)});
   const fire = async (map, name, event = {}) => {for (const fn of map.get(name) || []) await fn(event); await tick();};
@@ -313,7 +317,7 @@ test('missing configuration never makes automatic auth requests and returns an e
 
 test('polling runs only in visible calendar/home/school and respects the sixty-second refresh interval', async () => {
   const f = mountedFixture(); await f.api.initialization;
-  const reads = () => f.calls.filter(c => c.url.endsWith('/school/index.json')).length;
+  const reads = () => f.calls.filter(c => new URL(c.url).pathname.endsWith('/school/index.json')).length;
   assert.equal(reads(), 1); await f.api.onView('cal'); await f.poll(); assert.equal(reads(), 1);
   f.advance(61000); f.document.hidden = true; await f.poll(); assert.equal(reads(), 1);
   f.document.hidden = false; await f.fireDocument('visibilitychange'); assert.equal(reads(), 2);
@@ -358,7 +362,7 @@ test('changed credentials during loading discard the old response and queue a fr
   assert.equal(f.client.index, null);
   await f.runTimers();
   assert.equal(f.api.getCalendarStatus().state, 'ready');
-  const reads = f.calls.filter(c => c.url.endsWith('/school/index.json'));
+  const reads = f.calls.filter(c => new URL(c.url).pathname.endsWith('/school/index.json'));
   assert.equal(reads.length, 2);
   assert.equal(reads[1].init.headers.Authorization, 'Bearer github_pat_changed');
 });
@@ -383,4 +387,149 @@ test('404 school index is waiting, not an authentication error or a successful c
   assert.equal(f.api.getCalendarStatus().state, 'waiting');
   assert.match(f.api.getCalendarStatus().text, /수집 대기/);
   assert.deepEqual(f.api.getCalendar([]), {byDate: {}, undatedCount: 0});
+});
+
+const durableDecision = (action = 'approve') => ({version: 1, id: ID, source_id: item.id, source_hash: item.content_hash, action, candidates: action === 'approve' ? [cleanEvent(candidate, choice.input)] : [], created_at: NOW.toISOString()});
+const treePaths = (...paths) => paths.map(path => ({path, type: 'blob', sha: 'b'.repeat(40)}));
+const decisionPath = 'school/decisions/' + ID + '.json';
+const resultPath = 'school/decision-results/' + ID + '.json';
+
+test('accepted immutable decisions survive reload before the worker projects review and hide only private calendar suggestions', async () => {
+  for (const action of ['approve', 'ignore']) {
+    const decision = durableDecision(action);
+    const f = mountedFixture(url => url.endsWith('/school/index.json') ? file(index) : url.endsWith('/' + decisionPath) ? file(decision) : response(404), {tree: treePaths(decisionPath)});
+    await f.api.initialization;
+    assert.equal(f.client.pending.get(item.id).state, 'accepted');
+    assert.equal(f.client.pending.get(item.id).restored, true);
+    const html = f.elements.get('school-list').innerHTML;
+    assert.match(html, /<details class="school-processing"><summary>처리 대기 1개/);
+    assert.ok(!html.slice(0, html.indexOf('<details class="school-processing">')).includes(item.title));
+    assert.match(html, /아직 일정 반영 완료가 아닙니다/);
+    assert.match(f.api.getCalendarStatus().text, /처리 대기 1개/);
+    const publicEvents = [{id: 'existing-public-event'}];
+    assert.deepEqual(f.api.getCalendar(publicEvents), {byDate: {}, undatedCount: 0});
+    assert.deepEqual(publicEvents, [{id: 'existing-public-event'}]);
+    assert.equal(f.store.size, 2);
+    assert.ok(f.calls.every(call => call.init.cache === 'no-store'));
+    assert.ok(f.calls.filter(call => call.url.includes('/contents/')).every(call => new URL(call.url).searchParams.get('ref') === REVISION));
+    await assert.rejects(f.client.decide(item, action, [choice]), /이미 접수/);
+    assert.equal(puts(f).length, 0);
+  }
+});
+
+test('queued server review restores processing without local state and newer source content becomes actionable', async () => {
+  let current = {...index, items: [{...item, review: {state: 'queued', decision_id: ID, source_hash: item.content_hash, action: 'approve', updated_at: NOW.toISOString()}}]};
+  const f = mountedFixture(url => url.endsWith('/school/index.json') ? file(current) : response(404));
+  await f.api.initialization;
+  assert.equal(f.client.pending.size, 1); assert.deepEqual(f.api.getCalendar([]).byDate, {});
+  current = {...current, items: [{...current.items[0], content_hash: 'new-content-version'}]};
+  await f.api.refresh();
+  assert.equal(f.client.pending.size, 0);
+  assert.ok(f.api.getCalendar([]).byDate['2026-09-20']);
+  assert.doesNotMatch(f.elements.get('school-list').innerHTML, /school-processing/);
+  assert.match(f.elements.get('school-list').innerHTML, /data-school-action="approve"/);
+});
+
+test('terminal conflict, failure and partial completion restore actionable review while full completion stays history', async () => {
+  for (const state of ['conflict', 'failed', 'completed']) {
+    let done = false;
+    const terminal = {version: 1, state, source_id: item.id, source_hash: item.content_hash, remaining_count: 1};
+    const current = () => ({...index, items: [{...item, state: state === 'completed' ? 'needs_review' : 'conflict', review: {...terminal, decision_id: ID, action: 'approve'}}]});
+    const f = mountedFixture(url => url.endsWith('/school/index.json') ? file(done ? current() : index) : url.endsWith('/' + decisionPath) ? file(durableDecision()) : url.endsWith('/' + resultPath) && done ? file(terminal) : response(404), {tree: () => response(200, {tree: treePaths(decisionPath, ...(done ? [resultPath] : []))})});
+    await f.api.initialization; assert.equal(f.client.pending.size, 1);
+    done = true; await f.api.refresh();
+    assert.equal(f.client.pending.size, 0); assert.ok(f.api.getCalendar([]).byDate['2026-09-20']);
+    assert.doesNotMatch(f.elements.get('school-list').innerHTML, /school-processing/);
+    assert.match(f.elements.get('school-list').innerHTML, /data-school-action="approve"/);
+  }
+  const finished = {...index, items: [{...item, state: 'ignored', review: {state: 'completed', remaining_count: 0, decision_id: ID, source_hash: item.content_hash, action: 'ignore'}}]};
+  const f = fixture(url => file(finished), {tree: treePaths(decisionPath, resultPath)}); await f.client.refresh();
+  assert.equal(f.client.pending.size, 0);
+  const html = render(f.client.index, f.client.pending);
+  assert.doesNotMatch(html, /school-processing/); assert.match(html, /확인 완료/);
+  assert.ok(!f.calls.some(call => new URL(call.url).pathname.endsWith('/' + decisionPath)));
+});
+
+test('wrong-version, rejected and malformed receipts never hide new actionable notices', () => {
+  for (const review of [{state: 'queued', source_hash: 'old', action: 'approve', decision_id: ID}, {state: 'conflict', source_hash: item.content_hash, action: 'approve', decision_id: ID}, {state: 'queued', source_hash: item.content_hash, action: 'invalid', decision_id: ID}, {state: 'queued', source_hash: item.content_hash, action: 'approve', decision_id: 'bad-id'}]) assert.equal(pendingReview({...item, review}), null);
+  for (const state of ['sending', 'uncertain', 'rejected']) assert.equal(pendingReview(item, new Map([[item.id, {state, decision: durableDecision()}]])), null);
+  assert.equal(pendingReview({...item, content_hash: 'new'}, new Map([[item.id, {state: 'accepted', decision: durableDecision()}]])), null);
+});
+
+test('button shows sending feedback immediately and durably accepted acknowledgement moves into processing with one PUT', async () => {
+  const entered = deferred(), finish = deferred();
+  const f = mountedFixture(async (url, init) => {
+    if (init.method === 'PUT') {entered.resolve(); await finish.promise; return response(201);}
+    return url.endsWith('/school/index.json') ? file(index) : response(404);
+  });
+  await f.api.initialization;
+  const article = {dataset: {sourceIndex: '0'}, querySelectorAll: () => []};
+  const button = {textContent: '확인했어요', disabled: false, dataset: {schoolAction: 'ignore'}, closest: selector => selector === '[data-school-action]' ? button : selector === '[data-source-index]' ? article : null};
+  const clicking = f.fireDocument('click', {target: button}); await entered.promise;
+  assert.equal(button.textContent, '전송 중…'); assert.equal(f.elements.get('toast').hidden, false);
+  assert.match(f.elements.get('toast').textContent, /보내고 있습니다/);
+  assert.ok(f.api.getCalendar([]).byDate['2026-09-20'], 'not hidden before durable acceptance');
+  const redraws = f.redraws(); finish.resolve(); await clicking;
+  assert.match(f.elements.get('toast').textContent, /접수 완료/);
+  assert.match(f.elements.get('school-status').textContent, /실제 반영 결과/);
+  assert.deepEqual(f.api.getCalendar([]).byDate, {}); assert.ok(f.redraws() > redraws);
+  assert.match(f.elements.get('school-list').innerHTML, /school-processing/);
+  assert.equal(puts(f).length, 1);
+  await f.fireDocument('click', {target: button}); assert.equal(puts(f).length, 1);
+});
+
+test('rejected click displays an error and keeps the notice actionable without an accepted toast', async () => {
+  const f = mountedFixture((url, init) => init.method === 'PUT' ? response(403) : url.endsWith('/school/index.json') ? file(index) : response(404));
+  await f.api.initialization;
+  const article = {dataset: {sourceIndex: '0'}, querySelectorAll: () => []};
+  const button = {textContent: '확인했어요', disabled: false, dataset: {schoolAction: 'ignore'}, closest: selector => selector === '[data-school-action]' ? button : selector === '[data-source-index]' ? article : null};
+  await f.fireDocument('click', {target: button});
+  assert.match(f.elements.get('toast').textContent, /전송 실패/); assert.ok(f.elements.get('toast').classList.contains('school-toast-error'));
+  assert.doesNotMatch(f.elements.get('school-list').innerHTML, /school-processing/);
+  assert.ok(f.api.getCalendar([]).byDate['2026-09-20']);
+});
+
+test('incomplete or inaccessible private decision tree clears prior data instead of showing an unverified queue', async () => {
+  let tree = response(200, {tree: []});
+  const f = mountedFixture(url => file(index), {tree: () => tree}); await f.api.initialization;
+  for (const failure of [response(503), response(200, {tree: [], truncated: true})]) {
+    tree = failure; await f.api.refresh();
+    assert.equal(f.api.getCalendarStatus().state, 'error'); assert.equal(f.client.index, null);
+    assert.deepEqual(f.api.getCalendar([]).byDate, {}); assert.ok(!f.elements.get('school-list').innerHTML.includes(item.title));
+    tree = response(200, {tree: []}); await f.api.refresh();
+  }
+});
+
+test('large private JSON uses the exact pinned blob in the same repository without following download URLs', async () => {
+  const large = {...index, padding: '모의 자료 '.repeat(150000)};
+  const text = JSON.stringify(large), size = Buffer.byteLength(text), sha = 'd'.repeat(40);
+  assert.ok(size > 1024 * 1024 && size < 8 * 1024 * 1024);
+  const f = fixture(url => url.endsWith('/school/index.json') ? response(200, {type: 'file', encoding: 'none', content: '', size, sha, download_url: 'https://outside.invalid/private-token', git_url: 'https://outside.invalid/blob'}) : url.endsWith('/git/blobs/' + sha) ? response(200, {encoding: 'base64', content: Buffer.from(text).toString('base64'), size, sha}) : response(404));
+  await f.client.refresh();
+  assert.equal(f.client.index.padding, large.padding);
+  const contents = f.calls.find(call => new URL(call.url).pathname.endsWith('/school/index.json'));
+  assert.equal(new URL(contents.url).searchParams.get('ref'), REVISION);
+  assert.equal(f.calls.filter(call => call.url.includes('/git/blobs/')).length, 1);
+  assert.ok(f.calls.every(call => call.url.startsWith('https://api.github.com/') && call.init.cache === 'no-store'));
+  assert.equal(f.store.size, 2);
+});
+
+test('unsafe or oversized blob metadata is rejected before any blob download', async () => {
+  for (const invalid of [{sha: '../elsewhere'}, {sha: 'x'.repeat(40)}, {size: 8 * 1024 * 1024 + 1}, {size: -1}, {type: 'symlink'}]) {
+    const f = fixture(() => response(200, {type: 'file', encoding: 'none', content: '', size: 1024, sha: 'd'.repeat(40), ...invalid}));
+    await assert.rejects(f.client.refresh(), /파일 크기/);
+    assert.equal(f.client.index, null);
+    assert.ok(!f.calls.some(call => call.url.includes('/git/blobs/')));
+  }
+});
+
+test('blob hash, size, encoding and JSON errors clear the view without exposing raw private content', async () => {
+  const sha = 'd'.repeat(40), content = Buffer.from('github_pat_PRIVATE_MALFORMED').toString('base64');
+  for (const overrides of [{sha: 'e'.repeat(40)}, {size: 1}, {encoding: 'none'}, {content: 'not valid base64!!'}, {}]) {
+    const f = fixture(url => url.endsWith('/school/index.json') ? response(200, {type: 'file', encoding: 'none', size: 28, sha}) : response(200, {sha, size: 28, encoding: 'base64', content, ...overrides}));
+    await assert.rejects(f.client.refresh(), error => !error.message.includes('PRIVATE') && !error.message.includes('github_pat_'));
+    assert.equal(f.client.index, null);
+  }
+  const f = fixture(() => response(200, {encoding: 'base64', size: 8 * 1024 * 1024 + 1, content: ''}));
+  await assert.rejects(f.client.refresh(), /8MB/);
 });

@@ -22,6 +22,8 @@ EXAM = re.compile(r"중간(?:고사|시험)|기말(?:고사|시험)|시험|고�
 LAB = re.compile(r"실습|실험|\bLab\s*\d+|MATLAB", re.I)
 CANCEL = re.compile(r"휴강|취소|cancel(?:led|ed)?|대면\s*없음|녹화\s*(?:동영상|수업)", re.I)
 RANGE = re.compile(r"\d(?:\([^)]*\))?\s*[~–]\s*(?:\d{1,2}[./월-]|\d{1,2}\s*일)")
+TIMETABLE_ROW = re.compile(r"^\s*\d{1,2}\s+(20\d{2}[-./]\d{1,2}[-./]\d{1,2})\s*([월화수목금토일])(?:\s|\()")
+ROOM = re.compile(r"(?<!\d)(\d{1,3})\s*동\s*([A-Za-z]?\d{2,4})\s*호")
 
 
 def _in_term(day, config):
@@ -111,7 +113,10 @@ def extract_candidates(source, config):
         context = title + " " + line
         if not line or len(line) > 2000 or RANGE.search(line):
             continue
-        kind = _kind(context)
+        table = TIMETABLE_ROW.search(line)
+        # A date/weekday/room row in a course timetable remains a class even
+        # when its content is only 'TBA', a speaker name, or a pitching topic.
+        kind = (_kind(line) or 'class') if table and ROOM.search(line) else _kind(context)
         if not kind:
             continue
         if IGNORE_ONLY.search(line):
@@ -129,10 +134,13 @@ def extract_candidates(source, config):
                     dates.append(value)
         if len(dates) != 1:
             continue
+        weekday_mismatch = bool(table and table[2] != '월화수목금토일'[dates[0].weekday()])
         moments = [value for value in (_time(match) for match in TIME.finditer(line)) if value is not None]
         if not moments:
             moments = [value for value in (_time(match) for match in KOREAN_TIME.finditer(line)) if value is not None]
         start = moments[0] if len(moments) <= 2 and moments else None
+        if start is None and kind == 'deadline' and re.search(r'자정|밤\s*12\s*시', line):
+            start = 1440
         end = moments[1] if len(moments) == 2 and kind != "deadline" else None
         # Unknown or conflicting duration/time labels stay editable in review.
         reason = "원문에 적힌 날짜입니다. 시간·장소와 기존 수업/마감 변경 여부를 검토해 주세요."
@@ -140,9 +148,19 @@ def extract_candidates(source, config):
             reason = "원문이 추정·미정 또는 변경 가능성을 표시합니다. 확정 전에 검토해 주세요."
         if kind == "cancellation":
             reason = "휴강/수업 방식 변경 공지입니다. 해당 기존 일정만 선택하여 반영해 주세요."
+        if table:
+            reason = '강의계획표의 날짜·요일·강의실입니다. 기존 반복 수업과 다른 요일 또는 휴강을 확인해 주세요.'
+        if weekday_mismatch:
+            reason = '강의계획표의 날짜와 요일이 일치하지 않습니다. 원문을 다시 확인해 주세요.'
         key = [kind, dates[0].isoformat(), re.sub(r"\s+", " ", line)]
         candidate = _candidate(source, key, kind, title, dates[0], start, end,
                                evidence=line, reason=reason)
+        if table:
+            candidate['schedule_row'] = True
+            candidate['weekday_conflict'] = weekday_mismatch
+        room = ROOM.search(line)
+        if room:
+            candidate['event']['loc'] = f'서울대 {room[1]}동 {room[2].upper()}호'
         if candidate["id"] not in seen:
             result.append(candidate)
             seen.add(candidate["id"])

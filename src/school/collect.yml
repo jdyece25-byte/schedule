@@ -16,7 +16,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: schedule-school-inbox
+  # Decision acknowledgments need not wait behind slow document downloads.
+  # The private lease serializes their brief writes across both groups/PC.
+  group: ${{ github.event_name == 'push' && 'schedule-school-decisions' || 'schedule-school-inbox' }}
   cancel-in-progress: false
 
 jobs:
@@ -24,6 +26,8 @@ jobs:
     if: github.event.repository.private == true
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SCHEDULE_SCHOOL_CACHE_DIR: ${{ runner.temp }}/schedule-school-documents
     steps:
       - name: Check out public collector code
         uses: actions/checkout@v7.0.1
@@ -40,24 +44,69 @@ jobs:
             src/school/requirements.txt
             src/notifications/requirements.txt
       - name: Install document reader
+        if: github.event_name != 'push'
         run: python -m pip install --disable-pip-version-check -r src/school/requirements.txt -r src/notifications/requirements.txt
-      - name: Collect into private inbox without changing public DB
+      - name: Restore private school document cache
+        id: document-cache
+        if: github.event_name != 'push'
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: ${{ env.SCHEDULE_SCHOOL_CACHE_DIR }}
+          key: school-documents-${{ runner.os }}-v1-restore-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: school-documents-${{ runner.os }}-v1-
+      - name: Synchronize private notices and decisions
         env:
           GH_TOKEN: ${{ github.token }}
           ETL_API_TOKEN: ${{ secrets.ETL_API_TOKEN }}
+          SCHOOL_EVENT: ${{ github.event_name }}
         shell: bash
         run: |
           set +e
-          python -B src/school/runner.py --sources DB/school-sources.json --inbox-only
+          if [ "$SCHOOL_EVENT" = push ]; then
+            python -B src/school/runner.py --sources DB/school-sources.json --inbox-only --decisions-only
+          else
+            python -B src/school/runner.py --sources DB/school-sources.json --inbox-only
+          fi
           result=$?
           if [ "$result" = 75 ]; then
-            echo 'Another collector is active; the next pass will retry.'
+            echo 'Temporary contention or network failure; queued work remains for the next retry.'
             exit 0
           fi
           exit "$result"
+      # Persist completed downloads even when a later request/collection fails.
+      # Only changed record content gets a new immutable cache entry, avoiding
+      # identical copies every 15 minutes. Its records contain hashed revisions
+      # and parsed text, excluding downloader headers and signed download URLs.
+      - name: Fingerprint completed document cache
+        id: document-cache-state
+        if: always() && github.event_name != 'push'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          root = Path(os.environ['SCHEDULE_SCHOOL_CACHE_DIR'])
+          records = sorted(root.glob('*.json'))
+          if records:
+              state = hashlib.sha256()
+              for path in records:
+                  state.update(path.name.encode('utf-8'))
+                  state.update(b'\0')
+                  state.update(path.read_bytes())
+              key = 'school-documents-' + os.environ['RUNNER_OS'] + '-v1-' + state.hexdigest()
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+                  output.write('key=' + key + '\n')
+          PY
+      - name: Save completed private school documents
+        if: always() && github.event_name != 'push' && steps.document-cache-state.outputs.key != '' && steps.document-cache-state.outputs.key != steps.document-cache.outputs.cache-matched-key
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: ${{ env.SCHEDULE_SCHOOL_CACHE_DIR }}
+          key: ${{ steps.document-cache-state.outputs.key }}
       # GITHUB_TOKEN commits do not trigger another push workflow. Send here
       # explicitly; the ordinary notification cron remains the retry path.
       - name: Deliver newly collected notices
+        if: github.event_name != 'push'
         env:
           GH_TOKEN: ${{ github.token }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}

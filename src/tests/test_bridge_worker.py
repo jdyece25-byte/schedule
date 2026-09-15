@@ -81,8 +81,9 @@ class Runner:
         self.callback = callback
         self.output = output if output is not None else plan()
 
-    def run(self, request, events, travel, notes, history, tick):
+    def run(self, request, events, travel, notes, history, tick, school_context=None):
         self.calls += 1
+        self.school_context = copy.deepcopy(school_context)
         if self.callback:
             self.callback(self.calls)
         return copy.deepcopy(self.output)
@@ -128,7 +129,7 @@ class WorkerTests(unittest.TestCase):
         self.github.seed("owner/schedule", "SCHEDULE.md", "Obsolete root rules")
         snapshots = []
 
-        def propose(request, events, travel, notes, history, tick):
+        def propose(request, events, travel, notes, history, tick, school_context=None):
             snapshots.append(copy.deepcopy((events, travel, notes)))
             return plan(None)
 
@@ -136,6 +137,18 @@ class WorkerTests(unittest.TestCase):
         self.start()
         self.worker.process(self.req, self.req_sha)
         self.assertEqual(snapshots, [(expected_events, expected_travel, expected_notes)])
+        self.assertFalse(self.github.commits)
+
+    def test_private_school_knowledge_reaches_planner_without_entering_public_files(self):
+        self.github.seed('owner/inbox', 'school/index.json', {'items': [
+            {'id':'source','course':'공도리','course_key':'leadership','state':'ignored',
+             'knowledge':{'status':'parsed','excerpts':['2026-09-16 수요일 17:30 특강']}}
+        ]})
+        self.runner.output = plan(None)
+        self.start()
+        self.worker.process(self.req, self.req_sha)
+        self.assertTrue(self.runner.school_context['available'])
+        self.assertIn('수요일', self.runner.school_context['sources'][0]['excerpts'][0])
         self.assertFalse(self.github.commits)
 
     def test_missing_database_never_falls_back_to_stale_root_files(self):
@@ -199,7 +212,7 @@ class WorkerTests(unittest.TestCase):
         self.github.seed("owner/schedule", "DB/events.json", [existing])
         snapshots = []
 
-        def propose(request, events, travel, notes, history, tick):
+        def propose(request, events, travel, notes, history, tick, school_context=None):
             snapshots.append(copy.deepcopy(events))
             if len(snapshots) == 1:
                 # The event existed when planning began, then another client

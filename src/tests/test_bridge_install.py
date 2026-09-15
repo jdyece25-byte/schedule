@@ -21,7 +21,7 @@ class InstallerTests(unittest.TestCase):
             real_source = Path(__file__).parents[1] / "bridge" / "install.ps1"
             installer = real_source.read_text(encoding="utf-8")
             (source / "install.ps1").write_text(installer, encoding="utf-8-sig")
-            for name in ("worker.py", "planner.py", "github.py"):
+            for name in ("worker.py", "planner.py", "github.py", "school_knowledge.py"):
                 (runtime / name).write_text("# original runtime\n")
                 (source / name).write_text("# changed runtime\n" if changed else "# original runtime\n")
             # No supervisor process, GitHub, AI, Startup folder or scheduled task

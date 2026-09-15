@@ -17,9 +17,11 @@ import uuid
 try:
     from .github import GitHub, GitHubError
     from .planner import PLAN_SCHEMA, apply_plan, build_prompt
+    from .school_knowledge import build_school_context
 except ImportError:
     from github import GitHub, GitHubError
     from planner import PLAN_SCHEMA, apply_plan, build_prompt
+    from school_knowledge import build_school_context
 
 KST = timezone(timedelta(hours=9))
 TERMINAL = {"completed", "needs_input", "failed"}
@@ -134,12 +136,12 @@ class AgentRunner:
             "--json-schema", json.dumps(PLAN_SCHEMA, ensure_ascii=False),
         ]
 
-    def run(self, request, events, travel, notes, history, tick):
+    def run(self, request, events, travel, notes, history, tick, school_context=None):
         root = Path(self.config["data_dir"]) / "jobs"
         folder = root / (request["id"] + "-" + uuid.uuid4().hex[:8])
         folder.mkdir(parents=True)
         (folder / "schema.json").write_text(json.dumps(PLAN_SCHEMA), encoding="utf-8")
-        prompt = build_prompt(request, events, travel, notes, history)
+        prompt = build_prompt(request, events, travel, notes, history, school_context=school_context)
         (folder / "prompt.txt").write_text(prompt, encoding="utf-8")
         command = self.command(request["agent"], folder)
         # Do not pass GitHub or provider API tokens to the model process.
@@ -338,7 +340,15 @@ class Worker:
             notes, _ = self.github.read(self.target, NOTES_PATH, base)
             if not isinstance(events, list) or not isinstance(travel, dict):
                 raise ValueError("현재 일정 파일을 읽을 수 없습니다.")
-            plan = self.runner.run(request, events, travel, notes or "", history, self.tick)
+            try:
+                school_index, _ = self.github.read_json(self.queue, 'school/index.json')
+                school_context = build_school_context(school_index, request)
+            except (GitHubError, ValueError, TypeError):
+                # Ordinary schedule requests remain available during an eTL
+                # outage, while the model must explicitly admit missing evidence.
+                school_context = {'available': False, 'reason': '학교 자료 조회 실패', 'sources': []}
+            plan = self.runner.run(request, events, travel, notes or "", history, self.tick,
+                                   school_context=school_context)
             updated_events, updated_travel, warnings = apply_plan(events, travel, plan, request_id)
             if plan["status"] == "needs_input":
                 self.finish("needs_input", plan["message"], plan["questions"])

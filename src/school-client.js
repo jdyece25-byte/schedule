@@ -10,13 +10,36 @@
   const STATES = {baseline: '기준 자료', needs_review: '확인 필요', ready: '반영 확인', applied: '반영 완료', ignored: '확인 완료', info: '새 공지', conflict: '일정 충돌 · 확인 필요'};
   const TYPES = {deadline: '마감', exam: '시험', lab: '실험·랩', class: '수업', cancellation: '휴강·취소'};
   const COLLECTORS = {local: '학교 공지', etl: 'eTL'};
+  const MAX_PRIVATE_JSON_BYTES = 8 * 1024 * 1024;
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
   const encode = value => btoa(Array.from(new TextEncoder().encode(JSON.stringify(value, null, 2)), b => String.fromCharCode(b)).join(''));
-  const decode = file => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g, '')), c => c.charCodeAt(0))));
+  function decode(file) {
+    if (file.encoding !== 'base64' || typeof file.content !== 'string') throw new Error('학교 공지 파일 응답을 읽지 못했습니다.');
+    if (file.size !== undefined && (!Number.isSafeInteger(file.size) || file.size < 0 || file.size > MAX_PRIVATE_JSON_BYTES)) throw new Error('학교 공지 파일 크기가 읽기 한도(8MB)를 넘거나 올바르지 않습니다.');
+    const maxEncoded = Math.ceil(MAX_PRIVATE_JSON_BYTES / 3) * 4;
+    if (file.content.length > maxEncoded * 2) throw new Error('학교 공지 파일 크기가 읽기 한도(8MB)를 넘었습니다.');
+    const content = file.content.replace(/\s/g, '');
+    if (content.length > maxEncoded) throw new Error('학교 공지 파일 크기가 읽기 한도(8MB)를 넘었습니다.');
+    try {
+      if (content.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(content)) throw new Error();
+      const binary = atob(content);
+      if (binary.length > MAX_PRIVATE_JSON_BYTES || (file.size !== undefined && file.size !== binary.length)) throw new Error();
+      return JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(Uint8Array.from(binary, c => c.charCodeAt(0))));
+    } catch { throw new Error('학교 공지 JSON 파일 형식이나 크기를 확인할 수 없습니다.'); }
+  }
   const canonical = value => JSON.stringify(value, function (key, item) { return item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(k => [k, item[k]])) : item; });
   const uuidOK = value => /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value || '');
   const shortText = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
   const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && Number.isFinite(new Date(value + 'T00:00:00Z').getTime()) && new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) === value;
+  function pendingReview(item, pending = new Map()) {
+    const row = pending.get(item.id);
+    if (row?.state === 'accepted' && row.decision.source_hash === item.content_hash) return row;
+    const review = item.review;
+    if (review?.source_hash === item.content_hash && ['queued', 'processing'].includes(review.state) && ['approve', 'ignore'].includes(review.action) && uuidOK(review.decision_id)) {
+      return {state: 'accepted', restored: true, decision: {version: 1, id: review.decision_id, source_id: item.id, source_hash: item.content_hash, action: review.action, created_at: review.updated_at}};
+    }
+    return null;
+  }
   function safeSourceURL(value) {
     try {
       const url = new URL(value);
@@ -113,13 +136,42 @@
       if (repo.private !== true) throw new Error('학교 공지는 비공개 저장소에서만 읽고 처리할 수 있습니다.');
       if (user.login?.toLowerCase() !== 'jdyece25-byte' || repo.owner?.login?.toLowerCase() !== 'jdyece25-byte' || repo.permissions?.push === false) throw new Error('비공개 요청 저장소 소유자의 Contents 읽기·쓰기 권한이 필요합니다.');
     }
-    async file(path, credentials) {
-      const response = await this.api('/repos/' + REPO + '/contents/' + path, credentials);
+    async file(path, credentials, revision = '') {
+      const response = await this.api('/repos/' + REPO + '/contents/' + path + (revision ? '?ref=' + encodeURIComponent(revision) : ''), credentials);
       if (response.status === 404) return null;
       if (!response.ok) throw new Error('학교 공지 읽기 실패 (HTTP ' + response.status + ')');
-      const file = await response.json();
-      if (file.encoding !== 'base64' || typeof file.content !== 'string') throw new Error('학교 공지 파일 응답을 읽지 못했습니다.');
+      let file = await response.json();
+      if (file.encoding === 'none') {
+        if (!/^[a-f0-9]{40}$/i.test(file.sha || '') || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > MAX_PRIVATE_JSON_BYTES || file.type !== 'file') throw new Error('학교 공지 파일 크기(최대 8MB)와 버전을 확인할 수 없습니다.');
+        const sha = file.sha;
+        const blobResponse = await this.api('/repos/' + REPO + '/git/blobs/' + sha, credentials);
+        if (!blobResponse.ok) throw new Error('학교 공지 파일 읽기 실패 (HTTP ' + blobResponse.status + ')');
+        const blob = await blobResponse.json();
+        if (blob.sha !== sha || blob.size !== file.size) throw new Error('학교 공지 파일 버전이 일치하지 않습니다. 다시 확인해 주세요.');
+        file = blob;
+      }
       return decode(file);
+    }
+    async outstanding(credentials) {
+      const head = await this.api('/repos/' + REPO + '/git/ref/heads/main', credentials);
+      if (head.status === 404) return {decisions: [], revision: ''};
+      if (!head.ok) throw new Error('공지 처리 대기열 확인 실패 (HTTP ' + head.status + ')');
+      const reference = await head.json(); const revision = reference.object?.sha;
+      if (!/^[a-f0-9]{40,64}$/i.test(revision || '')) throw new Error('공지 처리 대기열 버전을 확인하지 못했습니다.');
+      const response = await this.api('/repos/' + REPO + '/git/trees/' + revision + '?recursive=1', credentials);
+      if (response.status === 404) return {decisions: [], revision: ''};
+      if (!response.ok) throw new Error('공지 처리 대기열 확인 실패 (HTTP ' + response.status + ')');
+      const tree = await response.json();
+      if (!Array.isArray(tree.tree) || tree.truncated === true) throw new Error('공지 처리 대기열을 완전히 확인하지 못했습니다.');
+      const paths = new Set(tree.tree.filter(entry => entry.type === 'blob').map(entry => entry.path));
+      const result = [];
+      for (const path of paths) {
+        const match = /^school\/decisions\/([a-f0-9-]{36})\.json$/i.exec(path);
+        if (!match || !uuidOK(match[1]) || paths.has('school/decision-results/' + match[1] + '.json')) continue;
+        const decision = await this.file(path, credentials, revision);
+        if (decision?.version === 1 && decision.id === match[1] && ['approve', 'ignore'].includes(decision.action) && typeof decision.source_id === 'string' && typeof decision.source_hash === 'string') result.push(decision);
+      }
+      return {decisions: result, revision};
     }
     async refresh() {
       if (this.busy) throw new Error('학교 공지 처리 요청을 확인 중입니다.');
@@ -129,22 +181,37 @@
         const assertCurrent = () => { if (epoch !== this.epoch || !this.credentialsMatch(credentials)) throw new Error('학교 공지 연결 설정이 변경되었습니다. 새 설정으로 다시 확인해 주세요.'); };
         await this.validate(credentials);
         assertCurrent();
-        const index = await this.file('school/index.json', credentials);
+        // Pin index, decisions and outcomes to one immutable tree so an atomic
+        // completion cannot briefly look like an old queued review on reload.
+        const snapshot = await this.outstanding(credentials);
+        assertCurrent();
+        const index = await this.file('school/index.json', credentials, snapshot.revision);
         if (index && (index.version !== 1 || !Array.isArray(index.items))) throw new Error('학교 공지 목록 형식을 확인할 수 없습니다.');
         assertCurrent();
+        const hydrated = new Map(this.pending);
+        if (index) for (const item of index.items) {
+          const review = pendingReview(item);
+          if (review) hydrated.set(item.id, review);
+        }
+        for (const decision of index ? snapshot.decisions : []) {
+          const item = index.items.find(item => item.id === decision.source_id && item.content_hash === decision.source_hash);
+          if (!item || !ACTIVE.has(item.state)) continue;
+          const existing = hydrated.get(item.id);
+          if (!existing || existing.decision.source_hash !== decision.source_hash || existing.decision.id === decision.id || (Date.parse(decision.created_at) || 0) >= (Date.parse(existing.decision.created_at) || 0)) hydrated.set(item.id, {state: 'accepted', restored: true, decision, error: ''});
+        }
         const resolved = [];
-        if (index) for (const [source, row] of this.pending) {
+        if (index) for (const [source, row] of hydrated) {
           const current = index.items.find(item => item.id === source);
           if (current && (current.content_hash !== row.decision.source_hash || !ACTIVE.has(current.state))) resolved.push(source);
           else if (row.state === 'accepted') {
-            const outcome = await this.file('school/decision-results/' + row.decision.id + '.json', credentials);
+            const outcome = await this.file('school/decision-results/' + row.decision.id + '.json', credentials, snapshot.revision);
             assertCurrent();
-            if (outcome?.version === 1 && ['completed', 'conflict'].includes(outcome.state)) resolved.push(source);
+            if (outcome?.version === 1 && ['completed', 'conflict', 'failed'].includes(outcome.state)) resolved.push(source);
           }
         }
         assertCurrent();
         this.index = index; this.indexCredentials = credentials;
-        resolved.forEach(source => this.pending.delete(source));
+        resolved.forEach(source => hydrated.delete(source)); this.pending = hydrated;
         return index;
       } catch (error) { this.invalidate(); throw error;
       } finally { this.busy = false; }
@@ -170,7 +237,7 @@
       if (canonical(existing) !== canonical(row.decision)) throw new Error('같은 요청 ID의 내용이 달라 전송을 중단했습니다.');
       return true;
     }
-    receipt(row) { row.state = 'accepted'; row.error = ''; return row; }
+    receipt(row) { row.state = 'accepted'; row.error = ''; this.onChange(this); return row; }
     async deliver(row, credentials, retry) {
       const path = '/repos/' + REPO + '/contents/school/decisions/' + row.decision.id + '.json';
       const body = JSON.stringify({message: 'Queue school notice decision ' + row.decision.id, content: encode(row.decision)});
@@ -248,15 +315,18 @@
   function render(index, pending, filter = 'review', focusedSourceId = '') {
     if (!index) return '<p class="school-empty">수집 대기 · 아직 학교 공지 목록이 없습니다. 수집기가 공지를 확인하면 여기에 표시됩니다.</p>';
     const items = index.items.map((item, index) => ({item, index})).sort((a, b) => String(b.item.updated_at || '').localeCompare(String(a.item.updated_at || '')));
-    const current = items.filter(row => ACTIVE.has(row.item.state));
+    const waiting = items.filter(row => ACTIVE.has(row.item.state) && pendingReview(row.item, pending));
+    const current = items.filter(row => ACTIVE.has(row.item.state) && !pendingReview(row.item, pending));
     const history = items.filter(row => !ACTIVE.has(row.item.state));
+    const processing = waiting.length ? '<details class="school-processing"><summary>처리 대기 ' + waiting.length + '개 · 접수 완료</summary><p class="school-note">처리 요청은 저장됐으며 실제 일정 반영은 아직 완료되지 않았습니다. 실패하거나 다시 확인할 내용이 생기면 확인할 공지에 나타납니다.</p>' + waiting.map(row => noticeHTML(row.item, row.index, pendingReview(row.item, pending))).join('') + '</details>' : '';
     if (filter === 'latest') {
-      let latest = items.slice(0, 100);
+      let latest = items.filter(row => !pendingReview(row.item, pending)).slice(0, 100);
       const focused = items.find(row => row.item.id === focusedSourceId);
-      if (focused && !latest.includes(focused)) latest = [focused, ...latest.slice(0, 99)];
-      return latest.length ? latest.map(row => noticeHTML(row.item, row.index, pending.get(row.item.id), !ACTIVE.has(row.item.state))).join('') : '<p class="school-empty">수집된 공지가 없습니다.</p>';
+      if (focused && !pendingReview(focused.item, pending) && !latest.includes(focused)) latest = [focused, ...latest.slice(0, 99)];
+      return (latest.length ? latest.map(row => noticeHTML(row.item, row.index, pending.get(row.item.id), !ACTIVE.has(row.item.state))).join('') : '<p class="school-empty">현재 표시할 공지가 없습니다.</p>') + processing;
     }
     return (current.length ? current.map(row => noticeHTML(row.item, row.index, pending.get(row.item.id))).join('') : '<p class="school-empty">새로 확인할 공지가 없습니다.</p>') +
+      processing +
       '<details class="school-history"><summary>지난 공지·기준 자료 ' + history.length + '개</summary>' + history.slice(0, 100).map(row => noticeHTML(row.item, row.index, null, true)).join('') + '</details>';
   }
   function mount(root, options = {}) {
@@ -271,6 +341,13 @@
     let loading = null, refreshAgain = false, lastSuccess = null, lastAttempt = null, renderedIndex = null, focusedSourceId = '', scheduleReady = false;
     let calendarStatus = {state: configured() ? 'waiting' : 'unconfigured', text: configured() ? '학교 공지 확인 대기' : '학교 공지 연결 설정이 필요합니다.'};
     const notify = (message, error = false) => { byId('school-status').textContent = message; byId('school-status').classList.toggle('school-warning', error); };
+    const toast = document.createElement?.('div'); let toastTimer;
+    if (toast && document.body) { toast.className = 'school-toast'; toast.hidden = true; toast.setAttribute('role', 'status'); toast.setAttribute('aria-live', 'polite'); document.body.appendChild(toast); }
+    const flash = (message, error = false) => {
+      if (!toast) return;
+      root.clearTimeout?.(toastTimer); toast.textContent = message; toast.hidden = false; toast.classList.toggle('school-toast-error', error);
+      toastTimer = root.setTimeout(() => {toast.hidden = true;}, 6000);
+    };
     const announce = (state, text, redraw = true) => {
       calendarStatus = {state, text};
       const status = byId('calendar-school-status');
@@ -314,7 +391,7 @@
           });
         });
       });
-      const count = client.index?.items.filter(item => ACTIVE.has(item.state)).length;
+      const count = client.index?.items.filter(item => ACTIVE.has(item.state) && !pendingReview(item, client.pending)).length;
       byId('school-home-summary').textContent = count === undefined ? '새 공지·시험·과제 확인' : count ? '확인할 공지 ' + count + '개' : '확인할 새 공지 없음';
     };
     const buttons = () => {
@@ -333,6 +410,8 @@
     };
     const readyText = () => {
       const warnings = Object.entries(client.index?.collectors || {}).filter(([, collector]) => ['auth_required', 'error', 'partial'].includes(collector.state)).map(([key, collector]) => (COLLECTORS[key] || '수집기') + (collector.state === 'auth_required' ? ' 다시 로그인 필요' : collector.state === 'partial' ? ' 일부 수집' : ' 수집 확인 필요'));
+      const waiting = client.index?.items.filter(item => ACTIVE.has(item.state) && pendingReview(item, client.pending)).length || 0;
+      if (waiting) warnings.push('처리 대기 ' + waiting + '개');
       return warnings.length ? '학교 공지 확인됨 · ' + warnings.join(' · ') : '학교 공지 확인됨';
     };
     const refresh = ({force = true} = {}) => {
@@ -394,6 +473,7 @@
       focusedSourceId = sourceId; byId('school-filter').value = 'latest'; paint({preserveDrafts: true});
       const article = Array.from(byId('school-list').querySelectorAll('[data-source-index]')).find(element => Number(element.dataset.sourceIndex) === position);
       if (!article) return false;
+      const processing = article.closest?.('.school-processing'); if (processing) processing.open = true;
       article.tabIndex = -1; article.classList.add('school-source-focus'); article.focus({preventScroll: true}); article.scrollIntoView({block: 'start', behavior: 'smooth'});
       return true;
     };
@@ -414,9 +494,13 @@
         }) : [];
         // The immutable body is built from explicit selections; no background approval.
         const operation = action === 'retry' ? client.retry(item.id) : client.decide(item, action, choices);
-        buttons(); notify('처리 요청 전송 중…'); await operation; paint();
+        const label = button.textContent; button.textContent = '전송 중…';
+        buttons(); notify('처리 요청 전송 중…'); flash('처리 요청을 보내고 있습니다…');
+        try { await operation; } finally { button.textContent = label; }
+        paint(); announce('ready', readyText());
         notify('처리 요청이 접수되었습니다. 목록 새로고침으로 실제 반영 결과를 확인해 주세요.');
-      } catch (error) { if (client.pending.has(item.id)) paint(); notify(error.name === 'AbortError' ? '접수 여부 확인이 필요합니다. 같은 요청 상태 확인을 눌러 주세요.' : error.message, true); }
+        flash(action === 'ignore' ? '확인 요청 접수 완료 · 처리 대기에서 확인하세요.' : '반영 요청 접수 완료 · 처리 대기에서 확인하세요.');
+      } catch (error) { if (client.pending.has(item.id)) paint(); const message = error.name === 'AbortError' ? '접수 여부 확인이 필요합니다. 같은 요청 상태 확인을 눌러 주세요.' : error.message; notify(message, true); flash(message, true); }
       finally { buttons(); if (refreshAgain) { refreshAgain = false; root.setTimeout(resume, 0); } }
     });
     byId('school-filter').addEventListener('change', () => { focusedSourceId = ''; paint({preserveDrafts: true}); });
@@ -435,10 +519,10 @@
     return {
       client, refresh, initialization, openSource,
       onView: next => { view = next; syncConnection(); if ((scheduleReady || view === 'school') && !document.hidden && relevantViews.has(view)) return refresh({force: view === 'school'}); },
-      getCalendar: events => { syncConnection(false); return client.index && root.SchoolCalendar?.project ? root.SchoolCalendar.project(client.index, events) : {byDate: {}, undatedCount: 0}; },
+      getCalendar: events => { syncConnection(false); return client.index && root.SchoolCalendar?.project ? root.SchoolCalendar.project({...client.index, items: client.index.items.filter(item => !pendingReview(item, client.pending))}, events) : {byDate: {}, undatedCount: 0}; },
       getCalendarStatus: () => { syncConnection(false); return {...calendarStatus}; },
       dispose: () => { if (poll !== undefined) root.clearInterval?.(poll); }
     };
   }
-  return {SchoolClient, cleanEvent, safeSourceURL, collectorText, render, noticeHTML, mount};
+  return {SchoolClient, cleanEvent, safeSourceURL, collectorText, render, noticeHTML, pendingReview, mount};
 });

@@ -153,7 +153,7 @@ $backup = Join-Path $stageDir 'backup'
 New-Item -ItemType Directory -Path $staged, $backup, $runtimeDir, $startupDir -Force | Out-Null
 $runtimeNames = @((Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.py' -File).Name) + @('install.ps1', 'stop.ps1')
 foreach ($name in $runtimeNames) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $staged $name) }
-foreach ($name in @('worker.py', 'planner.py', 'github.py', 'supervisor.py')) {
+foreach ($name in @('worker.py', 'planner.py', 'github.py', 'supervisor.py', 'school_knowledge.py')) {
     if (-not (Test-Path -LiteralPath (Join-Path $staged $name))) { throw "Required runtime file is missing: $name" }
 }
 [IO.File]::WriteAllText((Join-Path $staged 'config.json'), $configJson, $utf8)
@@ -187,7 +187,7 @@ function Ensure-Guard {
     if (-not $state.supervisor_running) { throw 'The recovery supervisor did not start. Inspect supervisor.log.' }
 }
 $coreChanged = $configChanged
-foreach ($name in @('worker.py', 'planner.py', 'github.py')) {
+foreach ($name in @('worker.py', 'planner.py', 'github.py', 'school_knowledge.py')) {
     if (Different-File (Join-Path $staged $name) (Join-Path $runtimeDir $name)) { $coreChanged = $true }
 }
 $targets = @{}

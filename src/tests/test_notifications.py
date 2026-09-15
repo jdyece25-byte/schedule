@@ -6,7 +6,7 @@ import unittest
 from src.bridge.github import GitHubError
 from src.notifications import scheduler as schedule
 from src.notifications.sender import (Busy, STATE_PATH, StateStore, disable_expired,
-                                      empty_state, run, validate_subscription)
+                                      empty_state, load_school_notices, run, validate_subscription)
 
 
 def at(day=14, hour=7, minute=32):
@@ -404,8 +404,8 @@ class SchoolNoticeTests(unittest.TestCase):
         item.update(notify=True, content_hash='changed-after-first-connection')
         self.assertEqual(len(self.notices([item])), 1)
 
-    def notices(self, items=None, now=None):
-        return schedule.school_notices({"version": 1, "items": [school_item()] if items is None else items}, now or at())
+    def notices(self, items=None, now=None, pending=()):
+        return schedule.school_notices({"version": 1, "items": [school_item()] if items is None else items}, now or at(), pending)
 
     def execute(self, github, transport):
         return run(github, transport, "owner/private", "owner/schedule", True, now=lambda: github.now)
@@ -505,6 +505,113 @@ class SchoolNoticeTests(unittest.TestCase):
     def test_posted_date_without_time_is_preserved_and_invalid_time_not_guessed(self):
         for updated_at, expected in (("2026-09-13", "2026-09-13"), ("PRIVATE UNKNOWN TEXT", "게시 시각 미정")):
             self.assertEqual(self.notices([school_item(updated_at=updated_at)])[0]["payload"]["items"][0]["time"], expected)
+
+    def decision(self, **changes):
+        return {"version": 1, "id": "decision-one", "source_id": "notice-one", "source_hash": "version-one",
+                "action": "ignore", "candidates": [], "created_at": schedule.stamp(at()), **changes}
+
+    def test_durable_pending_suppresses_only_matching_source_version_and_valid_acknowledgements(self):
+        for action in ("approve", "ignore"):
+            self.assertFalse(self.notices(pending=[self.decision(action=action)]))
+            self.assertEqual(len(self.notices([school_item(content_hash="version-two")], pending=[self.decision(action=action)])), 1)
+            self.assertEqual(len(self.notices([school_item(id="other-notice")], pending=[self.decision(action=action)])), 1)
+        for invalid in (None, {}, self.decision(version=2), self.decision(id="../bad"), self.decision(action="edit"), self.decision(source_hash="old")):
+            self.assertEqual(len(self.notices(pending=[invalid])), 1)
+
+    def test_projected_queued_and_fully_completed_reviews_suppress_but_conflicts_partial_and_new_versions_resume(self):
+        review = {"source_hash": "version-one", "action": "approve", "remaining_count": 0}
+        for state in ("queued", "processing", "completed"):
+            self.assertFalse(self.notices([school_item(review={**review, "state": state})]))
+        for changes in ({"state": "conflict"}, {"state": "failed"}, {"state": "completed", "remaining_count": 2},
+                        {"state": "queued", "source_hash": "old-version"}, {"state": "queued", "action": "invalid"}):
+            self.assertEqual(len(self.notices([school_item(review={**review, **changes})])), 1)
+
+    def test_sender_hydrates_pending_decision_before_index_projection_without_touching_regular_reminders(self):
+        github, transport = self.setup_sender()
+        github.files[("owner/private", "school/decisions/decision-one.json")] = self.decision()
+        self.assertFalse(load_school_notices(github, "owner/private", github.now))
+        result = run(github, transport, "owner/private", "owner/schedule", now=lambda: github.now)
+        self.assertEqual(result["sent"], 1)
+        self.assertEqual([notice["kind"] for notice in transport.sent], ["daily"])
+        github.files[("owner/private", "school/index.json")]["items"][0]["content_hash"] = "version-two"
+        self.assertEqual(self.execute(github, transport)["sent"], 1)
+        self.assertEqual(transport.sent[-1]["kind"], "notice")
+
+    def test_decision_accepted_while_waiting_for_send_lease_is_suppressed(self):
+        github, transport = self.setup_sender()
+        put = github.put_json
+
+        def acknowledge(*args, **kwargs):
+            result = put(*args, **kwargs)
+            github.files[("owner/private", "school/decisions/decision-one.json")] = self.decision(action="approve")
+            return result
+
+        github.put_json = acknowledge
+        self.assertEqual(self.execute(github, transport)["sent"], 0)
+        self.assertFalse(transport.sent)
+
+    def test_terminal_result_is_not_treated_as_pending_and_historical_decision_body_is_not_downloaded(self):
+        github, _ = self.setup_sender([school_item(state="conflict", review={"state": "conflict", "source_hash": "version-one", "action": "approve"})])
+        github.files[("owner/private", "school/decisions/decision-one.json")] = self.decision()
+        github.files[("owner/private", "school/decision-results/decision-one.json")] = {"version": 1, "state": "conflict"}
+        read = github.read_json
+        reads = []
+
+        def track(repo, path, ref="main"):
+            reads.append((path, ref))
+            if path.startswith("school/decisions/"):
+                raise AssertionError("historical decision must not be downloaded")
+            return read(repo, path, ref)
+
+        github.read_json = track
+        self.assertEqual(len(load_school_notices(github, "owner/private", github.now)), 1)
+        self.assertTrue(all(ref == "queue-head" for _, ref in reads))
+
+    def test_pending_decision_read_failure_isolated_from_daily_and_deadline_reminders(self):
+        for error in (GitHubError(503, "network unavailable"), RuntimeError("truncated queue")):
+            github, transport = self.setup_sender()
+            github.now = at(hour=8, minute=2)
+            github.files[("owner/schedule", "DB/events.json")] = [event(t="deadline")]
+            github.files[("owner/private", "school/decisions/decision-one.json")] = self.decision()
+            read = github.read_json
+
+            def fail(repo, path, ref="main"):
+                if path.startswith("school/decisions/"):
+                    raise error
+                return read(repo, path, ref)
+
+            github.read_json = fail
+            result = run(github, transport, "owner/private", "owner/schedule", now=lambda: github.now)
+            self.assertEqual(result["sent"], 2)
+            self.assertEqual({notice["kind"] for notice in transport.sent}, {"daily", "deadline"})
+
+    def test_notice_acknowledgement_does_not_remove_actual_departure_or_deadline_schedule(self):
+        github, transport = self.setup_sender()
+        github.now = at(hour=9, minute=52)
+        github.files[("owner/schedule", "DB/events.json")] = [event(s=480, e=540), event(id="next", lid="b", s=660, e=720)]
+        github.files[("owner/private", "school/decisions/decision-one.json")] = self.decision()
+        run(github, transport, "owner/private", "owner/schedule", now=lambda: github.now)
+        self.assertEqual({notice["kind"] for notice in transport.sent}, {"daily", "departure"})
+
+    def test_parser_hash_migration_preserves_undelivered_notice_without_redelivery_to_notified_device(self):
+        github, transport = self.setup_sender()
+        self.assertEqual(self.execute(github, transport)['sent'], 1)
+        item = github.files[("owner/private", "school/index.json")]['items'][0]
+        item.update(content_hash='new-parser-hash', notice_hash='version-one')
+        self.assertEqual(self.execute(github, transport)['sent'], 0)
+        fresh, fresh_transport = self.setup_sender([item])
+        self.assertEqual(self.execute(fresh, fresh_transport)['sent'], 1)
+        self.assertEqual(fresh_transport.sent[0]['id'], transport.sent[0]['id'])
+        item.update(content_hash='actual-new-content', notice_hash='actual-new-content')
+        self.assertEqual(self.execute(github, transport)['sent'], 1)
+
+    def test_notice_delivery_alias_does_not_change_pending_source_version_validation(self):
+        item = school_item(content_hash='parser-current', notice_hash='version-one')
+        self.assertEqual(len(self.notices([item], pending=[self.decision(source_hash='version-one')])), 1)
+        self.assertEqual(self.notices([item], pending=[self.decision(source_hash='parser-current')]), [])
+        expected = self.notices()[0]['id']
+        for invalid in (None, {}, '', ' ', 'x' * 513):
+            self.assertEqual(self.notices([school_item(notice_hash=invalid)])[0]['id'], expected)
 
 
 if __name__ == "__main__":

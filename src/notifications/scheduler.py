@@ -169,7 +169,7 @@ def scheduled(events, travel, now):
     return result
 
 
-def school_notices(index, now):
+def school_notices(index, now, pending_decisions=()):
     """Private announcements become generic course/time-only notifications.
 
     The collector owns first_seen_at for each content version. Provider posting
@@ -177,6 +177,13 @@ def school_notices(index, now):
     """
     if not isinstance(index, dict) or index.get("version") != 1 or not isinstance(index.get("items"), list):
         return []
+    # The immutable private decision is already a durable acknowledgement,
+    # even when the collector has not yet projected it into index.review.
+    acknowledged = {(d.get("source_id"), d.get("source_hash")) for d in (pending_decisions or ())
+                    if isinstance(d, dict) and d.get("version") == 1
+                    and d.get("action") in ("approve", "ignore")
+                    and isinstance(d.get("id"), str) and re.fullmatch(r"[A-Za-z0-9_-]{1,100}", d["id"])
+                    and isinstance(d.get("source_id"), str) and isinstance(d.get("source_hash"), str)}
     result = []
     seen = set()
     for item in index["items"]:
@@ -188,7 +195,20 @@ def school_notices(index, now):
         if any(not isinstance(value, str) or not value.strip() or len(value) > 512
                for value in (identifier, content_hash, course)):
             continue
-        key = "notice:" + digest([identifier, content_hash])
+        review = item.get("review")
+        if (identifier, content_hash) in acknowledged:
+            continue
+        if (isinstance(review, dict) and review.get("source_hash") == content_hash
+                and review.get("action") in ("approve", "ignore")
+                and (review.get("state") in ("queued", "processing")
+                     or (review.get("state") == "completed" and review.get("remaining_count") == 0))):
+            continue
+        # A parser-only migration may improve the candidate/source hash while
+        # preserving the same teacher announcement and its delivery ledger.
+        notice_hash = item.get("notice_hash", content_hash)
+        if not isinstance(notice_hash, str) or not notice_hash.strip() or len(notice_hash) > 512:
+            notice_hash = content_hash
+        key = "notice:" + digest([identifier, notice_hash])
         if key in seen:
             continue
         try:

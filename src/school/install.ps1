@@ -20,7 +20,7 @@ foreach ($folder in @('school','bridge','notifications')) { New-Item -ItemType D
 Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.py' -File | ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $runtime ('src\school\' + $_.Name)) -Force
 }
-foreach ($name in @('github.py','planner.py','supervisor.py')) {
+foreach ($name in @('github.py','planner.py','supervisor.py','school_knowledge.py')) {
     Copy-Item -LiteralPath (Join-Path $sourceRoot ('bridge\' + $name)) -Destination (Join-Path $runtime ('src\bridge\' + $name)) -Force
 }
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'validate_db.py') -Destination (Join-Path $runtime 'src\validate_db.py') -Force

@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import subprocess
 import urllib.error
 import urllib.parse
@@ -60,9 +61,24 @@ class GitHub:
             if error.status == 404:
                 return None, None
             raise
-        if value.get("type") != "file" or value.get("encoding") != "base64":
+        if value.get("type") != "file":
             raise RuntimeError("예상하지 않은 GitHub 파일 형식입니다.")
-        return base64.b64decode(value["content"]).decode("utf-8"), value["sha"]
+        sha = value.get("sha")
+        if value.get("encoding") == "none" and re.fullmatch(r"[a-f0-9]{40}", str(sha)):
+            # Contents omits bodies above 1 MB. Resolve the immutable blob from
+            # that exact response, never a fresh main revision or download URL.
+            size = value.get("size")
+            if not isinstance(size, int) or not 0 <= size <= 8 * 1024 * 1024:
+                raise RuntimeError("GitHub JSON 파일의 읽기 크기 제한을 초과했습니다.")
+            value = self.api(f"repos/{repo}/git/blobs/{sha}")
+            if value.get("sha") != sha:
+                raise RuntimeError("GitHub 파일 버전을 확인할 수 없습니다.")
+        if value.get("encoding") != "base64":
+            raise RuntimeError("예상하지 않은 GitHub 파일 형식입니다.")
+        raw = base64.b64decode(value["content"])
+        if len(raw) > 8 * 1024 * 1024:
+            raise RuntimeError("GitHub JSON 파일의 읽기 크기 제한을 초과했습니다.")
+        return raw.decode("utf-8"), sha
 
     def read_json(self, repo, path, ref="main"):
         text, sha = self.read(repo, path, ref)

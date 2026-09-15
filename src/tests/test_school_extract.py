@@ -16,6 +16,26 @@ def source(content="", **kwargs):
 
 
 class ExtractTests(unittest.TestCase):
+    def test_timetable_rows_find_wednesday_exceptions_room_and_explicit_cancellation(self):
+        item = source(kind='etl_external_file', title='Intro.pdf', content='\n'.join([
+            '3 2026-09-16 수 39동 B103호 특강 외부 연사',
+            '4 2026-09-25 금 (추석) 38동 422호 휴강 보강 예정',
+            '12 2026-11-18 수 39동 B103호 특강 대체',
+            '13 2026-11-27 금 38동 422호 TBA']))
+        rows = extract_candidates(item, CONFIG)
+        self.assertEqual([r['event']['d'] for r in rows], ['2026-09-16','2026-09-25','2026-11-18','2026-11-27'])
+        self.assertEqual(rows[0]['event']['loc'], '서울대 39동 B103호')
+        self.assertEqual(rows[1]['kind'], 'cancellation')
+        self.assertTrue(all(not row['auto_eligible'] for row in rows))
+        self.assertNotIn('s', rows[0]['event'])
+
+    def test_midnight_deadline_and_inconsistent_timetable_day_remain_explicit(self):
+        row = extract_candidates(source(content='9월 20일 자정까지 제출'), CONFIG)[0]
+        self.assertEqual(row['event']['s'], 1440)
+        wrong = extract_candidates(source(title='Intro.pdf', content='3 2026-09-16 금 39동 B103호 특강'), CONFIG)[0]
+        self.assertTrue(wrong['weekday_conflict'])
+        self.assertIn('일치하지', wrong['reason'])
+
     def test_effective_assignment_due_converts_kst_and_update_preserves_identity(self):
         item = source(kind="etl_assignment", title="Lab01 Report", due_at="2026-09-20T14:59:00Z")
         first = extract_candidates(item, CONFIG)[0]

@@ -129,6 +129,8 @@ def prepare(candidate, events, config):
     value.pop('target_hash', None)
     value['action'] = 'add'
     value['auto_eligible'] = value.get('auto_eligible') is True
+    if value.get('weekday_conflict'):
+        value.update(auto_eligible=False, reason='원문의 날짜와 요일이 일치하지 않습니다. 정확한 날짜를 확인해 주세요.')
     expected = value['event']
     course = definition(value['course'], config)
     if not course:
@@ -138,6 +140,12 @@ def prepare(candidate, events, config):
         expected['n'] = course['name'] + ' · ' + expected['n']
     owned_matches = [e for e in events if owned(e, value, config)]
     matches = owned_matches or [e for e in events if matching_item(e, expected, value['course'], config)]
+    if not matches and value.get('schedule_row') and value.get('kind') == 'class':
+        # Explicit timetable rows can refine a unique same-day class without
+        # duplicating it under the attachment's generic title (e.g. Intro.pdf).
+        matches = [e for e in events if belongs(e, value['course'], config)
+                   and e.get('d') == expected.get('d') and e.get('t') == 'class']
+        value['auto_eligible'] = False
     if value.get('kind') == 'cancellation':
         matches = [e for e in events if belongs(e, value['course'], config)
                    and e.get('d') == expected.get('d') and e.get('t') in ('class', 'lab', 'exam')]
@@ -197,6 +205,8 @@ def apply(events, candidates, source, *, approved=False, config=None):
             raise ValueError('새 일정 추가에는 기존 수정·삭제 대상이 올 수 없습니다.')
         if action != 'link' and not approved and candidate.get('auto_eligible') is not True:
             raise ValueError('확인되지 않은 변경은 자동 적용할 수 없습니다.')
+        if action != 'link' and not approved and candidate.get('weekday_conflict'):
+            raise ValueError('날짜와 요일이 다른 일정은 사용자 확인 후 반영해야 합니다.')
         event = {key: candidate['event'][key] for key in EDITABLE if key in candidate['event']}
         if any(isinstance(event.get(key), str) and CREDENTIAL.search(event[key]) for key in ('n', 'loc', 'ti')):
             raise ValueError('인증 정보로 보이는 문자열은 공개 일정에 저장할 수 없습니다.')
@@ -235,6 +245,10 @@ def apply(events, candidates, source, *, approved=False, config=None):
         term = {'start': source['term_start'], 'end': source['term_end']}
         if any(e is not target and matching_item(e, updated, candidate['course'], config, term) for e in result):
             raise ValueError('기존 일정과 중복될 수 있습니다. 먼저 기존 회차를 확인해 주세요.')
+        if action == 'add' and candidate.get('schedule_row') and updated.get('t') == 'class' and any(
+                e.get('d') == updated.get('d') and e.get('t') == 'class' and belongs(e, candidate['course'], config)
+                for e in result):
+            raise ValueError('같은 과목·날짜의 기존 수업이 있습니다. 새로 추가하지 말고 해당 회차를 확인해 주세요.')
         if not approved and any(e is not target and same_course_slot(e, updated, candidate['course'], config)
                                 for e in result):
             raise ValueError('같은 과목·날짜·시각의 기존 일정과 겹칩니다. 별도 일정인지 확인해 주세요.')

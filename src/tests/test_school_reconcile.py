@@ -307,6 +307,27 @@ class ReconcileTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         self.apply([], [prepare(value, [], CONFIG)], approved=True)
 
+    def test_timetable_add_rechecks_same_course_date_after_concurrent_class_creation(self):
+        value = candidate(kind='class', schedule_row=True, auto_eligible=False,
+                          event={'d': '2026-09-22', 'n': '강의계획표', 't': 'class'})
+        prepared = prepare(value, [], CONFIG)
+        manual = existing(n='논설 특별수업', t='class', s=570, e=645)
+        with self.assertRaisesRegex(ValueError, '같은 과목·날짜'):
+            self.apply([manual], [prepared], approved=True)
+        other = {**manual, 'n': '기전 특별수업'}
+        result, _ = self.apply([other], [prepared], approved=True)
+        self.assertEqual(len(result), 2)
+
+    def test_weekday_conflict_cannot_be_auto_applied_even_with_retained_or_forged_auto_flag(self):
+        value = candidate(weekday_conflict=True)
+        prepared = prepare(value, [], CONFIG)
+        self.assertFalse(prepared['auto_eligible'])
+        with self.assertRaisesRegex(ValueError, '날짜와 요일'):
+            self.apply([], [{**prepared, 'auto_eligible': True}])
+        # Explicit review may resolve an incorrect printed weekday/date.
+        result, _ = self.apply([], [prepared], approved=True)
+        self.assertEqual(len(result), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

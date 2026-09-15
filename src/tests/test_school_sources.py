@@ -1,5 +1,6 @@
 from copy import deepcopy
 import json
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -35,7 +36,7 @@ class LocalSourceTests(unittest.TestCase):
         result = collect_local(self.root, CONFIG)
         self.assertEqual(result["status"], "partial")
         self.assertEqual(len(result["sources"]), 4)
-        self.assertEqual(sum(s["extraction_status"] == "unsupported" for s in result["sources"]), 2)
+        self.assertEqual(sum(s["extraction_status"] == "unreadable" for s in result["sources"]), 2)
         summary = next(s for s in result["sources"] if s["course"] == "학기 전체")
         self.assertEqual(summary["extraction_status"], "summary")
         for source in result["sources"]:
@@ -92,6 +93,11 @@ class LocalSourceTests(unittest.TestCase):
 
 class ApiSourceTests(unittest.TestCase):
     def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        environment = patch.dict('os.environ', {'SCHEDULE_SCHOOL_CACHE_DIR': temporary.name})
+        environment.start()
+        self.addCleanup(environment.stop)
         self.calls = []
         self.catalog = [{"id": 123, "name": "대학 글쓰기 1 (043)", "term": {"name": "2026년 2학기"}}]
 
@@ -100,6 +106,10 @@ class ApiSourceTests(unittest.TestCase):
         path = urlsplit(url).path
         if path == "/api/v1/courses":
             return self.catalog, {}
+        if re.fullmatch(r'/api/v1/courses/\d+', path):
+            return {'syllabus_body': ''}, {}
+        if path.endswith(('/files', '/pages', '/modules')):
+            return [], {}
         if path.endswith("/assignments"):
             return [{"id": 456, "name": "과제 마감", "updated_at": STAMP, "description": "<p>과제 안내</p>",
                      "due_at": "2026-09-20T14:59:00Z", "lock_at": "2026-09-27T14:59:00Z",

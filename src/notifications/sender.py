@@ -179,9 +179,20 @@ def load_subscriptions(github, queue):
 
 def load_school_notices(github, queue, now):
     try:
-        index, _ = github.read_json(queue, "school/index.json")
-        return school_notices(index, now)
-    except (GitHubError, ValueError, TypeError, KeyError, AttributeError):
+        revision = github.head(queue)
+        index, _ = github.read_json(queue, "school/index.json", revision)
+        tree = github.tree(queue, revision)
+        pending = []
+        for path in tree:
+            if not re.fullmatch(r"school/decisions/[A-Za-z0-9_-]{1,100}\.json", path):
+                continue
+            if path.replace("school/decisions/", "school/decision-results/", 1) in tree:
+                continue  # Terminal results and index.review are committed together.
+            decision, _ = github.read_json(queue, path, revision)
+            if isinstance(decision, dict) and decision.get("id") == Path(path).stem:
+                pending.append(decision)
+        return school_notices(index, now, pending)
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError):
         # A collector error or absent/private malformed index cannot block the
         # independently useful daily, deadline, change and departure reminders.
         return []
