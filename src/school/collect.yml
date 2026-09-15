@@ -26,8 +26,6 @@ jobs:
     if: github.event.repository.private == true
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      SCHEDULE_SCHOOL_CACHE_DIR: ${{ runner.temp }}/schedule-school-documents
     steps:
       - name: Check out public collector code
         uses: actions/checkout@v7.0.1
@@ -35,6 +33,10 @@ jobs:
           repository: jdyece25-byte/schedule
           ref: main
           persist-credentials: false
+      - name: Set private document cache directory
+        if: github.event_name != 'push'
+        shell: bash
+        run: echo "SCHEDULE_SCHOOL_CACHE_DIR=$RUNNER_TEMP/schedule-school-documents" >> "$GITHUB_ENV"
       - name: Set up Python
         uses: actions/setup-python@v7.0.0
         with:

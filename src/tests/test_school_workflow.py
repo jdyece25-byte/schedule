@@ -34,7 +34,11 @@ class SchoolWorkflowTests(unittest.TestCase):
 
     def test_cache_is_private_collection_only_and_saves_after_failure(self):
         self.assertIn('if: github.event.repository.private == true', self.workflow)
-        self.assertIn('SCHEDULE_SCHOOL_CACHE_DIR: ${{ runner.temp }}/schedule-school-documents', self.workflow)
+        setup = self.section('Set private document cache directory')
+        self.assertIn('SCHEDULE_SCHOOL_CACHE_DIR=$RUNNER_TEMP/schedule-school-documents', setup)
+        self.assertIn('>> "$GITHUB_ENV"', setup)
+        self.assertIn("github.event_name != 'push'", setup)
+        self.assertNotIn('${{ runner.temp }}', self.workflow.split('    steps:', 1)[0])
         for name in ('Restore private school document cache', 'Fingerprint completed document cache', 'Save completed private school documents'):
             self.assertIn("github.event_name != 'push'", self.section(name))
         save = self.section('Save completed private school documents')
