@@ -688,6 +688,15 @@ class SchoolRunnerTests(unittest.TestCase):
         self.assertEqual(current['state'], 'baseline')
         self.assertFalse(current['notify'])
         self.assertFalse(current['read_status']['stale'])
+        # Repair an index produced by the former collector, which overwrote a
+        # historical image PDF with a budget placeholder and a false new alert.
+        current.update(content_hash='failed-budget', raw_content_hash='hash-of-empty-content',
+                       extraction_status='download_budget', state='info', notify=True)
+        importer.consume({'etl': result(inspected, status='partial')})
+        restored = importer.index['items'][0]
+        self.assertEqual(restored['content_hash'], inspected['content_hash'])
+        self.assertEqual(restored['state'], 'baseline')
+        self.assertFalse(restored['notify'])
 
 
 if __name__ == "__main__":

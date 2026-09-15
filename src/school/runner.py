@@ -258,7 +258,8 @@ class Importer:
                 # verified file body is still a new notice, even when its
                 # metadata continues to look like an initial historical import.
                 verified_body = bool(source.get('file_hash') or str(source.get('content') or '').strip())
-                changed_body = bool(existing and verified_body and raw_hash and old_raw_hash and raw_hash != old_raw_hash and not upgrading)
+                previously_read = (existing or {}).get('extraction_status') in ('parsed', 'summary', 'truncated', 'partial_document', 'no_text')
+                changed_body = bool(existing and previously_read and verified_body and raw_hash and old_raw_hash and raw_hash != old_raw_hash and not upgrading)
                 if not existing and collector == 'etl' and source.get('kind') in ('etl_file', 'etl_external_file', 'etl_page', 'etl_module', 'etl_syllabus') and checkpoint:
                     try:
                         historical |= (datetime.fromisoformat(source['updated_at'].replace('Z', '+00:00'))
@@ -322,8 +323,7 @@ class Importer:
                 if not first_local:
                     # Raw source is private, never copied to public event notes.
                     extra['school/sources/' + source['id'] + '.json'] = json.dumps(source, ensure_ascii=False) + '\n'
-                if not existing or upgrading:
-                    reference_history(item, source)
+                reference_history(item, source)
                 items[item['id']] = item
             previous = self.index['collectors'].get(collector, {})
             self.index['collectors'][collector] = {
