@@ -541,6 +541,138 @@ class SchoolRunnerTests(unittest.TestCase):
         importer.consume({'local': result({**upgraded, 'content_hash': 'teacher-new-content', 'raw_content_hash': 'new-bytes'})})
         self.assertNotEqual(school_notices(importer.index, datetime.now(timezone.utc))[0]['id'], before['id'])
 
+    def test_empty_failed_read_preserves_verified_data_and_clears_diagnostic_on_same_hash_recovery(self):
+        importer = self.importer(inbox_only=True)
+        importer.index['collectors']['etl'] = {'initialized': True}
+        good = source(kind='etl_file', content='9/22 보고서 제출 마감', extraction_version=5, raw_content_hash='verified-bytes')
+        importer.consume({'etl': result(good)})
+        current = importer.index['items'][0]
+        current.update(state='ignored', review={'state': 'completed', 'source_hash': good['content_hash'], 'action': 'ignore'})
+        verified = deepcopy(current)
+        raw_path = 'school/sources/' + good['id'] + '.json'
+        for status in ('download_budget', 'download_failed', 'no_text', 'truncated'):
+            failed = {**good, 'content_hash': 'empty-' + status, 'content': '', 'extraction_status': status, 'raw_content_hash': ''}
+            importer.consume({'etl': result(failed, status='partial')})
+            for key in ('content_hash', 'knowledge', 'candidates', 'state', 'review', 'first_seen_at', 'notify', 'notice_hash'):
+                self.assertEqual(current[key], verified[key], key)
+            self.assertFalse(current['read_status']['stale'])
+            self.assertEqual(current['read_status']['state'], status)
+            self.assertEqual(self.github.read_json(QUEUE, raw_path)[0], good)
+            self.assertEqual(importer.index['collectors']['etl']['state'], 'partial')
+        importer.consume({'etl': result(good)})
+        recovered = importer.index['items'][0]
+        self.assertNotIn('read_status', recovered)
+        self.assertNotIn('diagnostic', recovered)
+        self.assertEqual(recovered['knowledge'], verified['knowledge'])
+        self.assertEqual(recovered['state'], 'ignored')
+        self.assertEqual(self.github.public_commits(), [])
+
+    def test_changed_metadata_failed_read_marks_old_knowledge_stale_until_normal_recovery(self):
+        from src.bridge.school_knowledge import build_school_context
+        importer = self.importer(inbox_only=True)
+        importer.index['collectors']['etl'] = {'initialized': True}
+        good = source(kind='etl_file', content='9/22 보고서 제출 마감', extraction_version=5, raw_content_hash='verified-bytes')
+        importer.consume({'etl': result(good)})
+        current = importer.index['items'][0]
+        current.update(state='ignored', review={'state': 'completed', 'source_hash': good['content_hash'], 'action': 'ignore'})
+        verified = deepcopy(current)
+        failed = {**good, 'content_hash': 'unreadable-file-hash', 'content': '', 'extraction_status': 'download_failed',
+                  'updated_at': '2026-09-16T00:00:00Z', 'title': '수정된 보고서 안내'}
+        importer.consume({'etl': result(failed, status='partial')})
+        current = importer.index['items'][0]
+        self.assertEqual(current['state'], 'needs_review'); self.assertEqual(current['candidates'], [])
+        self.assertNotEqual(current['content_hash'], verified['content_hash']); self.assertNotIn('review', current)
+        self.assertTrue(current['read_status']['stale']); self.assertTrue(current['knowledge']['incomplete'])
+        self.assertIn('날짜·시각 변경 근거로 사용하지 마세요', current['knowledge']['excerpts'][0])
+        self.assertEqual(current['knowledge']['excerpts'][1:], verified['knowledge']['excerpts'])
+        context = build_school_context(importer.index, {'text': '논설 일정 알려줘'})
+        self.assertTrue(context['incomplete'])
+        self.assertIn('날짜·시각 변경 근거로 사용하지 마세요', str(context['sources']))
+        observed_hash = current['content_hash']; first_seen = current['first_seen_at']
+        current['state'] = 'ignored'
+        importer.consume({'etl': result({**failed, 'extraction_status': 'download_budget'}, status='partial')})
+        self.assertEqual(current['content_hash'], observed_hash); self.assertEqual(current['first_seen_at'], first_seen)
+        self.assertEqual(current['state'], 'ignored')
+        self.assertEqual(len(current['knowledge']['excerpts']), len(verified['knowledge']['excerpts']) + 1)
+        recovered = source(kind='etl_file', content='9/23 보고서 제출 마감', extraction_version=5,
+                           raw_content_hash='new-verified-bytes', title=failed['title'], updated_at=failed['updated_at'])
+        importer.consume({'etl': result(recovered)})
+        current = importer.index['items'][0]
+        self.assertNotIn('knowledge_stale', current); self.assertNotIn('read_previous', current)
+        self.assertEqual(current['knowledge']['status'], 'parsed')
+        self.assertNotIn('이전 원문 참고', str(current['knowledge']))
+        self.assertEqual(current['content_hash'], recovered['content_hash'])
+        self.assertEqual(self.github.public_commits(), [])
+
+    def test_metadata_only_failure_recovers_original_acknowledgement_if_verified_content_is_unchanged(self):
+        importer = self.importer(inbox_only=True)
+        importer.index['collectors']['etl'] = {'initialized': True}
+        good = source(kind='etl_file', content='9/22 보고서 제출 마감')
+        importer.consume({'etl': result(good)})
+        importer.index['items'][0].update(state='ignored', reason='사용자 확인')
+        verified = deepcopy(importer.index['items'][0])
+        failed = {**good, 'content_hash': 'bad', 'content': '', 'updated_at': '2026-09-16T00:00:00Z', 'extraction_status': 'download_failed'}
+        importer.consume({'etl': result(failed, status='partial')})
+        importer.consume({'etl': result({**good, 'updated_at': failed['updated_at']})})
+        current = importer.index['items'][0]
+        self.assertEqual(current['state'], 'ignored'); self.assertEqual(current['knowledge'], verified['knowledge'])
+        self.assertEqual(current['content_hash'], verified['content_hash'])
+        self.assertNotIn('read_status', current); self.assertNotIn('knowledge_stale', current)
+
+    def test_changed_unreadable_source_invalidates_old_approval_before_collection_pass_can_publish(self):
+        item = self.make_review_item()
+        item['knowledge'] = {'version': 2, 'status': 'parsed', 'incomplete': False, 'excerpts': ['10/1 보고서 제출']}
+        self.github.seed(QUEUE, INDEX, {'version': 1, 'collectors': {}, 'items': [item]})
+        self.decision(item)
+        failed = {**source(kind='local'), 'id': item['id'], 'title': '변경된 학교 원문', 'content_hash': 'failed-new',
+                  'content': '', 'updated_at': '2026-09-16T00:00:00Z', 'extraction_status': 'download_failed'}
+        with patch('src.school.runner.collect_etl', return_value=result(failed, status='partial')):
+            run_once(CONFIG, github=self.github)
+        self.assertEqual(self.github.public_commits(), [])
+        self.assertEqual(self.github.read_json(QUEUE, 'school/decision-results/decision-1.json')[0]['state'], 'conflict')
+        self.assertTrue(self.github.read_json(QUEUE, INDEX)[0]['items'][0]['knowledge']['incomplete'])
+
+    def test_prior_term_empty_source_never_silently_keeps_old_knowledge_as_current(self):
+        importer = self.importer(inbox_only=True)
+        importer.index['collectors']['etl'] = {'initialized': True}
+        good = source(kind='etl_syllabus', content='9/22 시험 안내')
+        importer.consume({'etl': result(good)})
+        importer.consume({'etl': result({**good, 'content': '', 'content_hash': 'old-term', 'extraction_status': 'prior_term', 'term_conflict': True}, status='partial')})
+        current = importer.index['items'][0]
+        self.assertTrue(current['read_status']['stale'])
+        self.assertEqual(current['knowledge']['status'], 'prior_term')
+        self.assertEqual(current['candidates'], [])
+
+    def test_historical_references_keep_knowledge_in_history_but_announcements_stay_actionable(self):
+        importer = self.importer(inbox_only=True)
+        importer.index['collectors']['etl'] = {'initialized': True}
+        documents = [source(kind=kind, content='출석 정책을 설명하는 강의 참고 자료', historical_import=True) for kind in ('etl_file', 'etl_page', 'etl_module', 'etl_syllabus', 'etl_announcement')]
+        importer.consume({'etl': result(*documents, status='partial')})
+        for item in importer.index['items']:
+            self.assertTrue(item['knowledge']['excerpts'])
+            self.assertEqual(item['state'], 'info' if item['source_kind'] == 'etl_announcement' else 'baseline')
+        self.assertEqual(importer.index['collectors']['etl']['state'], 'partial')
+
+    def test_existing_historical_reference_info_migrates_on_same_hash_but_true_new_version_reappears(self):
+        importer = self.importer(inbox_only=True)
+        importer.index['collectors']['etl'] = {'initialized': True}
+        old = source(kind='etl_file', content='출석 정책 설명', historical_import=True, extraction_version=5, raw_content_hash='old-bytes')
+        importer.consume({'etl': result(old)})
+        importer.index['items'][0]['state'] = 'info'  # Earlier deployment left reference imports actionable.
+        importer.consume({'etl': result(old)})
+        self.assertEqual(importer.index['items'][0]['state'], 'baseline')
+        changed = source(kind='etl_file', content='출석 정책이 변경되었습니다', historical_import=True, extraction_version=5, raw_content_hash='new-bytes')
+        importer.consume({'etl': result(changed)})
+        self.assertEqual(importer.index['items'][0]['state'], 'info')
+        self.assertTrue(importer.index['items'][0]['notify'])
+        importer.consume({'etl': result(changed)})
+        self.assertEqual(importer.index['items'][0]['state'], 'info')
+        self.assertEqual(importer.index['items'][0]['content_hash'], changed['content_hash'])
+        current = importer.index['items'][0]
+        current.update(review={'state': 'queued', 'source_hash': changed['content_hash']}, initial_review=True)
+        importer.consume({'etl': result(changed)})
+        self.assertEqual(current['state'], 'info')
+
 
 if __name__ == "__main__":
     unittest.main()

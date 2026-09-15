@@ -302,10 +302,16 @@
     const url = safeSourceURL(item.source_url);
     const candidates = Array.isArray(item.candidates) ? item.candidates : [];
     const pending = active && row && row.state === 'accepted' && row.decision.source_hash === item.content_hash;
+    const reading = item.read_status?.state || item.extraction_status;
+    const excerpts = Array.isArray(item.knowledge?.excerpts) ? item.knowledge.excerpts.filter(line => typeof line === 'string') : [];
+    const readingWarning = item.read_status?.stale ? '최신 원문을 읽지 못했습니다. 아래 내용은 이전 자료이므로 변경 사항을 확인해 주세요.' :
+      reading && reading !== 'parsed' ? ({truncated: '자료 일부만 읽었습니다. 원문의 나머지 내용을 확인해 주세요.', restricted: '접근이 제한된 자료입니다. eTL에서 공개 여부를 확인해 주세요.', no_text: '읽을 수 있는 텍스트가 없습니다. 원문을 직접 확인해 주세요.', unsupported: '이 형식은 자동으로 읽지 못합니다. 원문을 직접 확인해 주세요.', too_large: '파일이 커서 자동 분석 범위를 넘었습니다. 원문을 확인해 주세요.'}[reading] || '자료를 모두 읽지 못했습니다. 원문 확인 또는 재수집이 필요합니다.') : '';
     return '<article class="school-notice" data-source-index="' + index + '"><div class="school-notice-top"><span class="school-badge">' + esc(pending ? '처리 요청 접수' : STATES[item.state] || '확인 필요') + '</span><span class="school-time">' + esc(timestamp(item.updated_at)) + '</span></div>' +
       '<p class="school-course">' + esc(item.course || '학교 공지') + '</p><h3>' + esc(item.title || '제목 없는 공지') + '</h3>' +
       (url ? '<a class="school-source" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">학교 원문 열기 ↗</a>' : '<p class="school-note">확인 가능한 학교 원문 링크가 없습니다.</p>') +
       (item.reason ? '<p class="school-note">' + esc(item.reason) + '</p>' : '') +
+      (readingWarning ? '<p class="school-warning">' + esc(readingWarning) + '</p>' : '') +
+      (excerpts.length ? '<details class="school-evidence"><summary>읽은 학사 규칙 · 자연어 요청에 참고</summary>' + (item.knowledge?.incomplete ? '<p class="school-note">일부 발췌입니다. 원문 전체를 읽은 결과와 다를 수 있습니다.</p>' : '') + excerpts.map(line => '<p>' + esc(line) + '</p>').join('') + '</details>' : '') +
       (active && !pending ? candidates.map(candidateHTML).join('') : candidates.map(c => '<p class="school-note">' + esc([c.event?.n, c.event?.d, clockValue(c.event?.s), c.event?.loc].filter(Boolean).join(' · ')) + '</p>').join('')) +
       (row?.error ? '<p class="school-warning">' + esc(row.error) + '</p>' : '') +
       (pending ? '<p class="school-note">처리 요청이 접수되었습니다. 아직 일정 반영 완료가 아닙니다. 목록을 새로고침해 결과를 확인하세요.</p>' : active ? '<div class="school-actions">' +

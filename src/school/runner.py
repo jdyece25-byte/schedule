@@ -23,6 +23,55 @@ INDEX = 'school/index.json'
 LEASE = 'school/lease.json'
 SAFE_ID = re.compile(r'[A-Za-z0-9_-]{1,100}\Z')
 TERMINAL = {'completed', 'conflict'}
+REFERENCE_KINDS = {'etl_file', 'etl_external_file', 'etl_page', 'etl_module', 'etl_syllabus'}
+STALE_SOURCE_WARNING = '[이전 원문 참고: 최신 자료를 읽지 못했습니다. 날짜·시각 변경 근거로 사용하지 마세요.]'
+
+
+def source_metadata(value, *, indexed=False):
+    return {'title': value.get('title'), 'kind': value.get('source_kind' if indexed else 'kind'),
+            'updated_at': value.get('updated_at')}
+
+
+def reference_history(item, source):
+    review = item.get('review', {})
+    if (item.get('state') == 'info' and item.get('initial_review') and item.get('notify') is False and source.get('historical_import') is True
+            and source.get('kind') in REFERENCE_KINDS and not item.get('candidates')
+            and review.get('state') not in ('queued', 'processing') and not item.get('knowledge_stale')):
+        item.update(state='baseline', reason='기존 참고 자료로 보관했습니다. 원문 읽기 상태와 수집기의 미확인 항목을 확인해 주세요.')
+
+
+def preserve_failed_read(existing, source):
+    """A temporary empty read cannot replace verified private source evidence."""
+    if not existing or source.get('extraction_status', 'parsed') in ('parsed', 'summary') or str(source.get('content') or '').strip():
+        return False
+    previous = existing.get('read_previous') if isinstance(existing.get('read_previous'), dict) else existing
+    knowledge = previous.get('knowledge') if isinstance(previous.get('knowledge'), dict) else {}
+    if not (previous.get('extraction_status') in ('parsed', 'summary') or knowledge.get('status') in ('parsed', 'summary') or knowledge.get('excerpts') or previous.get('candidates')):
+        return False
+    stale = (bool(existing.get('knowledge_stale')) or source_metadata(previous, indexed=True) != source_metadata(source)
+             or source.get('term_conflict') is True or source.get('extraction_status') == 'prior_term')
+    status = {'state': source.get('extraction_status', 'unreadable'), 'checked_at': stamp(),
+              'source_updated_at': source.get('updated_at'), 'stale': stale}
+    if stale:
+        failed_hash = digest({'unreadable_revision': source_metadata(source), 'previous_source_hash': previous['content_hash'],
+                              'term_conflict': bool(source.get('term_conflict') or source.get('extraction_status') == 'prior_term')})
+        if existing.get('content_hash') != failed_hash:
+            prior = deepcopy(previous)
+            for key in ('read_status', 'diagnostic', 'read_previous', 'knowledge_stale'):
+                prior.pop(key, None)
+            existing.update(read_previous=prior, content_hash=failed_hash, notice_hash=failed_hash,
+                            title=source.get('title'), source_kind=source.get('kind'), updated_at=source.get('updated_at'),
+                            state='needs_review', candidates=[], first_seen_at=stamp(), notify=True,
+                            reason='원문 정보가 변경됐지만 최신 내용을 읽지 못했습니다. 학교 원문을 확인해 주세요.')
+            existing.pop('review', None)
+        old_knowledge = deepcopy(previous.get('knowledge', {'version': 2, 'excerpts': []}))
+        old_knowledge.update(status=status['state'], incomplete=True,
+                             excerpts=[STALE_SOURCE_WARNING, *old_knowledge.get('excerpts', [])])
+        existing.update(knowledge=old_knowledge, knowledge_stale=True)
+    existing['read_status'] = status
+    existing['diagnostic'] = ('최신 원문 읽기에 실패하여 이전 자료를 참고용으로만 보존했습니다.' if stale
+                              else '이번 원문 읽기를 완료하지 못해 마지막으로 확인한 자료와 처리 상태를 보존했습니다.')
+    return True
 
 
 def transient(error):
@@ -171,6 +220,16 @@ class Importer:
             checkpoint = self.index['collectors'].get(collector, {}).get('last_checked')
             for source in result.get('sources', []):
                 existing = items.get(source['id'])
+                if preserve_failed_read(existing, source):
+                    continue  # Never overwrite the last successful private raw source.
+                if existing and source.get('extraction_status', 'parsed') in ('parsed', 'summary'):
+                    previous = existing.get('read_previous')
+                    if isinstance(previous, dict) and previous.get('content_hash') == source['content_hash']:
+                        existing = deepcopy(previous)
+                        existing['updated_at'] = source.get('updated_at')
+                        items[source['id']] = existing
+                    for flag in ('read_status', 'diagnostic', 'read_previous', 'knowledge_stale'):
+                        existing.pop(flag, None)
                 same_version = bool(existing and existing['content_hash'] == source['content_hash'])
                 raw_hash = source.get('raw_content_hash') or source.get('file_hash')
                 old_raw_hash = (existing or {}).get('raw_content_hash')
@@ -181,6 +240,7 @@ class Importer:
                     same_version and existing.get('analysis_version') != ANALYSIS_VERSION or
                     parser_changed and (raw_hash and raw_hash == old_raw_hash or legacy_parser)))
                 if same_version and not upgrading:
+                    reference_history(existing, source)
                     continue
                 queued = bool(existing and existing.get('review', {}).get('state') in ('queued', 'processing')
                               and existing['review'].get('source_hash') == existing['content_hash'])
@@ -194,12 +254,18 @@ class Importer:
                 known[source['id']] = source['content_hash']
                 candidates = [prepare(candidate, events, self.config) for candidate in extract_candidates(source, self.config)]
                 historical = source.get('historical_import') is True
+                # External PDFs often have no updated timestamp. A changed
+                # verified file body is still a new notice, even when its
+                # metadata continues to look like an initial historical import.
+                changed_body = bool(existing and raw_hash and old_raw_hash and raw_hash != old_raw_hash and not upgrading)
                 if not existing and collector == 'etl' and source.get('kind') in ('etl_file', 'etl_external_file', 'etl_page', 'etl_module', 'etl_syllabus') and checkpoint:
                     try:
                         historical |= (datetime.fromisoformat(source['updated_at'].replace('Z', '+00:00'))
                                        <= datetime.fromisoformat(checkpoint.replace('Z', '+00:00')))
                     except (ValueError, TypeError, KeyError):
                         historical = True  # Unknown old-file timestamps are never automatic changes.
+                if changed_body:
+                    historical = False
                 initial_review = bool(first_etl or historical or upgrading or (existing and existing.get('initial_review')
                                                    and existing.get('state') != 'applied'))
                 if initial_review:
@@ -255,6 +321,8 @@ class Importer:
                 if not first_local:
                     # Raw source is private, never copied to public event notes.
                     extra['school/sources/' + source['id'] + '.json'] = json.dumps(source, ensure_ascii=False) + '\n'
+                if not existing or upgrading:
+                    reference_history(item, source)
                 items[item['id']] = item
             previous = self.index['collectors'].get(collector, {})
             self.index['collectors'][collector] = {
@@ -399,6 +467,16 @@ def run_once(config, local_root=None, *, collect=True, github=None, token=None, 
                 results['local'] = collect_local(local_root, config)
         importer.stage = 'acquire'
         importer.acquire()
+        if collect:
+            # A known changed-but-unreadable revision invalidates an older
+            # queued approval before it can publish stale candidates.
+            items = {item['id']: item for item in importer.index['items']}
+            changed = False
+            for result in results.values():
+                for source in result.get('sources', []):
+                    changed = preserve_failed_read(items.get(source['id']), source) or changed
+            if changed:
+                importer.save_index()
         importer.decisions()
         if collect:
             importer.stage = 'consume'

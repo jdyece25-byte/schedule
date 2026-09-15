@@ -27,6 +27,17 @@ function fixture(handler = () => response(404), options = {}) {
   return {client, root, calls, store, uuids: () => uuids};
 }
 const puts = f => f.calls.filter(call => call.init.method === 'PUT');
+test('private knowledge is escaped and stale reference data remains visibly incomplete', () => {
+  const html = noticeHTML({...item, state: 'baseline', candidates: [],
+    read_status: {state: 'download_failed', stale: true},
+    knowledge: {incomplete: true, excerpts: ['<img src=x onerror=alert(1)>', '9/16 수요일 특강']}}, 0, null, true);
+  assert.match(html, /최신 원문을 읽지 못했습니다/);
+  assert.match(html, /읽은 학사 규칙/);
+  assert.match(html, /일부 발췌/);
+  assert.match(html, /&lt;img/);
+  assert.doesNotMatch(html, /<img/);
+  assert.doesNotMatch(html, /data-school-action="approve"/);
+});
 const decisionBody = call => JSON.parse(Buffer.from(JSON.parse(call.init.body).content, 'base64').toString('utf8'));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function deferred() { let resolve; const promise = new Promise(done => {resolve = done;}); return {promise, resolve}; }
