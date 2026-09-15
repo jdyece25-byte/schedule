@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlsplit
 import zipfile
 
 from src.school.sources import (CollectionError, collect_etl, collect_local, normalized_source,
-                                safe_source_url, validated_origin)
+                                safe_source_url, validated_origin, _pages)
 
 CONFIG = {"term": {"start": "2026-09-01", "end": "2026-12-31"},
           "courses": [{"key": "writing", "name": "대학 글쓰기 1", "folder": "대글1",
@@ -162,6 +162,87 @@ class ApiSourceTests(unittest.TestCase):
         def denied(url, headers):
             raise CollectionError("auth_required")
         self.assertEqual(collect_etl(CONFIG, token="test", fetch=denied)["status"], "auth_required")
+
+    def test_canvas_opaque_cursor_and_json_links_can_omit_original_filters(self):
+        origin = CONFIG["etl"]["base_url"]
+        for suffix in (".json?page=opaque_2-a", "?cursor=YXNkOmFiYw%3D%3D",
+                       "?bookmark=next-page", "?opaqueContinuation_2-a"):
+            with self.subTest(suffix=suffix):
+                calls = []
+                next_url = origin + "/api/v1/courses" + suffix
+                def fetch(url, headers):
+                    calls.append(url)
+                    if len(calls) == 1:
+                        return [{"id": 1}], {"Link": '<' + next_url + '>; rel="next"'}
+                    return [{"id": 2}], {}
+                result = _pages(origin, "/api/v1/courses", {"per_page": 100, "include[]": "term"},
+                                "synthetic", fetch)
+                self.assertEqual(result, [{"id": 1}, {"id": 2}])
+                self.assertEqual(calls[1], next_url)
+
+    def test_pagination_rejects_context_changes_metadata_expansion_and_unbounded_cursors(self):
+        origin = CONFIG["etl"]["base_url"]
+        params = {"per_page": 100, "context_codes[]": "course_123", "start_date": "2026-09-01"}
+        unsafe = ["?context_codes[]=course_999&page=2", "?start_date=2025-09-01&page=2",
+                  "?include[]=students&page=2", "?include[]=term&page=2",
+                  "?access_token=synthetic&page=2", "?as_user_id=123&page=2",
+                  "?page=a&page=b", "?page=a%0Ab", "?cursor=" + "x" * 2049,
+                  "?page=2#fragment", ".json/../users?page=2", "?grades", "?access_token"]
+        for suffix in unsafe:
+            with self.subTest(suffix=suffix[:80]):
+                calls = []
+                def fetch(url, headers):
+                    calls.append(url)
+                    return [], {"Link": '<' + origin + '/api/v1/announcements' + suffix + '>; rel="next"'}
+                with self.assertRaises(CollectionError) as caught:
+                    _pages(origin, "/api/v1/announcements", params, "synthetic", fetch)
+                self.assertEqual(caught.exception.code, "unsafe_pagination")
+                self.assertEqual(len(calls), 1)
+
+    def test_original_include_values_cannot_expand_or_change_on_next_page(self):
+        origin = CONFIG["etl"]["base_url"]
+        for query in ("include[]=students", "include[]=term&include[]=students", "per_page=500"):
+            calls = []
+            def fetch(url, headers):
+                calls.append(url)
+                return [], {"Link": '<' + origin + '/api/v1/courses?' + query + '&page=opaque>; rel="next"'}
+            with self.subTest(query=query), self.assertRaises(CollectionError):
+                _pages(origin, "/api/v1/courses", {"per_page": 100, "include[]": "term"}, "synthetic", fetch)
+            self.assertEqual(len(calls), 1)
+
+    def test_korean_academic_year_labels_and_safe_catalog_name_wrappers(self):
+        for term_name in ("2026학년도 2학기", "2026학년도 제2학기", "2026년 제 2 학기"):
+            for name in ("[2026-2] 대학 글쓰기 1 (043)",
+                         "(2026학년도 제2학기) 대학 글쓰기 1 [043]",
+                         "대학 글쓰기 1 (430.447-001)"):
+                with self.subTest(term=term_name, name=name):
+                    self.catalog = [{"id": 123, "name": name, "term": {"name": term_name}}]
+                    result = collect_etl(CONFIG, token="synthetic", fetch=self.fetch)
+                    self.assertEqual(result["status"], "ok")
+                    self.assertEqual(result["courses"], [{"key": "writing", "canvas_id": "123"}])
+
+    def test_original_name_is_used_when_canvas_name_is_a_nickname(self):
+        self.catalog = [{"id": 123, "name": "나의 글쓰기", "original_name": "[2026-2] 대학 글쓰기 1 (043)",
+                         "term": {"name": "Default Term", "start_at": None, "end_at": None}}]
+        self.assertEqual(collect_etl(CONFIG, token="synthetic", fetch=self.fetch)["status"], "ok")
+
+    def test_term_evidence_is_required_and_conflicting_title_semester_is_rejected(self):
+        cases = [
+            {"name": "대학 글쓰기 1", "term": {"name": "Default Term", "start_at": None, "end_at": None}},
+            {"name": "[2026-1] 대학 글쓰기 1", "term": {"name": "2026학년도 제2학기"}},
+            {"name": "대학 글쓰기 1", "original_name": "[2025-2] 대학 글쓰기 1", "term": {"name": "2026-2"}},
+            {"name": "대학 글쓰기 1", "course_code": "2025-2-writing", "term": {"name": "2026-2"}},
+            {"name": "대학 글쓰기 1 (심화)", "term": {"name": "2026-2"}},
+            {"name": "[기초] 대학 글쓰기 1", "term": {"name": "2026-2"}},
+        ]
+        for item in cases:
+            with self.subTest(item=item):
+                self.calls.clear()
+                self.catalog = [dict(item, id=123)]
+                result = collect_etl(CONFIG, token="synthetic", fetch=self.fetch)
+                self.assertEqual(result["sources"], [])
+                self.assertEqual(result["courses"], [])
+                self.assertEqual(len(self.calls), 1)
 
     def test_malformed_notice_does_not_hide_other_valid_notices(self):
         original = self.fetch

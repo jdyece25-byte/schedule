@@ -314,15 +314,31 @@ def _fetch(url, headers):
 
 def _pages(origin, path, params, token, fetch):
     url = origin + path + "?" + urllib.parse.urlencode(params, doseq=True)
-    base_params = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+    base_params = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query, keep_blank_values=True)
+    approved_path = path.removesuffix(".json")
+    cursor_keys = {"page", "cursor", "after", "before", "bookmark", "offset", "start_key",
+                   "page_token", "pagination_token", "continuation_token", "next_page"}
     seen, result = set(), []
     for _ in range(MAX_PAGES):
         parts = urllib.parse.urlsplit(url)
-        query = urllib.parse.parse_qs(parts.query)
-        if (validated_origin(parts.scheme + "://" + parts.netloc) != origin or parts.path != path
-                or parts.fragment or set(query) - (set(base_params) | {"page"})
-                or any(query.get(key) != value for key, value in base_params.items())
-                or ("page" in query and (len(query["page"]) != 1 or not query["page"][0].isdigit()))):
+        query = urllib.parse.parse_qs(parts.query, keep_blank_values=True)
+        # Canvas says Link URLs are opaque; cursors need not be page numbers and
+        # a canonical link can omit original filters or append .json. Keep auth
+        # on this original endpoint, and reject scope/metadata expansion.
+        bare_cursor = bool(parts.query and "=" not in parts.query and "&" not in parts.query
+                           and re.fullmatch(r"[A-Za-z0-9_-]{1,2048}", parts.query)
+                           and parts.query.casefold() not in
+                           {"access_token", "token", "authorization", "include", "students", "grades",
+                            "enrollments", "context_codes", "as_user_id"})
+        unknown = set(query) - set(base_params) - cursor_keys
+        invalid_query = (not bare_cursor and bool(unknown))
+        invalid_query = invalid_query or any(query[key] != value for key, value in base_params.items() if key in query)
+        invalid_query = invalid_query or any(len(query[key]) != 1 or len(query[key][0]) > 2048
+                                             or any(ord(character) < 32 or ord(character) == 127 for character in query[key][0])
+                                             for key in cursor_keys if key in query)
+        if (validated_origin(parts.scheme + "://" + parts.netloc) != origin
+                or parts.path not in {approved_path, approved_path + ".json"}
+                or parts.fragment or len(parts.query) > 8192 or len(query) > 20 or invalid_query):
             raise CollectionError("unsafe_pagination")
         if url in seen:
             raise CollectionError("pagination_loop")
@@ -341,20 +357,43 @@ def _pages(origin, path, params, token, fetch):
     raise CollectionError("api_page_limit")
 
 
+_TERM_LABEL = re.compile(r"(?<!\d)(20\d{2})(?:\s*(?:학)?년(?:도)?\s*|\s*[-_/]\s*|\s+)"
+                         r"(?:제\s*)?([12])\s*(?:학기)?(?!\d)")
+_ENGLISH_TERM = re.compile(r"(?<!\d)(20\d{2})\s*(?:[-_/]\s*)?(spring|fall|autumn)\b", re.I)
+
+
+def _source_terms(value):
+    text = str(value or "")
+    terms = {(int(year), int(semester)) for year, semester in _TERM_LABEL.findall(text)}
+    terms.update((int(year), 1 if semester.casefold() == "spring" else 2)
+                 for year, semester in _ENGLISH_TERM.findall(text))
+    return terms
+
+
 def _name(value):
-    # Only remove a plain section number, not arbitrary parenthesized course names.
-    value = re.sub(r"\s*[([]\s*\d{1,4}\s*[)\]]\s*$", "", str(value))
+    value = str(value)
+    prefix = re.match(r"^\s*(?:\[([^\]]+)\]|\(([^)]+)\))\s*[-_:]?\s*", value)
+    if prefix:
+        label = next(group for group in prefix.groups() if group is not None).strip()
+        if _TERM_LABEL.fullmatch(label) or _ENGLISH_TERM.fullmatch(label):
+            value = value[prefix.end():]
+    # Known SNU catalog format, e.g. 430.447-001, or a plain section number.
+    # Never strip descriptive parentheses such as '(심화)' or another subject.
+    code = r"(?:\d{1,4}|\d{3}\.\d{3}-\d{3})"
+    value = re.sub(rf"\s*(?:\(\s*{code}\s*\)|\[\s*{code}\s*\])\s*$", "", value)
     return re.sub(r"[\s._·-]+", "", value).casefold()
 
 
 def _term_matches(item, term):
     start, end = date.fromisoformat(term["start"]), date.fromisoformat(term["end"])
     details = item.get("term") if isinstance(item.get("term"), dict) else {}
-    name = str(details.get("name", ""))
     semester = 1 if start.month < 7 else 2
-    if re.search(rf"{start.year}\s*(?:년(?:도)?\s*)?[-_/ ]?\s*{semester}\s*(?:학기)?(?:\D|$)", name):
-        return True
-    if str(start.year) in name and ("spring" if semester == 1 else "fall") in name.lower():
+    labels = set().union(*(_source_terms(value) for value in
+                          (details.get("name"), item.get("name"), item.get("original_name"), item.get("course_code"))))
+    expected = (start.year, semester)
+    if labels - {expected}:
+        return False  # Contradictory explicit labels must never select an old class.
+    if expected in labels:
         return True
     for candidate in (details, item):
         try:
@@ -387,6 +426,26 @@ def _api_source(origin, kind, key, course_id, item):
     return source
 
 
+def probe_etl(config, token, fetch=None):
+    """Verify identity independently of enrollment filters; never retain profile data."""
+    if not isinstance(token, str) or not token.strip():
+        return {"status": "auth_required", "issues": [{"code": "auth_required"}]}
+    try:
+        origin = validated_origin(config.get("etl", {}).get("base_url", DEFAULT_ETL_URL))
+        profile, _ = (fetch or _fetch)(origin + "/api/v1/users/self/profile",
+                                      {"Authorization": "Bearer " + token, "Accept": "application/json"})
+        identifier = profile.get("id") if isinstance(profile, dict) else None
+        if (isinstance(identifier, bool) or not isinstance(identifier, (str, int))
+                or not str(identifier).isdigit() or int(identifier) <= 0):
+            raise CollectionError("invalid_api_shape")
+        return {"status": "ok", "issues": []}
+    except CollectionError as error:
+        return {"status": "auth_required" if error.code == "auth_required" else "error",
+                "issues": [{"code": error.code}]}
+    except Exception:
+        return {"status": "error", "issues": [{"code": "api_unavailable"}]}
+
+
 def collect_etl(config, token=None, fetch=None):
     result = {"status": "ok", "sources": [], "issues": [], "courses": []}
     remaining_text_bytes = MAX_TOTAL_TEXT_BYTES
@@ -401,7 +460,8 @@ def collect_etl(config, token=None, fetch=None):
                          "enrollment_state": "active", "include[]": "term"}, token, fetch)
         for course in config.get("courses", []):
             aliases = {_name(value) for value in [course["name"], *course.get("aliases", [])]}
-            matches = [item for item in catalog if _name(item.get("name", "")) in aliases
+            matches = [item for item in catalog if any(_name(item.get(field, "")) in aliases
+                                                      for field in ("name", "original_name"))
                        and _term_matches(item, config["term"])
                        and (course.get("canvas_id") is None or str(item.get("id")) == str(course["canvas_id"]))]
             if len(matches) != 1 or not str(matches[0].get("id", "")).isdigit():

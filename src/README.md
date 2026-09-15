@@ -210,3 +210,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File src/school/install.ps1 -Loca
 ```
 
 PC용 인증은 현재 Windows 계정으로 암호화한 `etl.dpapi`에 저장합니다. 토큰·쿠키·학교 자료 원문·실제 개인 폴더 경로는 공개 저장소에 넣지 않습니다. 비공개 저장소의 `school/index.json`은 확인 목록, `school/sources/`는 수집 원문, `school/decisions/`는 변경하지 않는 확인 요청, `school/decision-results/`는 처리 결과입니다. 공개 DB에는 검증된 일정과 필요한 출처 식별값만 남깁니다. 원문 해시나 대상 일정이 달라지면 변경을 강행하지 않고 다시 확인하도록 합니다.
+
+연결 명령은 **토큰 인증**과 **학기·과목 연결**을 따로 검사합니다. `Authentication: ok`인데 `Matched courses: 0`이면 인증은 성공했고 과목 이름·학기 설정을 확인해야 합니다. 검증된 토큰은 이 경우에도 암호화 저장하여 재입력 없이 과목 설정을 보완할 수 있습니다. 인증 실패는 기존 연결을 덮어쓰지 않습니다. 안전한 오류 코드와 건수만 `%LOCALAPPDATA%/ScheduleSchool/diagnostic.json`에 남기며, 토큰·프로필·공지 원문은 진단 파일에 기록하지 않습니다. `Collection connected.`와 수집 결과를 확인하기 전까지 새 공지를 실제로 읽었다고 간주하지 않습니다.
