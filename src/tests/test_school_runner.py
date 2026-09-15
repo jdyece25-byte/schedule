@@ -110,6 +110,43 @@ class SchoolRunnerTests(unittest.TestCase):
     def setUp(self):
         self.github = MemoryGitHub()
 
+    def test_release_retries_unrelated_branch_heartbeat_conflict(self):
+        importer = self.importer()
+        def concurrent(repo, base, files):
+            if repo == QUEUE and LEASE in files:
+                self.github.before_commit = None
+                self.github.seed(QUEUE, 'worker-heartbeat.json', {'state': 'online'})
+        self.github.before_commit = concurrent
+        with patch('src.school.runner.time.sleep') as sleep:
+            importer.release()
+        self.assertIsNone(self.github.read_json(QUEUE, LEASE)[0]['owner'])
+        self.assertEqual(self.github.read_json(QUEUE, 'worker-heartbeat.json')[0], {'state': 'online'})
+        self.assertEqual(sleep.call_count, 1)
+        self.assertIsNone(importer.lease_sha)
+
+    def test_release_lost_response_observes_cleared_owner_as_success(self):
+        importer = self.importer()
+        before = len(self.github.commits)
+        self.github.lose_response_for = QUEUE
+        with patch('src.school.runner.time.sleep'):
+            importer.release()
+        self.assertIsNone(self.github.read_json(QUEUE, LEASE)[0]['owner'])
+        self.assertEqual(len(self.github.commits), before + 1)
+        self.assertIsNone(importer.lease_sha)
+
+    def test_release_retry_never_clears_a_successor_owner(self):
+        importer = self.importer()
+        successor = {'owner': 'new-collector', 'until': '2099-01-01T00:00:00Z'}
+        def concurrent(repo, base, files):
+            if repo == QUEUE and LEASE in files:
+                self.github.before_commit = None
+                self.github.seed(QUEUE, LEASE, successor)
+        self.github.before_commit = concurrent
+        with patch('src.school.runner.time.sleep'):
+            importer.release()
+        self.assertEqual(self.github.read_json(QUEUE, LEASE)[0], successor)
+        self.assertIsNone(importer.lease_sha)
+
     def importer(self, **kwargs):
         importer = Importer(self.github, CONFIG, **kwargs)
         importer.acquire()

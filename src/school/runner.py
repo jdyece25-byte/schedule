@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import time
 import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -143,10 +144,31 @@ class Importer:
             message='Renew school notice synchronization')
 
     def release(self):
-        lease, sha = self.api.read_json(self.queue, LEASE)
-        if lease and lease.get('owner') == self.owner:
-            self.api.put_json(self.queue, LEASE, {'owner': None, 'until': stamp()}, sha,
-                              message='Complete school notice synchronization')
+        last_error = None
+        for attempt in range(5):
+            try:
+                # Contents writes can conflict with unrelated branch commits.
+                # Always reread ownership/SHA; never clear a successor's lease.
+                lease, sha = self.api.read_json(self.queue, LEASE)
+                if not lease or lease.get('owner') != self.owner:
+                    self.lease_sha = None
+                    return
+                self.api.put_json(self.queue, LEASE, {'owner': None, 'until': stamp()}, sha,
+                                  message='Complete school notice synchronization')
+                self.lease_sha = None
+                return
+            except GitHubError as error:
+                if error.status not in (0, 409, 422):
+                    raise
+                last_error = error
+                if attempt < 4:
+                    time.sleep(.1 * 2 ** attempt)
+        # The final PUT may have succeeded with only its response lost.
+        lease, _ = self.api.read_json(self.queue, LEASE)
+        if not lease or lease.get('owner') != self.owner:
+            self.lease_sha = None
+            return
+        raise last_error
 
     def save_index(self, extra=None):
         self.renew()
