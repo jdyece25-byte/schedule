@@ -46,7 +46,7 @@ def preserve_failed_read(existing, source):
         return False
     previous = existing.get('read_previous') if isinstance(existing.get('read_previous'), dict) else existing
     knowledge = previous.get('knowledge') if isinstance(previous.get('knowledge'), dict) else {}
-    if not (previous.get('extraction_status') in ('parsed', 'summary') or knowledge.get('status') in ('parsed', 'summary') or knowledge.get('excerpts') or previous.get('candidates')):
+    if not (previous.get('extraction_status') in ('parsed', 'summary', 'no_text', 'truncated', 'partial_document') or knowledge.get('status') in ('parsed', 'summary') or knowledge.get('excerpts') or previous.get('candidates')):
         return False
     stale = (bool(existing.get('knowledge_stale')) or source_metadata(previous, indexed=True) != source_metadata(source)
              or source.get('term_conflict') is True or source.get('extraction_status') == 'prior_term')
@@ -257,7 +257,8 @@ class Importer:
                 # External PDFs often have no updated timestamp. A changed
                 # verified file body is still a new notice, even when its
                 # metadata continues to look like an initial historical import.
-                changed_body = bool(existing and raw_hash and old_raw_hash and raw_hash != old_raw_hash and not upgrading)
+                verified_body = bool(source.get('file_hash') or str(source.get('content') or '').strip())
+                changed_body = bool(existing and verified_body and raw_hash and old_raw_hash and raw_hash != old_raw_hash and not upgrading)
                 if not existing and collector == 'etl' and source.get('kind') in ('etl_file', 'etl_external_file', 'etl_page', 'etl_module', 'etl_syllabus') and checkpoint:
                     try:
                         historical |= (datetime.fromisoformat(source['updated_at'].replace('Z', '+00:00'))

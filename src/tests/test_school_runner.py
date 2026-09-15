@@ -673,6 +673,22 @@ class SchoolRunnerTests(unittest.TestCase):
         importer.consume({'etl': result(changed)})
         self.assertEqual(current['state'], 'info')
 
+    def test_inspected_image_pdf_is_not_a_new_notice_when_cloud_download_budget_is_empty(self):
+        importer = self.importer(inbox_only=True)
+        importer.index['collectors']['etl'] = {'initialized': True}
+        inspected = source(kind='etl_file', content='', extraction_status='no_text', historical_import=True,
+                           extraction_version=5, raw_content_hash='verified-file-bytes', file_hash='verified-file-bytes')
+        importer.consume({'etl': result(inspected, status='partial')})
+        before = deepcopy(importer.index['items'][0])
+        failed = {**inspected, 'content_hash':'failed-budget', 'raw_content_hash':'hash-of-empty-content', 'extraction_status':'download_budget'}
+        failed.pop('file_hash')
+        importer.consume({'etl': result(failed, status='partial')})
+        current = importer.index['items'][0]
+        self.assertEqual(current['content_hash'], before['content_hash'])
+        self.assertEqual(current['state'], 'baseline')
+        self.assertFalse(current['notify'])
+        self.assertFalse(current['read_status']['stale'])
+
 
 if __name__ == "__main__":
     unittest.main()
