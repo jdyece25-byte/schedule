@@ -72,7 +72,8 @@
     "sindorim-helios": 70,
     "helios-sindorim": 70,
     "hantistation-helios": 30,
-    "helios-hantistation": 30
+    "helios-hantistation": 30,
+    "snu38-snu83": 20
   },
   "modes": {
     "skycastle-lagom": "도보",
