@@ -172,6 +172,7 @@ class SchoolRunnerTests(unittest.TestCase):
 
     def test_cloud_inbox_marks_ready_without_public_writes_then_pc_applies_once(self):
         cloud = self.importer(inbox_only=True)
+        cloud.index['collectors']['etl'] = {'initialized': True}
         cloud.consume({"etl": result(source())})
         self.assertEqual(cloud.index["items"][0]["state"], "ready")
         cloud.ready()
@@ -188,6 +189,24 @@ class SchoolRunnerTests(unittest.TestCase):
         self.assertEqual(len(self.github.public_commits()), 1)
         public_text = "\n".join(self.github.public_commits()[0]["files"].values())
         self.assertNotIn("과제 안내", public_text)
+
+    def test_first_etl_connection_keeps_existing_schedule_and_reviews_imported_deadlines(self):
+        importer = self.importer()
+        initial = source()
+        importer.consume({'etl': result(initial)})
+        item = importer.index['items'][0]
+        self.assertEqual(item['state'], 'needs_review')
+        self.assertTrue(item['initial_review'])
+        self.assertFalse(item['notify'])
+        self.assertFalse(item['candidates'][0]['auto_eligible'])
+        importer.ready()
+        changed = deepcopy(initial)
+        changed['content_hash'] = 'new-initial-source-version'
+        importer.consume({'etl': result(changed)})
+        self.assertFalse(importer.index['items'][0]['candidates'][0]['auto_eligible'])
+        self.assertTrue(importer.index['items'][0]['notify'])
+        self.assertEqual(self.github.public_commits(), [])
+        self.assertEqual(self.github.read_json(TARGET, 'DB/events.json')[0], [KEEP])
 
     def test_stale_source_hash_approval_is_rejected_without_db_change(self):
         item = self.make_review_item()
@@ -241,6 +260,7 @@ class SchoolRunnerTests(unittest.TestCase):
 
     def test_public_commit_response_loss_recovers_receipt_without_duplicate_event(self):
         importer = self.importer()
+        importer.index['collectors']['etl'] = {'initialized': True}
         self.github.lose_response_for = TARGET
         importer.consume({"etl": result(source())})
         self.assertEqual(importer.index["items"][0]["state"], "applied")

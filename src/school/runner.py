@@ -137,6 +137,7 @@ class Importer:
         events, _ = self.api.read_json(self.target, 'DB/events.json', self.api.head(self.target))
         for collector, result in results.items():
             first_local = collector == 'local' and not self.index['collectors'].get('local', {}).get('initialized')
+            first_etl = collector == 'etl' and not self.index['collectors'].get('etl', {}).get('initialized')
             for source in result.get('sources', []):
                 existing = items.get(source['id'])
                 if existing and existing['content_hash'] == source['content_hash']:
@@ -145,12 +146,21 @@ class Importer:
                     continue
                 known[source['id']] = source['content_hash']
                 candidates = [prepare(candidate, events, self.config) for candidate in extract_candidates(source, self.config)]
+                initial_review = bool(first_etl or (existing and existing.get('initial_review')
+                                                   and existing.get('state') != 'applied'))
+                if initial_review:
+                    for candidate in candidates:
+                        if candidate.get('auto_eligible'):
+                            candidate.update(auto_eligible=False, confidence='review',
+                                             reason='최초 연결 자료입니다. 기존 일정에 반영되었거나 이미 지난 과제인지 확인해 주세요.')
                 definition = next((c for c in self.config['courses'] if c['key'] == source['course']), {})
                 item = {'id': source['id'], 'content_hash': source['content_hash'],
                         'course': definition.get('name', source['course']), 'course_key': source['course'],
                         'title': source['title'], 'source_url': source.get('source_url', ''),
                         'source_kind': source['kind'], 'updated_at': source['updated_at'],
                         'first_seen_at': stamp(), 'candidates': candidates, 'event_ids': [],
+                        'initial_review': initial_review,
+                        'notify': not first_etl,
                         'state': 'needs_review' if candidates else 'info',
                         'reason': '원문과 날짜를 확인한 뒤 선택한 일정만 적용하세요.' if candidates else '새 자료·공지입니다. 내용을 확인해 주세요.',
                         'extraction_status': source.get('extraction_status', 'parsed')}

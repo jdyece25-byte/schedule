@@ -398,6 +398,12 @@ class EndpointTests(unittest.TestCase):
 
 
 class SchoolNoticeTests(unittest.TestCase):
+    def test_initial_import_is_visible_for_review_without_replaying_phone_alerts(self):
+        item = school_item(notify=False)
+        self.assertEqual(self.notices([item]), [])
+        item.update(notify=True, content_hash='changed-after-first-connection')
+        self.assertEqual(len(self.notices([item])), 1)
+
     def notices(self, items=None, now=None):
         return schedule.school_notices({"version": 1, "items": [school_item()] if items is None else items}, now or at())
 

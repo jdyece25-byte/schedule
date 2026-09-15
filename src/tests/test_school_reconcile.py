@@ -106,6 +106,42 @@ class ReconcileTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.apply([existing(d="2026-09-21")], [prepared], approved=True)
 
+    def test_short_api_title_at_same_course_deadline_slot_requires_review_without_linking(self):
+        original = existing(n="논설 HW1 온라인 퀴즈 마감")
+        before = deepcopy(original)
+        prepared = prepare(candidate(), [original], CONFIG)
+        self.assertEqual(prepared["action"], "add")
+        self.assertFalse(prepared["auto_eligible"])
+        self.assertNotIn("target_id", prepared)
+        with self.assertRaises(ValueError):
+            self.apply([original], [prepared])
+        self.assertEqual(original, before)
+
+    def test_deadline_exam_type_difference_does_not_bypass_same_course_slot_review(self):
+        original = existing(n="논설 온라인 퀴즈", t="exam")
+        prepared = prepare(candidate(), [original], CONFIG)
+        self.assertFalse(prepared["auto_eligible"])
+        self.assertNotIn("target_id", prepared)
+
+    def test_different_known_time_or_course_does_not_block_distinct_title_auto_add(self):
+        for original in (existing(n="논설 HW2 제출", s=1320), existing(n="기전 HW2 제출")):
+            prepared = prepare(candidate(), [original], CONFIG)
+            self.assertEqual(prepared["action"], "add")
+            self.assertTrue(prepared["auto_eligible"])
+            result, _ = self.apply([original], [prepared])
+            self.assertEqual(len(result), 2)
+
+    def test_concurrent_same_course_slot_add_is_rechecked_before_auto_apply(self):
+        prepared = prepare(candidate(), [], CONFIG)
+        original = existing(n="논설 HW2 제출")
+        with self.assertRaises(ValueError):
+            self.apply([original], [prepared])
+        # The owner may explicitly confirm two distinct assignments with the
+        # same deadline. This never changes the established event's ID/data.
+        result, _ = self.apply([original], [prepared], approved=True)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], original)
+
     def test_repreparing_discards_stale_target_fields(self):
         prepared = prepare(candidate(target_id="unrelated", target_hash="oldhash"), [], CONFIG)
         self.assertEqual(prepared["action"], "add")

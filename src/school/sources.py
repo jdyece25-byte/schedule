@@ -372,6 +372,10 @@ def _source_terms(value):
 
 def _name(value):
     value = str(value)
+    # SNU's actual course catalog prefixes names with an unbracketed '2026-2 '.
+    # Require the whitespace boundary; the original label remains available to
+    # _term_matches, so stripping it cannot opt an old semester into this term.
+    value = re.sub(r"^\s*20\d{2}-[12]\s+", "", value)
     prefix = re.match(r"^\s*(?:\[([^\]]+)\]|\(([^)]+)\))\s*[-_:]?\s*", value)
     if prefix:
         label = next(group for group in prefix.groups() if group is not None).strip()

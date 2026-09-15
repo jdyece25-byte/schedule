@@ -97,6 +97,20 @@ def matching_item(event, expected, course, config, term=None):
     return (not limits or limits['start'] <= event.get('d', '') <= limits['end'])
 
 
+def same_course_slot(event, expected, course, config):
+    """An unmatched title at an existing deadline slot is ambiguous, not new.
+
+    API titles often omit a user's descriptive suffix, and a quiz may be
+    represented as either an exam or a deadline. Distinct items can share a
+    deadline, so this guard requires review rather than merging their IDs.
+    """
+    return (event.get('t') in ('deadline', 'exam')
+            and expected.get('t') in ('deadline', 'exam')
+            and event.get('d') == expected.get('d')
+            and event.get('s') == expected.get('s')
+            and belongs(event, course, config))
+
+
 def patch_event(target, event):
     updated = deepcopy(target)
     for key, value in event.items():
@@ -134,6 +148,9 @@ def prepare(candidate, events, config):
     if not matches:
         if value['action'] == 'delete':
             value.update(reason='휴강 대상 회차를 특정하지 못했습니다. 일정을 직접 확인해 주세요.')
+        elif any(same_course_slot(e, expected, value['course'], config) for e in events):
+            value.update(auto_eligible=False,
+                         reason='같은 과목·날짜·시각의 마감 또는 시험이 이미 있습니다. 별도 일정인지 확인해 주세요.')
         return value
     target = matches[0]
     value.update(target_id=target.get('id'), target_hash=event_hash(target),
@@ -218,6 +235,9 @@ def apply(events, candidates, source, *, approved=False, config=None):
         term = {'start': source['term_start'], 'end': source['term_end']}
         if any(e is not target and matching_item(e, updated, candidate['course'], config, term) for e in result):
             raise ValueError('기존 일정과 중복될 수 있습니다. 먼저 기존 회차를 확인해 주세요.')
+        if not approved and any(e is not target and same_course_slot(e, updated, candidate['course'], config)
+                                for e in result):
+            raise ValueError('같은 과목·날짜·시각의 기존 일정과 겹칩니다. 별도 일정인지 확인해 주세요.')
         updated['school'] = {'source_id': source['id'], 'candidate_id': candidate['id'],
                              'course': candidate['course'], 'source_hash': source['content_hash'],
                              'managed_hash': event_hash(updated)}

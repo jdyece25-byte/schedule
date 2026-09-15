@@ -226,6 +226,42 @@ class ApiSourceTests(unittest.TestCase):
                          "term": {"name": "Default Term", "start_at": None, "end_at": None}}]
         self.assertEqual(collect_etl(CONFIG, token="synthetic", fetch=self.fetch)["status"], "ok")
 
+    def test_actual_snu_bare_semester_prefix_matches_all_six_configured_subjects(self):
+        subjects = [
+            ("macro", "거시경제이론", "거시경제이론", "001"),
+            ("leadership", "공학도의 도전과 리더십 2", "공학도의 도전과 리더십 2", "001"),
+            ("em", "기초전자기학 및 연습", "기초전자기학 및 연습", "002"),
+            ("logic", "논리설계 및 실험", "논리설계 및 실험", "002"),
+            ("writing", "대학 글쓰기 1", "대학 글쓰기 1", "043"),
+            ("power", "전력시장이론", "Power System Economics", "001"),
+        ]
+        config = deepcopy(CONFIG)
+        config["courses"] = [{"key": key, "name": name, "aliases": [alias], "canvas_id": None}
+                             for key, name, alias, section in subjects]
+        self.catalog = []
+        for index, (_, _, alias, section) in enumerate(subjects, 123):
+            name = f"2026-2 {alias} ({section})"
+            self.catalog.append({"id": index, "name": name, "course_code": name,
+                                 "original_name": None, "term": {"name": "2026년 2학기"}})
+        result = collect_etl(config, token="synthetic", fetch=self.fetch)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["courses"], [{"key": subject[0], "canvas_id": str(index)}
+                                            for index, subject in enumerate(subjects, 123)])
+        self.assertEqual(len(result["sources"]), 18)
+
+    def test_bare_prefix_retains_semester_and_ambiguous_section_guards(self):
+        current = {"id": 123, "name": "2026-2 대학 글쓰기 1 (043)", "term": {"name": "2026년 2학기"}}
+        old = {"id": 100, "name": "2025-2 대학 글쓰기 1 (043)", "term": {"name": "2025년 2학기"}}
+        self.catalog = [old, current]
+        result = collect_etl(CONFIG, token="synthetic", fetch=self.fetch)
+        self.assertEqual(result["courses"], [{"key": "writing", "canvas_id": "123"}])
+        self.catalog = [dict(old, term={"name": "2026년 2학기"})]
+        self.assertEqual(collect_etl(CONFIG, token="synthetic", fetch=self.fetch)["courses"], [])
+        self.catalog = [current, dict(current, id=124, name="2026-2 대학 글쓰기 1 (044)")]
+        self.assertEqual(collect_etl(CONFIG, token="synthetic", fetch=self.fetch)["courses"], [])
+        self.catalog = [dict(current, name="2026-2대학 글쓰기 1 (043)")]
+        self.assertEqual(collect_etl(CONFIG, token="synthetic", fetch=self.fetch)["courses"], [])
+
     def test_term_evidence_is_required_and_conflicting_title_semester_is_rejected(self):
         cases = [
             {"name": "대학 글쓰기 1", "term": {"name": "Default Term", "start_at": None, "end_at": None}},

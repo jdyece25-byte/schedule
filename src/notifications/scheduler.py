@@ -182,6 +182,8 @@ def school_notices(index, now):
     for item in index["items"]:
         if not isinstance(item, dict) or item.get("state") not in ("needs_review", "info", "conflict", "ready"):
             continue
+        if item.get("notify") is False:
+            continue  # Initial connection imports existing notices without replaying alerts.
         identifier, content_hash, course = item.get("id"), item.get("content_hash"), item.get("course")
         if any(not isinstance(value, str) or not value.strip() or len(value) > 512
                for value in (identifier, content_hash, course)):
