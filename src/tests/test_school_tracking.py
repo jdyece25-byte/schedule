@@ -3,7 +3,7 @@ from copy import deepcopy
 from unittest.mock import Mock, patch
 import unittest
 
-from src.school.runner import INDEX, QUEUE, run_once, sync_item_status
+from src.school.runner import INDEX, QUEUE, TARGET, run_once, sync_item_status
 from src.tests import test_school_runner as fixtures
 from src.tests.test_school_runner import CONFIG, source, result
 
@@ -86,6 +86,15 @@ class TrackingTests(unittest.TestCase):
         # Its retry sees an unchanged archive and an older remote inbox.
         importer.consume({'etl': result(revised)}, {revised['id']: {'state': 'unchanged', 'changes': changes}})
         self.assertEqual(importer.index['items'][0]['changes'], changes)
+
+    def test_legacy_events_without_ids_do_not_block_collection_or_get_rewritten(self):
+        events, _ = self.github.read_json(TARGET, 'DB/events.json')
+        events.append({'d': '2026-09-16', 'n': '기존 수동 일정', 't': 'class', 's': 540, 'e': 615})
+        self.github.seed(TARGET, 'DB/events.json', events)
+        importer = self.importer()
+        self.import_source(importer, source())
+        self.assertEqual(self.github.read_json(TARGET, 'DB/events.json')[0], events)
+        self.assertEqual(len(importer.index['items']), 1)
 
 
 if __name__ == '__main__':

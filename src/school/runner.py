@@ -326,7 +326,7 @@ class Importer:
                 confirmed = bool((existing or {}).get('user_confirmed') or
                                  (existing or {}).get('review', {}).get('action') == 'approve' and
                                  (existing or {}).get('review', {}).get('state') == 'completed')
-                missing_prior = set(prior_ids) - {event['id'] for event in events}
+                missing_prior = set(prior_ids) - {event.get('id') for event in events}
                 if confirmed or missing_prior or queued:
                     for candidate in candidates:
                         candidate.update(auto_eligible=False, confidence='review',
