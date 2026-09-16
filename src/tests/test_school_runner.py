@@ -10,6 +10,7 @@ from src.bridge.github import GitHubError
 from src.school.reconcile import digest, prepare
 from src.school.runner import CollectorBusy, Importer, INDEX, LEASE, QUEUE, TARGET, run_once
 from src.school.sources import normalized_source
+from src.school.knowledge import ANALYSIS_VERSION
 
 
 CONFIG = {"term": {"start": "2026-09-01", "end": "2026-12-31"}, "courses": [
@@ -463,7 +464,7 @@ class SchoolRunnerTests(unittest.TestCase):
                     self.assertEqual(current['event_ids'], old['event_ids'])
                     self.assertEqual(current['review'], old['review'])
                     self.assertEqual(current['candidates'], [])
-                    self.assertEqual(current['analysis_version'], 2)
+                    self.assertEqual(current['analysis_version'], ANALYSIS_VERSION)
                     self.assertIn('excerpts', current['knowledge'])
                     self.assertTrue(current['notify'])  # Same-version migration preserves prior eligibility.
                     from src.notifications.scheduler import school_notices

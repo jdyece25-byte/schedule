@@ -40,6 +40,13 @@ def school(event):
     return value if isinstance(value, dict) else {}
 
 
+def user_confirmed(event):
+    # Approval is a durable choice, including when the owner edited a proposed
+    # time before accepting it. A matching managed_hash alone cannot distinguish
+    # that choice from an untouched, automatically imported API deadline.
+    return school(event).get('user_confirmed') is True or event.get('status') == 'confirmed'
+
+
 def belongs(event, course, config):
     owned_course = school(event).get('course')
     if owned_course:
@@ -176,6 +183,8 @@ def prepare(candidate, events, config):
     same_except_name = all(target.get(k) == proposed.get(k) for k in EDITABLE if k != 'n')
     if fields_equal or (same_except_name and not owned_matches):
         value.update(action='link', auto_eligible=False, reason='같은 일정이 이미 등록되어 있습니다.')
+    elif user_confirmed(target):
+        value.update(auto_eligible=False, reason='사용자가 확정한 일정과 다릅니다. 기존 내용을 보존하고 다시 확인을 기다립니다.')
     elif not owned_matches or school(target).get('managed_hash') != event_hash(target):
         value.update(auto_eligible=False, reason='기존 일정 또는 사용자가 수정한 내용과 다릅니다. 기존 내용을 보존하고 확인을 기다립니다.')
     if not owned_matches:
@@ -221,6 +230,10 @@ def apply(events, candidates, source, *, approved=False, config=None):
             if (config or school(target).get('course')) and not belongs(target, candidate.get('course'), config):
                 raise ValueError('다른 과목의 기존 일정을 변경할 수 없습니다.')
             if action == 'link':
+                if approved and owned(target, candidate, config):
+                    linked = deepcopy(target)
+                    linked['school']['user_confirmed'] = True
+                    result[result.index(target)] = linked
                 applied_ids.append(target['id'])
                 continue
             if action == 'delete':
@@ -229,7 +242,7 @@ def apply(events, candidates, source, *, approved=False, config=None):
                 result.remove(target)
                 applied_ids.append(target['id'])
                 continue
-            if not approved and (not owned(target, candidate, config)
+            if not approved and (user_confirmed(target) or not owned(target, candidate, config)
                                  or school(target).get('managed_hash') != event_hash(target)):
                 raise ValueError('기존 일정 또는 사용자가 수정한 일정은 확인 후 변경해야 합니다.')
             updated = patch_event(target, event)
@@ -255,6 +268,8 @@ def apply(events, candidates, source, *, approved=False, config=None):
         updated['school'] = {'source_id': source['id'], 'candidate_id': candidate['id'],
                              'course': candidate['course'], 'source_hash': source['content_hash'],
                              'managed_hash': event_hash(updated)}
+        if approved or target and user_confirmed(target):
+            updated['school']['user_confirmed'] = True
         if action == 'update':
             result[result.index(target)] = updated
         else:

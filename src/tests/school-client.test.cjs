@@ -107,6 +107,94 @@ test('missing index is collection pending; authentication-required and stale col
   assert.ok(!text.includes('credential detail'));
 });
 
+test('collector display separates recent partial attempts from full success and summarizes only safe issue labels', () => {
+  const complete = '2026-09-10T00:00:00Z', usable = '2026-09-13T04:00:00Z';
+  const report = {collectors: {etl: {state: 'partial', last_checked: NOW.toISOString(), last_success: usable,
+    last_complete_success: complete, last_usable_success: usable, source_count: 12, issue_count: 6,
+    issues: [{code: 'restricted'}, {code: 'no_text'}, {code: 'github_pat_PRIVATE', message: 'private body'}]}}};
+  const text = collectorText(report, NOW);
+  assert.match(text, /eTL: 일부 수집/); assert.match(text, /자료 12건/); assert.match(text, /누락·읽기 문제 6건/);
+  assert.match(text, /최근 시도: 9\. 14\./); assert.match(text, /마지막 전체 성공: 9\. 10\./);
+  assert.match(text, /마지막 자료 확보\(부분 포함\): 9\. 13\./); assert.match(text, /문제 내역\(일부\)/);
+  assert.match(text, /접근 제한 1건/); assert.match(text, /텍스트 없음 1건/); assert.match(text, /기타 수집·읽기 문제 1건/);
+  assert.doesNotMatch(text, /github_pat|private body/);
+  const legacy = collectorText({collectors: {etl: {state: 'partial', last_checked: NOW.toISOString(), last_success: usable}}}, NOW);
+  assert.match(legacy, /마지막 전체 성공: 확인 기록 없음/);
+  const explicitUnknown = collectorText({collectors: {etl: {state: 'ok', last_checked: NOW.toISOString(), last_success: usable, last_complete_success: null}}}, NOW);
+  assert.match(explicitUnknown, /마지막 전체 성공: 확인 기록 없음/);
+});
+
+test('API list coverage distinguishes an empty verified quiz list from inaccessible or partially collected lists', () => {
+  const report = {collectors: {etl: {state: 'partial', coverage: {api: {
+    mock: {announcements: {status: 'ok', count: 3, collected: 2, listing_complete: true, incomplete: true}, quizzes: {status: 'ok', count: 0, collected: 0, listing_complete: true, incomplete: false}},
+    other: {quizzes: {status: 'unavailable', count: 0, collected: 0, listing_complete: false, incomplete: true}}
+  }}}}};
+  const text = collectorText(report, NOW);
+  assert.match(text, /공지 2건\(목록 3건\) · 목록 확인 미완료/);
+  assert.match(text, /퀴즈 0건 · 목록 확인 미완료/);
+  delete report.collectors.etl.coverage.api.other;
+  assert.match(collectorText(report, NOW), /퀴즈 0건(?:\n|$)/);
+});
+
+test('local archive failures preserve the last known success and expose no machine path or raw error', () => {
+  const archive = {state: 'error', last_checked: NOW.toISOString(), last_success: '2026-09-13T00:00:00Z', error_type: 'C:/private/path/github_pat_SECRET'};
+  const text = collectorText({...index, local_archive: archive}, NOW);
+  assert.match(text, /PC 자료 보관 실패 · 다시 시도 중/); assert.match(text, /마지막 보관 성공: 9\. 13\./);
+  assert.doesNotMatch(text, /private|SECRET|github_pat/);
+  assert.match(collectorText({...index, local_archive: {...archive, state: 'ok'}}, NOW), /PC 자료 보관: 보관 완료/);
+});
+
+test('categorized academic evidence is displayed once with source lines and only for the matching source version', () => {
+  const text = '9월 20일 시험, 계산기를 지참하세요.';
+  const knowledge = {excerpts: [text], evidence: [{text, categories: ['exam', 'preparation', '<script>'], source_id: item.id, source_hash: item.content_hash, line_start: 7, line_end: 7}]};
+  const html = noticeHTML({...item, knowledge}, 0);
+  assert.match(html, /시험 · 준비물 · 원문 7행/); assert.equal(html.split(text).length - 1, 1); assert.doesNotMatch(html, /<script>/);
+  assert.doesNotMatch(noticeHTML({...item, content_hash: 'new-version', knowledge}, 0), /원문 7행/);
+});
+
+test('read and applied are independent and a read source retains explicit candidate approval in history', async () => {
+  const read = {...item, state: 'ignored', acknowledgement: {state: 'read', source_hash: item.content_hash, read_at: NOW.toISOString()}, application: {state: 'not_applied', event_ids: []}};
+  const html = render({...index, items: [read]}, new Map());
+  assert.ok(!html.slice(0, html.indexOf('<details class="school-history">')).includes(item.title));
+  assert.match(html, /읽음 · 확인 완료 · 일정 미반영/); assert.match(html, /data-school-action="approve"/);
+  assert.doesNotMatch(html, /data-school-action="ignore"/);
+  assert.match(noticeHTML({...item, state: 'applied', acknowledgement: {state: 'unread', source_hash: item.content_hash}, application: {state: 'applied', event_ids: ['event-one']}}, 0), /안 읽음 · 일정 반영 완료/);
+  const f = fixture((url, init) => init.method === 'PUT' ? response(201) : response(404));
+  await f.client.decide(read, 'approve', [choice]);
+  assert.equal(decisionBody(puts(f)[0]).action, 'approve'); assert.equal(puts(f).length, 1);
+  assert.match(noticeHTML(read, 0, f.client.pending.get(read.id)), /읽음 · 확인 완료 · 일정 처리 중/);
+});
+
+test('read receipt is tied to source version and must not hide new content or a later conflict', () => {
+  const read = {...item, acknowledgement: {state: 'read', source_hash: item.content_hash}, application: {state: 'not_applied'}};
+  const beforeHistory = value => value.slice(0, value.indexOf('<details class="school-history">'));
+  assert.ok(!beforeHistory(render({...index, items: [read]}, new Map())).includes(item.title));
+  for (const changed of [{...read, content_hash: 'new-hash'}, {...read, state: 'conflict', application: {state: 'conflict'}}, {...read, read_status: {state: 'download_failed', stale: true}}]) {
+    assert.ok(beforeHistory(render({...index, items: [changed]}, new Map())).includes(item.title));
+  }
+  assert.match(noticeHTML({...read, content_hash: 'new-hash'}, 0), /안 읽음 · 일정 미반영/);
+  assert.match(noticeHTML({...read, application: {state: 'partial', event_ids: ['selected-event']}}, 0), /일정 일부 반영/);
+});
+
+test('current source comparison shows escaped before/after evidence and never applies an obsolete comparison', () => {
+  const changes = {previous_hash: 'old-hash', current_hash: item.content_hash, removed: ['9/20 제출'], added: [{line: 14, text: '9/21 제출 <img src=x>'}], metadata: [{field: 'title', before: '초기 안내', after: '수정 안내'}, {field: 'due_at', before: '9/20', after: '9/21'}, {field: 'token', before: 'PRIVATE', after: 'PRIVATE'}]};
+  const html = noticeHTML({...item, changes}, 0);
+  assert.match(html, /이전 자료와 달라진 내용/); assert.match(html, /이전 내용/); assert.match(html, /9\/20 제출/); assert.match(html, /9\/21 제출 &lt;img/);
+  assert.match(html, /초기 안내 → 수정 안내/); assert.doesNotMatch(html, /<img|PRIVATE/);
+  assert.match(html, /원문 14행/); assert.match(html, /제출 시각: 9\/20 → 9\/21/);
+  assert.doesNotMatch(noticeHTML({...item, content_hash: 'another-version', changes}, 0), /이전 자료와 달라진 내용/);
+});
+
+test('read normal notices leave the private calendar projection while failures remain available', async () => {
+  let current = {...index, items: [{...item, acknowledgement: {state: 'read', source_hash: item.content_hash}, application: {state: 'not_applied'}}]};
+  const f = mountedFixture(url => url.endsWith('/school/index.json') ? file(current) : response(404));
+  await f.api.initialization;
+  assert.deepEqual(f.api.getCalendar([]).byDate, {}); assert.match(f.elements.get('school-home-summary').textContent, /새 공지 없음/);
+  current = {...current, items: [{...current.items[0], state: 'conflict', application: {state: 'conflict'}}]};
+  await f.api.refresh();
+  assert.ok(f.api.getCalendar([]).byDate['2026-09-20']); assert.match(f.elements.get('school-home-summary').textContent, /공지 1개/);
+});
+
 test('public repo or another account is rejected before private index reads or decisions', async () => {
   for (const options of [{private: false}, {login: 'someone-else'}]) {
     const f = fixture(() => {throw new Error('private path must not be called');}, options);

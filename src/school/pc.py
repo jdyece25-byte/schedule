@@ -48,7 +48,7 @@ def invoke(config_path, collect):
         environment['ETL_API_TOKEN'] = protected_bytes(secret.read_bytes(), decrypt=True).decode('utf-8')
     command = [sys.executable, '-B', str(Path(__file__).with_name('runner.py')), '--sources', str(source_path)]
     if collect:
-        command.extend(['--local-root', config['local_root']])
+        command.extend(['--local-root', config['local_root'], '--archive-dir', str(root / 'knowledge')])
     else:
         command.append('--decisions-only')
         environment.pop('ETL_API_TOKEN', None)

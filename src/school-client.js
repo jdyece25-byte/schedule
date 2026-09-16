@@ -10,6 +10,9 @@
   const STATES = {baseline: '기준 자료', needs_review: '확인 필요', ready: '반영 확인', applied: '반영 완료', ignored: '확인 완료', info: '새 공지', conflict: '일정 충돌 · 확인 필요'};
   const TYPES = {deadline: '마감', exam: '시험', lab: '실험·랩', class: '수업', cancellation: '휴강·취소'};
   const COLLECTORS = {local: '학교 공지', etl: 'eTL'};
+  const APPLICATION_STATES = {not_applied: '일정 미반영', pending: '일정 처리 중', partial: '일정 일부 반영', applied: '일정 반영 완료', conflict: '일정 충돌 · 확인 필요'};
+  const EVIDENCE_LABELS = {exam: '시험', deadline: '마감', cancellation: '휴강·변경', preparation: '준비물'};
+  const ISSUE_LABELS = {auth_required: '인증 필요', restricted: '접근 제한', no_text: '텍스트 없음', unsupported: '읽기 미지원', too_large: '파일 크기 초과', truncated: '일부 내용만 읽음', partial_document: '일부 페이지 읽기 실패', download_failed: '다운로드 실패', download_budget: '다음 수집에서 재시도', course_not_found_or_ambiguous: '수업 연결 확인 필요', course_folder_missing_or_unsafe: '수업 폴더 확인 필요', local_root_missing: '학교 자료 폴더 없음', api_unavailable: 'eTL 연결 실패'};
   const MAX_PRIVATE_JSON_BYTES = 8 * 1024 * 1024;
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
   const encode = value => btoa(Array.from(new TextEncoder().encode(JSON.stringify(value, null, 2)), b => String.fromCharCode(b)).join(''));
@@ -40,6 +43,24 @@
     }
     return null;
   }
+  function acknowledged(item) {
+    if (item.acknowledgement) return item.acknowledgement.state === 'read' && item.acknowledgement.source_hash === item.content_hash;
+    return item.state === 'ignored';
+  }
+  function actionable(item) {
+    return ACTIVE.has(item.state) || (item.state === 'ignored' && Array.isArray(item.candidates) && item.candidates.length > 0 && item.application?.state !== 'applied');
+  }
+  function inInbox(item) {
+    return actionable(item) && (!acknowledged(item) || item.state === 'conflict' || item.application?.state === 'conflict' || item.knowledge_stale || item.read_status?.stale);
+  }
+  function applicationState(item, pending) {
+    if (pending?.decision.action === 'approve') return 'pending';
+    if (Object.hasOwn(APPLICATION_STATES, item.application?.state)) return item.application.state;
+    if (item.state === 'conflict') return 'conflict';
+    if (item.state === 'applied') return 'applied';
+    const ids = item.application?.event_ids || item.event_ids;
+    return Array.isArray(ids) && ids.length ? 'partial' : 'not_applied';
+  }
   function safeSourceURL(value) {
     try {
       const url = new URL(value);
@@ -64,14 +85,47 @@
   }
   function collectorText(index, now = new Date()) {
     if (!index) return '수집 대기 · 아직 학교 공지 목록이 없습니다.';
-    return Object.entries(COLLECTORS).map(([key, label]) => {
+    const collectors = Object.entries(COLLECTORS).map(([key, label]) => {
       const c = index.collectors?.[key];
       if (!c) return label + ': 수집 대기';
-      const state = c.state === 'auth_required' ? '다시 로그인 필요' : c.state === 'error' ? '수집 오류 · 확인 필요' : c.state === 'partial' ? '일부 수집 · 확인 필요' : ['running', 'checking'].includes(c.state) ? '수집 중' : ['ok', 'idle', 'success', 'healthy'].includes(c.state) ? '마지막 확인' : '수집 상태 확인 필요';
+      const state = c.state === 'auth_required' ? '다시 로그인 필요' : c.state === 'error' ? '수집 오류 · 확인 필요' : c.state === 'partial' ? '일부 수집 · 확인 필요' : ['running', 'checking'].includes(c.state) ? '수집 중' : ['ok', 'idle', 'success', 'healthy'].includes(c.state) ? '수집 완료' : '수집 상태 확인 필요';
       const checked = new Date(c.last_checked).getTime();
       const stale = Number.isFinite(checked) && now.getTime() - checked > 24 * 60 * 60 * 1000 ? ' · 24시간 이상 갱신 없음' : '';
-      return label + ': ' + state + ' · ' + timestamp(c.last_checked) + stale;
-    }).join('\n');
+      const count = Number.isSafeInteger(c.source_count) && c.source_count >= 0 ? ' · 자료 ' + c.source_count + '건' : '';
+      const missing = Number.isSafeInteger(c.missing_source_count) && c.missing_source_count > 0 ? '\n이전 자료 중 이번 목록에서 미관찰: ' + c.missing_source_count + '건 · 삭제하지 않고 보관' : '';
+      const issues = Array.isArray(c.issues) ? c.issues : [];
+      const issueCount = Number.isSafeInteger(c.issue_count) && c.issue_count >= 0 ? c.issue_count : issues.length;
+      const groups = new Map();
+      for (const issue of issues) {
+        const name = ISSUE_LABELS[issue?.code] || '기타 수집·읽기 문제';
+        groups.set(name, (groups.get(name) || 0) + 1);
+      }
+      // Older last_success values included partial scans. Only an explicit full
+      // success or an older successful final state can establish full coverage.
+      const complete = Object.hasOwn(c, 'last_complete_success') ? c.last_complete_success : c.state === 'ok' ? c.last_success : null;
+      const usable = c.last_usable_success || c.last_success;
+      const api = c.coverage?.api;
+      const coverage = api && typeof api === 'object' ? Object.entries({announcements: '공지', assignments: '과제', quizzes: '퀴즈'}).map(([kind, name]) => {
+        const rows = Object.values(api).map(course => course?.[kind]).filter(row => row && typeof row === 'object');
+        if (!rows.length) return '';
+        const listed = rows.reduce((sum, row) => sum + (Number.isSafeInteger(row.count) && row.count >= 0 ? row.count : 0), 0);
+        const collected = rows.reduce((sum, row) => sum + (Number.isSafeInteger(row.collected) && row.collected >= 0 ? row.collected : 0), 0);
+        const incomplete = rows.some(row => row.incomplete || row.listing_complete === false || ['error', 'unavailable', 'partial'].includes(row.status));
+        return name + ' ' + collected + '건' + (listed !== collected ? '(목록 ' + listed + '건)' : '') + (incomplete ? ' · 목록 확인 미완료' : '');
+      }).filter(Boolean) : [];
+      return label + ': ' + state + count + (issueCount ? ' · 누락·읽기 문제 ' + issueCount + '건' : '') + stale + missing +
+        '\n최근 시도: ' + timestamp(c.last_checked) + '\n마지막 전체 성공: ' + timestamp(complete) +
+        (usable && usable !== complete ? '\n마지막 자료 확보(부분 포함): ' + timestamp(usable) : '') +
+        (coverage.length ? '\n수집 목록: ' + coverage.join(' / ') : '') +
+        (groups.size ? '\n문제 내역' + (issueCount > issues.length ? '(일부)' : '') + ': ' + [...groups].map(([name, amount]) => name + ' ' + amount + '건').join(' · ') : '') +
+        (c.state === 'partial' || c.state === 'error' || c.state === 'auth_required' ? '\n미확인 자료가 남아 있습니다. 이전에 저장한 자료는 보존합니다.' : '');
+    });
+    const archive = index.local_archive;
+    if (archive && ['ok', 'error'].includes(archive.state)) collectors.push(
+      (archive.state === 'error' ? 'PC 자료 보관 실패 · 다시 시도 중' : 'PC 자료 보관: 보관 완료') +
+      '\n마지막 보관 성공: ' + timestamp(archive.last_success) +
+      (archive.state === 'error' ? '\n최근 시도: ' + timestamp(archive.last_checked) : ''));
+    return collectors.join('\n\n');
   }
   function cleanEvent(candidate, input) {
     if (typeof candidate.id !== 'string' || !candidate.id) throw new Error('일정 후보의 식별 정보가 없습니다. 목록을 새로고침해 주세요.');
@@ -195,14 +249,14 @@
         }
         for (const decision of index ? snapshot.decisions : []) {
           const item = index.items.find(item => item.id === decision.source_id && item.content_hash === decision.source_hash);
-          if (!item || !ACTIVE.has(item.state)) continue;
+          if (!item || !actionable(item)) continue;
           const existing = hydrated.get(item.id);
           if (!existing || existing.decision.source_hash !== decision.source_hash || existing.decision.id === decision.id || (Date.parse(decision.created_at) || 0) >= (Date.parse(existing.decision.created_at) || 0)) hydrated.set(item.id, {state: 'accepted', restored: true, decision, error: ''});
         }
         const resolved = [];
         if (index) for (const [source, row] of hydrated) {
           const current = index.items.find(item => item.id === source);
-          if (current && (current.content_hash !== row.decision.source_hash || !ACTIVE.has(current.state))) resolved.push(source);
+          if (current && (current.content_hash !== row.decision.source_hash || !actionable(current))) resolved.push(source);
           else if (row.state === 'accepted') {
             const outcome = await this.file('school/decision-results/' + row.decision.id + '.json', credentials, snapshot.revision);
             assertCurrent();
@@ -218,7 +272,7 @@
     }
     makeDecision(item, action, choices = []) {
       if (!item || typeof item.id !== 'string' || !item.id || typeof item.content_hash !== 'string' || !item.content_hash) throw new Error('원문 식별 정보가 없습니다. 목록을 새로고침해 주세요.');
-      if (!ACTIVE.has(item.state)) throw new Error('이미 처리했거나 기준 자료인 공지입니다. 새 공지를 확인해 주세요.');
+      if (!actionable(item)) throw new Error('이미 처리했거나 기준 자료인 공지입니다. 새 공지를 확인해 주세요.');
       if (!['approve', 'ignore'].includes(action)) throw new Error('지원하지 않는 처리 요청입니다.');
       if (action === 'approve' && !choices.length) throw new Error('반영할 일정을 먼저 선택해 주세요.');
       if (choices.length > 30) throw new Error('한 번에 선택할 수 있는 일정은 30개까지입니다.');
@@ -297,33 +351,65 @@
       (candidate.reason ? '<p class="school-note">' + esc(candidate.reason) + '</p>' : '') +
       (candidate.evidence ? '<details class="school-evidence"><summary>원문 근거 확인</summary><p>' + esc(typeof candidate.evidence === 'string' ? candidate.evidence : JSON.stringify(candidate.evidence)) + '</p></details>' : '') + '</fieldset>';
   }
+  function changesHTML(item) {
+    const changes = item.changes;
+    if (!changes || changes.current_hash !== item.content_hash || typeof changes.previous_hash !== 'string' || !changes.previous_hash) return '';
+    const lines = key => Array.isArray(changes[key]) ? changes[key].slice(0, 12).map(line => {
+      if (typeof line === 'string') return line.slice(0, 700);
+      if (!line || typeof line.text !== 'string') return '';
+      return (Number.isSafeInteger(line.line) && line.line > 0 ? '원문 ' + line.line + '행 · ' : '') + line.text.slice(0, 700);
+    }).filter(Boolean) : [];
+    const added = lines('added'), removed = lines('removed');
+    const metadata = Array.isArray(changes.metadata) ? changes.metadata.slice(0, 8).map(change => {
+      if (typeof change === 'string') return change.slice(0, 700);
+      if (!change || typeof change !== 'object') return '';
+      const labels = {title: '제목', updated_at: '원문 수정 시각', source_kind: '자료 종류', due_at: '제출 시각'};
+      if (!labels[change.field]) return '';
+      return labels[change.field] + ': ' + shortText(change.before, 300) + ' → ' + shortText(change.after, 300);
+    }).filter(Boolean) : [];
+    if (!added.length && !removed.length && !metadata.length) return '';
+    const section = (label, values) => values.length ? '<p><strong>' + label + '</strong></p>' + values.map(line => '<p>' + esc(line) + '</p>').join('') : '';
+    return '<details class="school-evidence school-changes"><summary>이전 자료와 달라진 내용</summary><p class="school-note">저장한 이전 원문과 비교한 내용입니다. 일정 반영 여부는 별도로 확인하세요.</p>' + (changes.limited ? '<p class="school-note">변경 내용 일부를 표시합니다. 원문도 함께 확인해 주세요.</p>' : '') + section('이전 내용', removed) + section('추가·변경 내용', added) + section('원문 정보 변경', metadata) + '</details>';
+  }
   function noticeHTML(item, index, row, history = false) {
-    const active = ACTIVE.has(item.state) && !history;
+    const active = actionable(item);
     const url = safeSourceURL(item.source_url);
     const candidates = Array.isArray(item.candidates) ? item.candidates : [];
     const pending = active && row && row.state === 'accepted' && row.decision.source_hash === item.content_hash;
+    const read = acknowledged(item);
+    const readLabel = pending && row.decision.action === 'ignore' ? '읽음 처리 접수' : read ? '읽음 · 확인 완료' : '안 읽음';
+    const application = applicationState(item, pending ? row : null);
     const reading = item.read_status?.state || item.extraction_status;
     const excerpts = Array.isArray(item.knowledge?.excerpts) ? item.knowledge.excerpts.filter(line => typeof line === 'string') : [];
+    const evidence = new Map((Array.isArray(item.knowledge?.evidence) ? item.knowledge.evidence : []).filter(fact => fact && fact.source_id === item.id && fact.source_hash === item.content_hash && typeof fact.text === 'string').map(fact => [fact.text, fact]));
+    const excerptHTML = line => {
+      const fact = evidence.get(line);
+      const labels = Array.isArray(fact?.categories) ? [...new Set(fact.categories.filter(kind => Object.hasOwn(EVIDENCE_LABELS, kind)).map(kind => EVIDENCE_LABELS[kind]))] : [];
+      const position = Number.isSafeInteger(fact?.line_start) && fact.line_start > 0 ? ' · 원문 ' + fact.line_start + '행' : '';
+      return '<p>' + (labels.length ? '<strong>' + esc(labels.join(' · ') + position) + '</strong><br>' : '') + esc(line) + '</p>';
+    };
     const readingWarning = item.read_status?.stale ? '최신 원문을 읽지 못했습니다. 아래 내용은 이전 자료이므로 변경 사항을 확인해 주세요.' :
       reading && reading !== 'parsed' ? ({truncated: '자료 일부만 읽었습니다. 원문의 나머지 내용을 확인해 주세요.', restricted: '접근이 제한된 자료입니다. eTL에서 공개 여부를 확인해 주세요.', no_text: '읽을 수 있는 텍스트가 없습니다. 원문을 직접 확인해 주세요.', unsupported: '이 형식은 자동으로 읽지 못합니다. 원문을 직접 확인해 주세요.', too_large: '파일이 커서 자동 분석 범위를 넘었습니다. 원문을 확인해 주세요.'}[reading] || '자료를 모두 읽지 못했습니다. 원문 확인 또는 재수집이 필요합니다.') : '';
     return '<article class="school-notice" data-source-index="' + index + '"><div class="school-notice-top"><span class="school-badge">' + esc(pending ? '처리 요청 접수' : STATES[item.state] || '확인 필요') + '</span><span class="school-time">' + esc(timestamp(item.updated_at)) + '</span></div>' +
+      '<p class="school-note school-tracking">' + esc(readLabel) + ' · ' + esc(APPLICATION_STATES[application]) + '</p>' +
       '<p class="school-course">' + esc(item.course || '학교 공지') + '</p><h3>' + esc(item.title || '제목 없는 공지') + '</h3>' +
       (url ? '<a class="school-source" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">학교 원문 열기 ↗</a>' : '<p class="school-note">확인 가능한 학교 원문 링크가 없습니다.</p>') +
       (item.reason ? '<p class="school-note">' + esc(item.reason) + '</p>' : '') +
       (readingWarning ? '<p class="school-warning">' + esc(readingWarning) + '</p>' : '') +
-      (excerpts.length ? '<details class="school-evidence"><summary>읽은 학사 규칙 · 자연어 요청에 참고</summary>' + (item.knowledge?.incomplete ? '<p class="school-note">일부 발췌입니다. 원문 전체를 읽은 결과와 다를 수 있습니다.</p>' : '') + excerpts.map(line => '<p>' + esc(line) + '</p>').join('') + '</details>' : '') +
+      changesHTML(item) +
+      (excerpts.length ? '<details class="school-evidence"><summary>읽은 학사 규칙 · 자연어 요청에 참고</summary>' + (item.knowledge?.incomplete ? '<p class="school-note">일부 발췌입니다. 원문 전체를 읽은 결과와 다를 수 있습니다.</p>' : '') + excerpts.map(excerptHTML).join('') + '</details>' : '') +
       (active && !pending ? candidates.map(candidateHTML).join('') : candidates.map(c => '<p class="school-note">' + esc([c.event?.n, c.event?.d, clockValue(c.event?.s), c.event?.loc].filter(Boolean).join(' · ')) + '</p>').join('')) +
       (row?.error ? '<p class="school-warning">' + esc(row.error) + '</p>' : '') +
       (pending ? '<p class="school-note">처리 요청이 접수되었습니다. 아직 일정 반영 완료가 아닙니다. 목록을 새로고침해 결과를 확인하세요.</p>' : active ? '<div class="school-actions">' +
-      (row ? '<button type="button" class="bridge-secondary" data-school-action="retry">같은 요청 상태 확인</button>' : (candidates.length ? '<button type="button" class="btn-primary" data-school-action="approve">선택한 일정 반영 요청</button>' : '') + '<button type="button" class="bridge-secondary" data-school-action="ignore">' + (candidates.length ? '반영하지 않고 확인 완료' : '확인했어요') + '</button>') +
+      (row ? '<button type="button" class="bridge-secondary" data-school-action="retry">같은 요청 상태 확인</button>' : (candidates.length ? '<button type="button" class="btn-primary" data-school-action="approve">선택한 일정 반영 요청</button>' : '') + (!read ? '<button type="button" class="bridge-secondary" data-school-action="ignore">확인했어요 · 읽음 처리</button>' : '')) +
       '<button type="button" class="bridge-secondary" data-school-action="ask">자연어 일정 요청으로 열기</button></div>' : '') + '</article>';
   }
   function render(index, pending, filter = 'review', focusedSourceId = '') {
     if (!index) return '<p class="school-empty">수집 대기 · 아직 학교 공지 목록이 없습니다. 수집기가 공지를 확인하면 여기에 표시됩니다.</p>';
     const items = index.items.map((item, index) => ({item, index})).sort((a, b) => String(b.item.updated_at || '').localeCompare(String(a.item.updated_at || '')));
-    const waiting = items.filter(row => ACTIVE.has(row.item.state) && pendingReview(row.item, pending));
-    const current = items.filter(row => ACTIVE.has(row.item.state) && !pendingReview(row.item, pending));
-    const history = items.filter(row => !ACTIVE.has(row.item.state));
+    const waiting = items.filter(row => actionable(row.item) && pendingReview(row.item, pending));
+    const current = items.filter(row => inInbox(row.item) && !pendingReview(row.item, pending));
+    const history = items.filter(row => !inInbox(row.item) && !pendingReview(row.item, pending));
     const processing = waiting.length ? '<details class="school-processing"><summary>처리 대기 ' + waiting.length + '개 · 접수 완료</summary><p class="school-note">처리 요청은 저장됐으며 실제 일정 반영은 아직 완료되지 않았습니다. 실패하거나 다시 확인할 내용이 생기면 확인할 공지에 나타납니다.</p>' + waiting.map(row => noticeHTML(row.item, row.index, pendingReview(row.item, pending))).join('') + '</details>' : '';
     if (filter === 'latest') {
       let latest = items.filter(row => !pendingReview(row.item, pending)).slice(0, 100);
@@ -397,7 +483,7 @@
           });
         });
       });
-      const count = client.index?.items.filter(item => ACTIVE.has(item.state) && !pendingReview(item, client.pending)).length;
+      const count = client.index?.items.filter(item => inInbox(item) && !pendingReview(item, client.pending)).length;
       byId('school-home-summary').textContent = count === undefined ? '새 공지·시험·과제 확인' : count ? '확인할 공지 ' + count + '개' : '확인할 새 공지 없음';
     };
     const buttons = () => {
@@ -416,7 +502,7 @@
     };
     const readyText = () => {
       const warnings = Object.entries(client.index?.collectors || {}).filter(([, collector]) => ['auth_required', 'error', 'partial'].includes(collector.state)).map(([key, collector]) => (COLLECTORS[key] || '수집기') + (collector.state === 'auth_required' ? ' 다시 로그인 필요' : collector.state === 'partial' ? ' 일부 수집' : ' 수집 확인 필요'));
-      const waiting = client.index?.items.filter(item => ACTIVE.has(item.state) && pendingReview(item, client.pending)).length || 0;
+      const waiting = client.index?.items.filter(item => actionable(item) && pendingReview(item, client.pending)).length || 0;
       if (waiting) warnings.push('처리 대기 ' + waiting + '개');
       return warnings.length ? '학교 공지 확인됨 · ' + warnings.join(' · ') : '학교 공지 확인됨';
     };
@@ -525,7 +611,7 @@
     return {
       client, refresh, initialization, openSource,
       onView: next => { view = next; syncConnection(); if ((scheduleReady || view === 'school') && !document.hidden && relevantViews.has(view)) return refresh({force: view === 'school'}); },
-      getCalendar: events => { syncConnection(false); return client.index && root.SchoolCalendar?.project ? root.SchoolCalendar.project({...client.index, items: client.index.items.filter(item => !pendingReview(item, client.pending))}, events) : {byDate: {}, undatedCount: 0}; },
+      getCalendar: events => { syncConnection(false); return client.index && root.SchoolCalendar?.project ? root.SchoolCalendar.project({...client.index, items: client.index.items.filter(item => !pendingReview(item, client.pending) && (!acknowledged(item) || inInbox(item)))}, events) : {byDate: {}, undatedCount: 0}; },
       getCalendarStatus: () => { syncConnection(false); return {...calendarStatus}; },
       dispose: () => { if (poll !== undefined) root.clearInterval?.(poll); }
     };

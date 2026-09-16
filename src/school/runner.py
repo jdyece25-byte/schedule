@@ -28,6 +28,49 @@ REFERENCE_KINDS = {'etl_file', 'etl_external_file', 'etl_page', 'etl_module', 'e
 STALE_SOURCE_WARNING = '[이전 원문 참고: 최신 자료를 읽지 못했습니다. 날짜·시각 변경 근거로 사용하지 마세요.]'
 
 
+def sync_item_status(item):
+    """Read acknowledgement is versioned independently of schedule application."""
+    acknowledgement = item.get('acknowledgement')
+    if not isinstance(acknowledgement, dict):
+        acknowledgement = {'state': 'read' if item.get('state') == 'ignored' else 'unread',
+                           'source_hash': item.get('content_hash')}
+        if acknowledgement['state'] == 'read':
+            acknowledgement['read_at'] = item.get('review', {}).get('updated_at')
+    if acknowledgement.get('source_hash') != item.get('content_hash'):
+        acknowledgement = {'state': 'unread', 'source_hash': item.get('content_hash')}
+    item['acknowledgement'] = acknowledgement
+    state, review = item.get('state'), item.get('review', {})
+    event_ids = list(item.get('event_ids', []))
+    previous = item.get('application', {})
+    if review.get('state') in ('queued', 'processing') and review.get('action') == 'approve' and review.get('source_hash') == item.get('content_hash'):
+        applied = 'pending'
+    elif state == 'conflict':
+        applied = 'conflict'
+    elif state == 'applied':
+        applied = 'applied'
+    elif state == 'ready':
+        applied = 'pending'
+    elif state == 'ignored' and previous.get('state') in ('not_applied', 'partial', 'applied'):
+        applied = previous['state']
+    else:
+        applied = ('partial' if item.get('candidates') else 'applied') if event_ids else 'not_applied'
+    item['application'] = {'state': applied, 'event_ids': event_ids}
+
+
+def evidence_changes(existing, item):
+    """Bounded private comparison; full original versions live in the PC archive."""
+    if not existing or existing.get('content_hash') == item.get('content_hash'):
+        return None
+    before = existing.get('knowledge', {}).get('excerpts', [])
+    after = item.get('knowledge', {}).get('excerpts', [])
+    return {'previous_hash': existing.get('content_hash'), 'current_hash': item.get('content_hash'),
+            'added': [line for line in after if line not in before][:24],
+            'removed': [line for line in before if line not in after][:24],
+            'metadata': [{'field': key, 'before': existing.get(key), 'after': item.get(key)}
+                         for key in ('title', 'updated_at', 'due_at') if existing.get(key) != item.get(key)],
+            'limited': True}
+
+
 def source_metadata(value, *, indexed=False):
     return {'title': value.get('title'), 'kind': value.get('source_kind' if indexed else 'kind'),
             'updated_at': value.get('updated_at')}
@@ -43,7 +86,9 @@ def reference_history(item, source):
 
 def preserve_failed_read(existing, source):
     """A temporary empty read cannot replace verified private source evidence."""
-    if not existing or source.get('extraction_status', 'parsed') in ('parsed', 'summary') or str(source.get('content') or '').strip():
+    if (not existing or source.get('extraction_status', 'parsed') in ('parsed', 'summary')
+            or source.get('extraction_status') == 'no_text' and source.get('file_hash')
+            or str(source.get('content') or '').strip()):
         return False
     previous = existing.get('read_previous') if isinstance(existing.get('read_previous'), dict) else existing
     knowledge = previous.get('knowledge') if isinstance(previous.get('knowledge'), dict) else {}
@@ -172,6 +217,8 @@ class Importer:
 
     def save_index(self, extra=None):
         self.renew()
+        for item in self.index['items']:
+            sync_item_status(item)
         self.index['updated_at'] = stamp()
         files = dict(extra or {})
         files[INDEX] = json.dumps(self.index, ensure_ascii=False, indent=2) + '\n'
@@ -230,7 +277,7 @@ class Importer:
                     raise
         raise RuntimeError('Schedule repository remained busy')
 
-    def consume(self, results):
+    def consume(self, results, archive_records=None):
         from src.school.knowledge import ANALYSIS_VERSION, source_knowledge
         items = {item['id']: item for item in self.index['items']}
         known = self.index.setdefault('known_sources', {})
@@ -275,6 +322,15 @@ class Importer:
                     continue
                 known[source['id']] = source['content_hash']
                 candidates = [prepare(candidate, events, self.config) for candidate in extract_candidates(source, self.config)]
+                prior_ids = list(dict.fromkeys((existing or {}).get('event_ids', []) + (existing or {}).get('prior_event_ids', [])))
+                confirmed = bool((existing or {}).get('user_confirmed') or
+                                 (existing or {}).get('review', {}).get('action') == 'approve' and
+                                 (existing or {}).get('review', {}).get('state') == 'completed')
+                missing_prior = set(prior_ids) - {event['id'] for event in events}
+                if confirmed or missing_prior or queued:
+                    for candidate in candidates:
+                        candidate.update(auto_eligible=False, confidence='review',
+                                         reason='이전에 승인·수정·삭제했거나 확인 중인 일정입니다. 기존 선택을 보존하고 다시 확인을 기다립니다.')
                 historical = source.get('historical_import') is True
                 # External PDFs often have no updated timestamp. A changed
                 # verified file body is still a new notice, even when its
@@ -301,9 +357,11 @@ class Importer:
                 item = {'id': source['id'], 'content_hash': source['content_hash'],
                         'course': definition.get('name', source['course']), 'course_key': source['course'],
                         'title': source['title'], 'source_url': source.get('source_url', ''),
+                        'due_at': source.get('due_at'),
                         'source_kind': source['kind'], 'updated_at': source['updated_at'],
                         'first_seen_at': existing.get('first_seen_at', stamp()) if upgrading else stamp(),
                         'candidates': candidates, 'event_ids': [],
+                        'user_confirmed': confirmed, 'prior_event_ids': prior_ids,
                         'initial_review': initial_review,
                         'notify': existing.get('notify', True) if upgrading else not (first_etl or historical),
                         'notice_hash': (existing.get('notice_hash') or existing['content_hash']) if upgrading else source['content_hash'],
@@ -319,6 +377,11 @@ class Importer:
                     # Reading a document more thoroughly is not a new teacher
                     # announcement and must not undo an owner's earlier choice.
                     item['event_ids'] = deepcopy(existing.get('event_ids', []))
+                    for key in ('acknowledgement', 'application', 'changes'):
+                        if key in existing:
+                            item[key] = deepcopy(existing[key])
+                    if isinstance(item.get('acknowledgement'), dict):
+                        item['acknowledgement']['source_hash'] = item['content_hash']
                     if 'review' in existing:
                         item['review'] = deepcopy(existing['review'])
                     if acknowledged:
@@ -345,22 +408,45 @@ class Importer:
                 if not first_local:
                     # Raw source is private, never copied to public event notes.
                     extra['school/sources/' + source['id'] + '.json'] = json.dumps(source, ensure_ascii=False) + '\n'
+                if not upgrading:
+                    archived = (archive_records or {}).get(source['id'], {})
+                    changes = archived.get('changes')
+                    if not (changes and changes.get('current_hash') == source['content_hash']
+                            and changes.get('previous_hash') == (existing or {}).get('content_hash')):
+                        changes = evidence_changes(existing, item)
+                    if changes:
+                        item['changes'] = changes
                 reference_history(item, source)
                 items[item['id']] = item
             previous = self.index['collectors'].get(collector, {})
+            checked = stamp()
+            usable = result['status'] in ('ok', 'partial')
+            complete = result['status'] == 'ok' and not result.get('issues') and not result.get('coverage', {}).get('api_incomplete')
+            observed = {source['id'] for source in result.get('sources', [])}
+            prior_known = previous.get('known_source_ids', [item['id'] for item in items.values()
+                          if (item.get('source_kind', '').startswith('etl_') if collector == 'etl' else item.get('source_kind') == 'local')])
+            known_ids = set(prior_known) | observed
             self.index['collectors'][collector] = {
-                'state': result['status'], 'last_checked': stamp(),
+                'state': result['status'], 'last_checked': checked,
                 'initialized': bool(previous.get('initialized') or result['status'] in ('ok', 'partial')),
                 'source_count': len(result.get('sources', [])), 'issue_count': len(result.get('issues', [])),
                 'coverage': deepcopy(result.get('coverage', {})),
+                'known_source_ids': sorted(known_ids), 'missing_source_ids': sorted(known_ids - observed),
+                'missing_source_count': len(known_ids - observed),
                 'issues': result.get('issues', [])[:50],
-                'last_success': stamp() if result['status'] in ('ok', 'partial') else previous.get('last_success')}
+                # Legacy last_success included partial scans. Never promote it
+                # into a full-success timestamp when migrating older indexes.
+                'last_success': checked if usable else previous.get('last_success'),
+                'last_usable_success': checked if usable else previous.get('last_usable_success', previous.get('last_success')),
+                'last_complete_success': checked if complete else previous.get('last_complete_success')}
         ordered = sorted(items.values(), key=lambda item: item.get('first_seen_at', ''), reverse=True)
         # Never discard unreviewed notices. Hash tombstones prevent archived
         # baseline/completed sources from reappearing as new on later scans.
         pending = [item for item in ordered if item['state'] not in ('baseline', 'applied', 'ignored')]
-        history = [item for item in ordered if item['state'] in ('baseline', 'applied', 'ignored')][:500]
-        self.index['items'] = pending + history
+        read_unapplied = [item for item in ordered if item['state'] == 'ignored' and item.get('candidates')]
+        history = [item for item in ordered if item['state'] in ('baseline', 'applied', 'ignored')
+                   and item not in read_unapplied][:500]
+        self.index['items'] = pending + read_unapplied + history
         self.save_index(extra)
 
     def ready(self):
@@ -390,7 +476,7 @@ class Importer:
         if changed:
             self.save_index()
 
-    def decisions(self):
+    def decisions(self, *, defer_publication=False):
         self.stage = 'decisions'
         tree = self.api.tree(self.queue)
         paths = sorted(path for path in tree if re.fullmatch(r'school/decisions/[A-Za-z0-9_-]{1,100}\.json', path))
@@ -415,6 +501,10 @@ class Importer:
                 review = {'state': 'queued', 'decision_id': identifier, 'source_id': item['id'],
                           'source_hash': item['content_hash'], 'action': decision.get('action'), 'updated_at': stamp()}
                 if decision.get('action') == 'ignore':
+                    sync_item_status(item)
+                    if item['application']['state'] in ('pending', 'conflict'):
+                        item['application']['state'] = 'partial' if item.get('event_ids') else 'not_applied'
+                    item['acknowledgement'] = {'state': 'read', 'source_hash': item['content_hash'], 'read_at': stamp()}
                     item.update(state='ignored', reason='사용자가 확인한 공지입니다.')
                 elif decision.get('action') == 'approve':
                     originals = {c['id']: c for c in item['candidates']}
@@ -441,11 +531,12 @@ class Importer:
                         item['review'] = review
                         self.save_index()
                         changed = True
-                    if self.inbox_only:
+                    if self.inbox_only or defer_publication:
                         continue
                     event_ids = self.publish(item, prepared, 'decision:' + identifier, approved=True)
                     remaining = [c for c in item['candidates'] if c['id'] not in seen and c.get('action') != 'link']
                     item.update(state='needs_review' if remaining else 'applied', candidates=remaining,
+                                user_confirmed=True,
                                 event_ids=list(dict.fromkeys(item.get('event_ids', []) + event_ids)),
                                 reason='선택한 일정을 반영했습니다. 남은 후보를 확인해 주세요.' if remaining else '사용자가 확인한 일정을 반영했습니다.')
                 else:
@@ -476,10 +567,12 @@ class Importer:
         return changed
 
 
-def run_once(config, local_root=None, *, collect=True, github=None, token=None, inbox_only=False):
+def run_once(config, local_root=None, *, collect=True, github=None, token=None, inbox_only=False, archive=None):
     api = github or GitHub()
     importer = Importer(api, config, inbox_only=inbox_only)
     failure = None
+    archive_records = {}
+    archive_report = None
     try:
         # Slow eTL/PDF reads do not reserve the private queue. Independent
         # decision-only passes remain available while collection runs.
@@ -488,8 +581,26 @@ def run_once(config, local_root=None, *, collect=True, github=None, token=None, 
             results = {'etl': collect_etl(config, token=token)}
             if local_root:
                 results['local'] = collect_local(local_root, config)
+            if archive is not None:
+                from src.school.archive import ArchiveError
+                importer.stage = 'archive_sources'
+                try:
+                    for name, result in results.items():
+                        for source in result.get('sources', []):
+                            archive_records[source['id']] = archive.record(source)
+                        archive.record_collection(name, result)
+                    archive_report = {'state': 'ok', 'last_checked': stamp(), 'last_success': stamp()}
+                except (ArchiveError, OSError, ValueError) as error:
+                    # A full disk must be visible and retried, but must not
+                    # prevent an already accepted phone decision from finishing.
+                    archive_report = {'state': 'error', 'last_checked': stamp(), 'error_type': type(error).__name__}
+                    importer.retry_pending = True
         importer.stage = 'acquire'
         importer.acquire()
+        if archive_report:
+            if archive_report['state'] != 'ok':
+                archive_report['last_success'] = importer.index.get('local_archive', {}).get('last_success')
+            importer.index['local_archive'] = archive_report
         if collect:
             # A known changed-but-unreadable revision invalidates an older
             # queued approval before it can publish stale candidates.
@@ -500,10 +611,12 @@ def run_once(config, local_root=None, *, collect=True, github=None, token=None, 
                     changed = preserve_failed_read(items.get(source['id']), source) or changed
             if changed:
                 importer.save_index()
-        importer.decisions()
+        # Register pending approvals before parser migrations, but do not
+        # publish their old version before freshly collected changes are seen.
+        importer.decisions(defer_publication=collect)
         if collect:
             importer.stage = 'consume'
-            importer.consume(results)
+            importer.consume(results, archive_records)
         importer.stage = 'ready'
         importer.ready()
         importer.decisions()
@@ -530,13 +643,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sources', type=Path, required=True)
     parser.add_argument('--local-root', type=Path)
+    parser.add_argument('--archive-dir', type=Path, help='Private local source versions, outside the public checkout')
     parser.add_argument('--decisions-only', action='store_true')
     parser.add_argument('--inbox-only', action='store_true', help='Private cloud inbox only; PC publishes verified DB changes')
     args = parser.parse_args()
     try:
         config = json.loads(args.sources.read_text(encoding='utf-8-sig'))
+        archive = None
+        if args.archive_dir and not args.decisions_only:
+            from src.school.archive import SourceArchive
+            archive = SourceArchive(args.archive_dir)
         result = run_once(config, args.local_root, collect=not args.decisions_only,
-                          token=os.environ.get('ETL_API_TOKEN'), inbox_only=args.inbox_only)
+                          token=os.environ.get('ETL_API_TOKEN'), inbox_only=args.inbox_only, archive=archive)
         print(json.dumps(result))
         return 75 if result['status'] == 'retry_pending' else 0
     except CollectorBusy:

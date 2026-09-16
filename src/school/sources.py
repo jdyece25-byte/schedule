@@ -385,7 +385,9 @@ def _fetch(url, headers):
         raise CollectionError("api_unavailable") from None
 
 
-def _pages(origin, path, params, token, fetch):
+def _pages(origin, path, params, token, fetch, *, progress=None):
+    if progress is not None:
+        progress.update(count=0, pages=0, listing_complete=False)
     url = origin + path + "?" + urllib.parse.urlencode(params, doseq=True)
     base_params = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query, keep_blank_values=True)
     approved_path = path.removesuffix(".json")
@@ -420,11 +422,15 @@ def _pages(origin, path, params, token, fetch):
         if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
             raise CollectionError("invalid_api_shape")
         result.extend(payload)
+        if progress is not None:
+            progress.update(count=len(result), pages=len(seen))
         if len(result) > 1500:
             raise CollectionError("api_item_limit")
         link = next((value for key, value in headers.items() if key.lower() == "link"), "")
         next_link = re.search(r'<([^>]+)>\s*;\s*rel="?next"?(?:\s|,|;|$)', link)
         if not next_link:
+            if progress is not None:
+                progress['listing_complete'] = True
             return result
         url = urllib.parse.urljoin(url, next_link.group(1))
     raise CollectionError("api_page_limit")
@@ -525,11 +531,24 @@ def probe_etl(config, token, fetch=None):
 
 def collect_etl(config, token=None, fetch=None, *, cache_dir=None, download_fetch=None):
     from .documents import DocumentCache, collect_documents
-    result = {"status": "ok", "sources": [], "issues": [], "courses": [], "coverage": {}}
+    resources = {'etl_assignment': 'assignments', 'etl_announcement': 'announcements', 'etl_quiz': 'quizzes'}
+    # Keep document coverage at its existing course keys. These counters record
+    # only safe listing metadata, including resources not reached on this pass.
+    courses = config.get('courses', []) if isinstance(config, dict) else []
+    courses = courses if isinstance(courses, list) else []
+    api_coverage = {course['key']: {name: {'status': 'not_checked', 'count': 0, 'collected': 0,
+                                         'pages': 0, 'listing_complete': False, 'incomplete': True}
+                                  for name in resources.values()}
+                    for course in courses if isinstance(course, dict) and isinstance(course.get('key'), str)}
+    result = {"status": "ok", "sources": [], "issues": [], "courses": [],
+              "coverage": {'api': api_coverage, 'api_incomplete': True}}
     remaining_text_bytes = MAX_TOTAL_TEXT_BYTES
     token = token if token is not None else os.environ.get("ETL_API_TOKEN", "")
     if not token:
         result.update(status="auth_required", issues=[{"code": "auth_required"}])
+        for course in api_coverage.values():
+            for resource in course.values():
+                resource.update(status='unavailable', code='auth_required')
         return result
     try:
         origin = validated_origin(config.get("etl", {}).get("base_url", DEFAULT_ETL_URL))
@@ -545,6 +564,8 @@ def collect_etl(config, token=None, fetch=None, *, cache_dir=None, download_fetc
                        and (course.get("canvas_id") is None or str(item.get("id")) == str(course["canvas_id"]))]
             if len(matches) != 1 or not str(matches[0].get("id", "")).isdigit():
                 result["issues"].append({"code": "course_not_found_or_ambiguous", "course": course["key"]})
+                for resource in api_coverage[course['key']].values():
+                    resource.update(status='unavailable', code='course_not_found_or_ambiguous')
                 continue
             course_id, key = str(matches[0]["id"]), course["key"]
             result["courses"].append({"key": key, "canvas_id": course_id})
@@ -558,8 +579,10 @@ def collect_etl(config, token=None, fetch=None, *, cache_dir=None, download_fetc
                 ("etl_quiz", f"/api/v1/courses/{course_id}/quizzes", {"per_page": 100}),
             ]
             for kind, path, params in endpoints:
+                coverage = api_coverage[key][resources[kind]]
                 try:
-                    items = _pages(origin, path, params, token, fetch)
+                    items = _pages(origin, path, params, token, fetch, progress=coverage)
+                    coverage['status'] = 'ok'
                     for item in items:
                         if len(result["sources"]) >= MAX_FILES:
                             raise CollectionError("api_source_count_limit")
@@ -574,14 +597,25 @@ def collect_etl(config, token=None, fetch=None, *, cache_dir=None, download_fetc
                             source["content_hash"] = digest({key: value for key, value in source.items()
                                                              if key not in {"id", "updated_at", "content_hash"}})
                             result["sources"].append(source)
+                            coverage['collected'] += 1
                             if source["extraction_status"] != "parsed":
                                 result["issues"].append({"code": source["extraction_status"], "source_id": source["id"]})
+                                coverage.update(status='partial', code=source['extraction_status'])
                         except (ValueError, TypeError, AttributeError):
                             result["issues"].append({"code": "invalid_notice_fields", "course": key, "kind": kind})
+                            coverage.update(status='partial', code='invalid_notice_fields')
                 except CollectionError as error:
                     result["issues"].append({"code": error.code, "course": key, "kind": kind})
+                    coverage.update(status='partial' if coverage['count'] else 'unavailable', code=error.code)
                 except (ValueError, TypeError, AttributeError):
                     result["issues"].append({"code": "invalid_notice_fields", "course": key, "kind": kind})
+                    coverage.update(status='partial' if coverage['count'] else 'unavailable', code='invalid_notice_fields')
+                except Exception:
+                    result['issues'].append({'code': 'api_unavailable', 'course': key, 'kind': kind})
+                    coverage.update(status='partial' if coverage['count'] else 'unavailable', code='api_unavailable')
+                finally:
+                    coverage['incomplete'] = (coverage['status'] != 'ok' or not coverage['listing_complete']
+                                              or coverage['collected'] != coverage['count'])
             documents = collect_documents(origin, key, course_id, token, fetch, document_cache, references=references, term=config['term'])
             result['coverage'][key] = documents['coverage']
             result['issues'].extend(documents['issues'])
@@ -603,6 +637,14 @@ def collect_etl(config, token=None, fetch=None, *, cache_dir=None, download_fetc
         result["issues"].append({"code": "invalid_etl_configuration"})
     except Exception:
         result["issues"].append({"code": "api_unavailable"})
+    # A successful zero-row endpoint is distinct from a skipped or failed list.
+    # Pagination failure may leave a lower-bound count, never a complete count.
+    for course in api_coverage.values():
+        for resource in course.values():
+            if resource['status'] == 'not_checked':
+                resource['code'] = 'collection_incomplete'
+    result['coverage']['api_incomplete'] = (not api_coverage or
+        any(resource['incomplete'] for course in api_coverage.values() for resource in course.values()))
     if result["issues"]:
         result["status"] = "auth_required" if any(item["code"] == "auth_required" for item in result["issues"]) else (
             "partial" if result["sources"] else "error")

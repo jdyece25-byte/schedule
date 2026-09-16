@@ -2,7 +2,7 @@ import copy
 import json
 import unittest
 
-from src.bridge.school_knowledge import source_knowledge, build_school_context
+from src.bridge.school_knowledge import source_knowledge, build_school_context, clean
 from src.bridge.planner import build_prompt
 
 
@@ -60,6 +60,51 @@ class KnowledgeTests(unittest.TestCase):
         self.assertEqual(result['sources'][0]['id'], 'new')
         self.assertEqual(result['sources'][0]['excerpts'], ['2026-12-03 종강'])
         self.assertTrue(result['limited'])
+
+    def test_new_announcement_correction_outranks_old_syllabus_and_preserves_diff(self):
+        index = {'items': [
+            {'id': 'old', 'course_key': 'writing', 'updated_at': '2026-09-01',
+             'source_kind': 'etl_file', 'knowledge': {'excerpts': ['12/8 기말시험']}},
+            {'id': 'new', 'course_key': 'writing', 'updated_at': '2026-09-16',
+             'source_kind': 'etl_announcement', 'content_hash': 'new-hash',
+             'acknowledgement': {'state': 'read', 'source_hash': 'new-hash'},
+             'application': {'state': 'not_applied'},
+             'knowledge': {'excerpts': ['12/5 기말시험']},
+             'changes': {'previous_hash': 'old-hash', 'current_hash': 'new-hash',
+                         'added': ['12/5 기말시험'], 'removed': ['12/8 기말시험']}}]}
+        result = build_school_context(index, {'text': '대글 시험일 변경'}, limit=40)
+        current = result['sources'][0]
+        self.assertEqual(current['id'], 'new')
+        self.assertEqual(current['changes']['removed'], ['12/8 기말시험'])
+        self.assertEqual(current['acknowledgement']['state'], 'read')
+        self.assertEqual(current['application']['state'], 'not_applied')
+
+    def test_fact_categories_retain_exact_source_line_without_inventing_dates(self):
+        document = {'id': 'one', 'content_hash': 'revision-one', 'content':
+                    '일반 안내\n시험은 추후 안내\n9/20 과제 제출\n9/24 휴강\n준비물: 노트북 지참'}
+        knowledge = source_knowledge(document)
+        facts = {item['text']: item for item in knowledge['evidence']}
+        self.assertEqual(facts['시험은 추후 안내']['line_start'], 2)
+        self.assertIn('exam', facts['시험은 추후 안내']['categories'])
+        self.assertIn('deadline', facts['9/20 과제 제출']['categories'])
+        self.assertIn('cancellation', facts['9/24 휴강']['categories'])
+        self.assertIn('preparation', facts['준비물: 노트북 지참']['categories'])
+        self.assertEqual(facts['시험은 추후 안내']['source_hash'], 'revision-one')
+        self.assertNotIn('date', facts['시험은 추후 안내'])
+
+    def test_empty_quiz_description_still_retains_title_and_api_due_evidence(self):
+        knowledge = source_knowledge({'id': 'quiz-one', 'content_hash': 'one', 'kind': 'etl_quiz',
+                                      'title': 'Quiz 2', 'content': '', 'due_at': '2026-09-30T14:59:00Z'})
+        self.assertTrue(any('Quiz 2' in line for line in knowledge['excerpts']))
+        self.assertTrue(any('2026-09-30T14:59:00Z' in line for line in knowledge['excerpts']))
+        self.assertEqual({fact.get('field') for fact in knowledge['evidence']}, {'title', 'due_at'})
+        self.assertTrue(all(fact['line_start'] is None for fact in knowledge['evidence']))
+
+    def test_auth_headers_and_short_credentials_are_not_model_evidence(self):
+        text = 'Authorization: Basic c2VjcmV0\nCookie: sid=privatecookie\n제출 api_key=secretvalue'
+        cleaned = clean(text)
+        for secret in ('c2VjcmV0', 'privatecookie', 'secretvalue'):
+            self.assertNotIn(secret, cleaned)
 
     def test_line_count_long_line_and_summary_omissions_are_explicit(self):
         for source in (

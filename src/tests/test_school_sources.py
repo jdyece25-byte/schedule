@@ -309,6 +309,96 @@ class ApiSourceTests(unittest.TestCase):
         self.assertLessEqual(sum(len(s["content"].encode("utf-8")) for s in result["sources"]), 3)
         self.assertTrue(any(s["needs_review"] for s in result["sources"]))
 
+    def test_api_coverage_records_all_three_lists_and_preserves_document_coverage(self):
+        result = collect_etl(CONFIG, token='synthetic-private-token', fetch=self.fetch)
+        coverage = result['coverage']
+        self.assertFalse(coverage['api_incomplete'])
+        self.assertIn('files', coverage['writing'])
+        self.assertEqual(set(coverage['api']['writing']), {'assignments', 'announcements', 'quizzes'})
+        for resource in coverage['api']['writing'].values():
+            self.assertEqual(resource, {'status': 'ok', 'count': 1, 'collected': 1,
+                                        'pages': 1, 'listing_complete': True, 'incomplete': False})
+        metadata = json.dumps(coverage['api'])
+        for sensitive in ('https:', 'Bearer', 'synthetic-private-token', '과제 안내', 'secret'):
+            self.assertNotIn(sensitive, metadata)
+
+    def test_api_coverage_counts_all_pages_only_after_terminal_page(self):
+        def fetch(url, headers):
+            if urlsplit(url).path.endswith('/quizzes'):
+                if 'page=2' in url:
+                    return [{'id': 556, 'title': 'Second quiz'}], {}
+                return [{'id': 555, 'title': 'First quiz'}], {'Link': '<' + url + '&page=2>; rel="next"'}
+            return self.fetch(url, headers)
+        result = collect_etl(CONFIG, token='test', fetch=fetch)
+        quiz = result['coverage']['api']['writing']['quizzes']
+        self.assertEqual(quiz['count'], 2)
+        self.assertEqual(quiz['collected'], 2)
+        self.assertEqual(quiz['pages'], 2)
+        self.assertTrue(quiz['listing_complete'])
+        self.assertFalse(quiz['incomplete'])
+
+    def test_failed_later_api_page_retains_lower_bound_count_without_claiming_empty_or_complete(self):
+        def fetch(url, headers):
+            if urlsplit(url).path.endswith('/quizzes'):
+                if 'page=2' in url:
+                    raise CollectionError('http_503')
+                return [{'id': 555, 'title': 'First quiz'}], {'Link': '<' + url + '&page=2>; rel="next"'}
+            return self.fetch(url, headers)
+        result = collect_etl(CONFIG, token='test', fetch=fetch)
+        quiz = result['coverage']['api']['writing']['quizzes']
+        self.assertEqual(result['status'], 'partial')
+        self.assertEqual(quiz['status'], 'partial')
+        self.assertEqual(quiz['code'], 'http_503')
+        self.assertEqual(quiz['count'], 1)
+        self.assertEqual(quiz['pages'], 1)
+        self.assertEqual(quiz['collected'], 0)
+        self.assertFalse(quiz['listing_complete'])
+        self.assertTrue(quiz['incomplete'])
+        self.assertTrue(result['coverage']['api_incomplete'])
+        self.assertEqual(len(result['sources']), 2, 'other successful resources remain collected')
+
+    def test_complete_list_with_invalid_item_reports_missing_extraction_separately(self):
+        def fetch(url, headers):
+            payload, response_headers = self.fetch(url, headers)
+            if urlsplit(url).path.endswith('/assignments'):
+                payload.append({'id': 999, 'name': '', 'description': 'invalid title'})
+            return payload, response_headers
+        result = collect_etl(CONFIG, token='test', fetch=fetch)
+        assignment = result['coverage']['api']['writing']['assignments']
+        self.assertEqual(assignment['status'], 'partial')
+        self.assertEqual(assignment['count'], 2)
+        self.assertEqual(assignment['collected'], 1)
+        self.assertTrue(assignment['listing_complete'])
+        self.assertTrue(assignment['incomplete'])
+        self.assertEqual(assignment['code'], 'invalid_notice_fields')
+
+    def test_empty_successful_list_is_distinct_from_unavailable_course_and_authentication(self):
+        def fetch(url, headers):
+            return ([], {}) if urlsplit(url).path.endswith('/quizzes') else self.fetch(url, headers)
+        result = collect_etl(CONFIG, token='test', fetch=fetch)
+        empty = result['coverage']['api']['writing']['quizzes']
+        self.assertEqual(empty['status'], 'ok')
+        self.assertEqual(empty['count'], 0)
+        self.assertTrue(empty['listing_complete'])
+        self.assertFalse(empty['incomplete'])
+        self.catalog = []
+        for result in (collect_etl(CONFIG, token='test', fetch=self.fetch), collect_etl(CONFIG, token='')):
+            self.assertTrue(result['coverage']['api_incomplete'])
+            for resource in result['coverage']['api']['writing'].values():
+                self.assertEqual(resource['status'], 'unavailable')
+                self.assertFalse(resource['listing_complete'])
+                self.assertTrue(resource['incomplete'])
+
+    def test_api_text_truncation_does_not_claim_complete_extraction_despite_complete_listing(self):
+        with patch('src.school.sources.MAX_TOTAL_TEXT_BYTES', 3):
+            result = collect_etl(CONFIG, token='test', fetch=self.fetch)
+        assignment = result['coverage']['api']['writing']['assignments']
+        self.assertTrue(assignment['listing_complete'])
+        self.assertEqual(assignment['count'], assignment['collected'])
+        self.assertEqual(assignment['status'], 'partial')
+        self.assertTrue(assignment['incomplete'])
+        self.assertTrue(result['coverage']['api_incomplete'])
+
     def test_signed_urls_are_never_preserved_and_university_origin_validation_is_strict(self):
         self.assertEqual(safe_source_url("https://myetl.snu.ac.kr/courses/1/assignments/2?token=secret#anchor"),
                          "https://myetl.snu.ac.kr/courses/1/assignments/2")

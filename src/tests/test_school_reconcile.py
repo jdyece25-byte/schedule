@@ -201,6 +201,50 @@ class ReconcileTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.apply([original], [{**prepared, "auto_eligible": True}])
 
+    def test_approved_edited_deadline_cannot_be_replaced_by_later_api_due_date(self):
+        proposal = prepare(candidate(), [], CONFIG)
+        proposal['event']['s'] = 1320
+        result, _ = self.apply([], [proposal], approved=True)
+        confirmed = result[0]
+        self.assertTrue(confirmed['school']['user_confirmed'])
+        self.assertEqual(confirmed['school']['managed_hash'], event_hash(confirmed))
+        newer = {**SOURCE, 'content_hash': 'version-b'}
+        changed = candidate(source_hash='version-b', event={**candidate()['event'], 'd': '2026-09-23'})
+        prepared = prepare(changed, result, CONFIG)
+        self.assertEqual(prepared['action'], 'update')
+        self.assertFalse(prepared['auto_eligible'])
+        before = deepcopy(result)
+        # Apply repeats the protection even if a stale caller retains its old
+        # automatic flag or prepares the candidate before user confirmation.
+        with self.assertRaises(ValueError):
+            self.apply(result, [{**prepared, 'auto_eligible': True}], source=newer)
+        self.assertEqual(result, before)
+        revised, _ = self.apply(result, [prepared], approved=True, source=newer)
+        self.assertEqual(revised[0]['id'], confirmed['id'])
+        self.assertEqual(revised[0]['d'], '2026-09-23')
+        self.assertTrue(revised[0]['school']['user_confirmed'])
+
+    def test_confirmed_status_also_blocks_automatic_managed_update(self):
+        original = self.managed()
+        original['status'] = 'confirmed'
+        # Model a legacy confirmed event whose managed hash already includes
+        # its status; hash mismatch must not be the only safety check.
+        original['school']['managed_hash'] = event_hash(original)
+        proposal = prepare(candidate(event={**candidate()['event'], 's': 1320}), [original], CONFIG)
+        self.assertFalse(proposal['auto_eligible'])
+        with self.assertRaises(ValueError):
+            self.apply([original], [{**proposal, 'auto_eligible': True}])
+
+    def test_explicit_link_of_owned_event_records_confirmation_without_changing_event_fields(self):
+        original = self.managed()
+        proposal = prepare(candidate(), [original], CONFIG)
+        self.assertEqual(proposal['action'], 'link')
+        linked, _ = self.apply([original], [proposal], approved=True)
+        self.assertTrue(linked[0]['school']['user_confirmed'])
+        self.assertEqual(event_hash(original), event_hash(linked[0]))
+        changed = prepare(candidate(event={**candidate()['event'], 's': 1320}), linked, CONFIG)
+        self.assertFalse(changed['auto_eligible'])
+
     def test_managed_location_or_confirmation_change_is_not_discarded_as_link(self):
         original = self.managed()
         for fields in ({"loc": "새 강의실"}, {"status": "confirmed"}):
