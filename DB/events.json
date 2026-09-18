@@ -4173,5 +4173,19 @@
       "source_hash": "490a23fe42db8a90a2d5edee46cbd0bce38f36da68c94c7fa1746165126b45c0",
       "managed_hash": "2a09fe32a2488ea2425a5693fd3fc154371960520f08728eb6a440d4e5fef214"
     }
+  },
+  {
+    "d": "2026-09-23",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · Quiz 1",
+    "s": 840,
+    "id": "school-80fff598fa1dab02f392dd38c01b",
+    "school": {
+      "source_id": "964ba40bf0ce0da85b142864aa70a80aaf2af6e5bea33a3d09a38c31732ee52f",
+      "candidate_id": "e46705f2fee229f8670b2118a12da3b1dd8ecda35c96274151f15562a7280e68",
+      "course": "em",
+      "source_hash": "84746f0f364ccd75759535dc9cb6d472e8332549c5b89e8e1799e9147c6ceb5a",
+      "managed_hash": "971ecb2bdf5813b9ef40fe6a93aaed343702245d15c92c708b72a681b45f6268"
+    }
   }
 ]
