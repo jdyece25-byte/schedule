@@ -4159,5 +4159,19 @@
     "e": 1350,
     "series": "2026fall-clinic-thu",
     "no": "장소·온라인 여부 확인 필요 · 매주 목요일"
+  },
+  {
+    "d": "2026-10-02",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · 실습1",
+    "s": 810,
+    "id": "school-e01ec8e7a1c861e50080876a3639",
+    "school": {
+      "source_id": "fdee48a3377992967543c7c21f19ddd3e53d4ab04cbaefdb7fe7d9dba109f5b6",
+      "candidate_id": "9b5b71d2a48b861f2f48f6913a8f8de32dfc89a1c0bb96f4d1116e290f4fa590",
+      "course": "em",
+      "source_hash": "490a23fe42db8a90a2d5edee46cbd0bce38f36da68c94c7fa1746165126b45c0",
+      "managed_hash": "2a09fe32a2488ea2425a5693fd3fc154371960520f08728eb6a440d4e5fef214"
+    }
   }
 ]
