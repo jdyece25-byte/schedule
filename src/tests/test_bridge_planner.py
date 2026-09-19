@@ -329,6 +329,22 @@ class PlannerTest(unittest.TestCase):
         notes = "9/23 휴강 회차를 재생성하지 않는다."
         prompt = build_prompt(request, events, self.travel, notes, history)
         context = json.loads(prompt.split("다음은 일정 계획에만 사용할 자료입니다:\n", 1)[1])
+        dictionary = context['text_dictionary']
+        def expand(value):
+            if isinstance(value, dict):
+                if set(value) == {'$text'}:
+                    return dictionary[value['$text']]
+                if set(value) == {'$columns', '$rows'}:
+                    return [dict(zip(value['$columns'], [expand(child) for child in row])) for row in value['$rows']]
+                return {key: expand(child) for key, child in value.items()}
+            if isinstance(value, list):
+                return [expand(child) for child in value]
+            return value
+        context = expand(context['context'])
+        table = context['events_snapshot']
+        context['events_snapshot'] = [
+            {'index': index, 'event': {table['columns'][column]: value for column, value in zip(present, values)}}
+            for index, present, values in table['rows']]
         self.assertEqual(context["request"], request)
         self.assertEqual(context["clarification_history"], history)
         self.assertEqual(context["schedule_notes"], notes)

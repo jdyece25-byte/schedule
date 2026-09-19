@@ -159,6 +159,120 @@ def _location_id(value: str) -> None:
         raise PlanValidationError("location id: use only ASCII letters, digits and underscores")
 
 
+def compact_context(context):
+    """Lossless string interning; never discard events, evidence or exceptions."""
+    context = deepcopy(context)
+    # The planner needs identity/equality, not opaque cryptographic bytes.
+    # Original hashes remain in the private source index and commit validator.
+    identities = {}
+    def compact_provenance(value):
+        if isinstance(value, dict):
+            return {key: identities.setdefault(child, 'source' + str(len(identities)))
+                    if key in ('id', 'source_hash', 'previous_hash', 'current_hash')
+                    and isinstance(child, str) and re.fullmatch(r'[0-9a-f]{64}', child)
+                    else compact_provenance(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [compact_provenance(child) for child in value]
+        return value
+    context['school_context'] = compact_provenance(context.get('school_context'))
+    snapshots = context.get('events_snapshot', [])
+    columns = sorted({key for row in snapshots for key in row['event']})
+    # Presence indexes distinguish absent fields from explicit null values.
+    context['events_snapshot'] = {
+        'columns': columns,
+        'rows': [[row['index'], [index for index, key in enumerate(columns) if key in row['event']],
+                  [row['event'][key] for key in columns if key in row['event']]] for row in snapshots],
+    }
+    counts = Counter()
+    def count(value):
+        if isinstance(value, str) and len(value) >= 24:
+            counts[value] += 1
+        elif isinstance(value, dict):
+            for child in value.values():
+                count(child)
+        elif isinstance(value, list):
+            for child in value:
+                count(child)
+    count(context)
+    texts = sorted(text for text, times in counts.items() if times > 1)
+    lookup = {text: index for index, text in enumerate(texts)}
+    def encode(value):
+        if isinstance(value, str) and value in lookup:
+            return {"$text": lookup[value]}
+        if isinstance(value, dict):
+            return {key: encode(child) for key, child in value.items()}
+        if isinstance(value, list):
+            if len(value) >= 2 and all(isinstance(row, dict) for row in value):
+                keys = list(value[0])
+                if keys and all(set(row) == set(keys) for row in value):
+                    return {'$columns': keys, '$rows': [[encode(row[key]) for key in keys] for row in value]}
+            return [encode(child) for child in value]
+        return value
+    return {"text_dictionary": texts, "context": encode(context)}
+
+
+def daily_briefing(request, events, travel, history=None):
+    """Only exact, standalone calendar queries bypass the model. Never mutate."""
+    if history or request.get('parent_id'):
+        return None
+    text = request.get('text', '').strip()
+    match = re.fullmatch(
+        r'(오늘|내일|모레|이번\s*주|다음\s*주|이번\s*달|\d{4}-\d{2}-\d{2}|\d{1,2}월\s*\d{1,2}일)\s*(?:의\s*)?일정\s*'
+        r'(?:(?:을\s*)?(?:알려\s*줘|보여\s*줘|브리핑\s*해\s*줘|요약\s*해\s*줘|조회))?[.!?]?', text)
+    if not match:
+        return None
+    try:
+        today = _calendar_date(request.get('today'), 'request.today')
+        label = match[1]
+        normalized = re.sub(r'\s+', '', label)
+        end = None
+        if normalized in ('이번주', '다음주'):
+            day = today - timedelta(days=today.weekday())
+            if normalized == '다음주':
+                day += timedelta(days=7)
+            end = day + timedelta(days=6)
+        elif normalized == '이번달':
+            day = today.replace(day=1)
+            end = (day + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        elif label in ('오늘', '내일', '모레'):
+            day = today + timedelta(days=('오늘', '내일', '모레').index(label))
+        elif '월' in label:
+            month, number = map(int, re.findall(r'\d+', label))
+            day = date(today.year, month, number)
+        else:
+            day = date.fromisoformat(label)
+    except (ValueError, PlanValidationError):
+        return None
+    end = end or day
+    selected = sorted((event for event in events if day.isoformat() <= event.get('d', '') <= end.isoformat()),
+                      key=lambda event: (event['d'], event.get('s') is None, event.get('s') or 0))
+    def clock(minutes):
+        return f'{minutes // 60:02d}:{minutes % 60:02d}'
+    period = day.isoformat() if day == end else f'{day.isoformat()} ~ {end.isoformat()}'
+    lines = [f'{period} 등록된 일정 {len(selected)}건입니다.']
+    for event in selected:
+        when = clock(event['s']) if type(event.get('s')) is int else event.get('ti') or '시각 미정'
+        if type(event.get('s')) is int and type(event.get('e')) is int:
+            when += '–' + clock(event['e'])
+        location = event.get('loc') or travel.get('locations', {}).get(event.get('lid'))
+        if isinstance(location, dict):
+            location = location.get('name')
+        prefix = '' if day == end else event['d'] + ' '
+        line = f"• {prefix}{when} {event['n']}"
+        if location:
+            line += f' · {location}'
+        if event.get('status') == 'tentative':
+            line += ' · 확인 필요'
+        if event.get('no'):
+            line += '\n  ' + event['no']
+        lines.append(line)
+    lines.append('앱에 등록된 일정 기준이며, 미반영 학교 공지까지 확인한 결과는 아닙니다.')
+    message = '\n'.join(lines)
+    if len(message) > 8000:
+        return None
+    return {'status': 'ready', 'message': message, 'questions': [], 'operations': [], 'locations': [], 'routes': []}
+
+
 def build_prompt(
     request: dict[str, Any],
     events: list[dict[str, Any]],
@@ -172,12 +286,12 @@ def build_prompt(
         raise PlanValidationError("request: expected an object")
     _calendar_date(request.get("today"), "request.today")
     context = {
-        "request": request,
-        "clarification_history": history if history is not None else [],
         "events_snapshot": [{"index": index, "event": event} for index, event in enumerate(events)],
         "travel_snapshot": travel,
         "schedule_notes": schedule_notes,
         "school_context": school_context if isinstance(school_context, dict) else {"available": False, "sources": []},
+        "clarification_history": history if history is not None else [],
+        "request": request,
     }
     instructions = """당신은 개인 일정 변경안을 작성하는 계획기입니다. 아래 JSON 자료와 제공된 출력 스키마만 사용해 JSON 객체 하나를 반환하세요.
 셸 실행, 파일 읽기·수정, 웹 검색, 도구 호출, GitHub 접근, 커밋·푸시를 하지 마세요. 실제 변경은 별도 검증기가 담당합니다.
@@ -221,9 +335,10 @@ def build_prompt(
 - 한 요청에 operations 최대 500개, locations 최대 100개, routes 최대 500개입니다. 새로 추가하거나 날짜를 옮기는 일정은 현재 기준 앞뒤 10년 범위로 제한합니다.
 - 최상위 status,message,questions,operations,locations,routes를 반드시 모두 포함하고 출력 스키마 외 필드를 넣지 마세요. 마크다운이나 JSON 밖 설명을 붙이지 마세요.
 
+압축 형식: text_dictionary는 반복 문자열 표입니다. context 안의 {"$text":N}은 text_dictionary[N] 문자열과 정확히 같습니다. {$columns:[필드명...],$rows:[[값...],...]}는 같은 필드들을 가진 객체 배열입니다. 참조와 표를 해석해 사용하고 출력에는 참조가 아닌 원래 문자열을 쓰세요. events_snapshot.rows의 각 행은 [원본index, 존재하는 열번호 배열, 대응하는 값 배열]입니다. columns[열번호]가 필드명이며 없는 필드는 원본에도 없습니다. 학교 자료의 source숫자는 원문 식별값의 별칭이며 같은 별칭은 같은 원문 식별값입니다. 모든 일정과 근거가 포함되어 있습니다.
 다음은 일정 계획에만 사용할 자료입니다:
 """
-    return instructions + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
+    return instructions + json.dumps(compact_context(context), ensure_ascii=False, separators=(",", ":"))
 
 
 def _travel_changes(travel: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:

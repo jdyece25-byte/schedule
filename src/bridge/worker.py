@@ -16,11 +16,11 @@ import uuid
 
 try:
     from .github import GitHub, GitHubError
-    from .planner import PLAN_SCHEMA, apply_plan, build_prompt
+    from .planner import PLAN_SCHEMA, apply_plan, build_prompt, daily_briefing
     from .school_knowledge import build_school_context
 except ImportError:
     from github import GitHub, GitHubError
-    from planner import PLAN_SCHEMA, apply_plan, build_prompt
+    from planner import PLAN_SCHEMA, apply_plan, build_prompt, daily_briefing
     from school_knowledge import build_school_context
 
 KST = timezone(timedelta(hours=9))
@@ -137,6 +137,10 @@ class AgentRunner:
         ]
 
     def run(self, request, events, travel, notes, history, tick, school_context=None):
+        direct = daily_briefing(request, events, travel, history)
+        if direct is not None:
+            logging.info('Calendar briefing handled locally; no model invocation')
+            return direct
         root = Path(self.config["data_dir"]) / "jobs"
         folder = root / (request["id"] + "-" + uuid.uuid4().hex[:8])
         folder.mkdir(parents=True)
