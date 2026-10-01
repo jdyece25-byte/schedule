@@ -4587,5 +4587,19 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
+  },
+  {
+    "d": "2026-10-07",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · Quiz #2",
+    "s": 840,
+    "id": "school-45e16014509fa13857479246db65",
+    "school": {
+      "source_id": "81d3a0bd9a37bb845259e8117a6f7ef208cb156efbed7e765abc14401722719c",
+      "candidate_id": "e529015788cfcfeb5ef9d4c28e19d92ad500dd6030377ab796d6d49c230803c6",
+      "course": "em",
+      "source_hash": "12bf58b3a6fa05973123f1394723f1844862c1ecfbfc8c44aa9ebeca720e981d",
+      "managed_hash": "1d415042b80c87743501c09169796f54c404b971d37a4c8f0b549987d3238489"
+    }
   }
 ]
