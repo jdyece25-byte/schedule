@@ -1293,18 +1293,6 @@
     "loc": "서울대 301동 102호"
   },
   {
-    "id": "2026fall-writing-thu-2026-10-01",
-    "d": "2026-10-01",
-    "t": "class",
-    "n": "대학 글쓰기 1",
-    "ti": "15:30–16:45",
-    "s": 930,
-    "e": 1005,
-    "series": "2026fall-writing-thu",
-    "lid": "snu83",
-    "loc": "서울대 83동 401호"
-  },
-  {
     "id": "2026fall-clinic-thu-2026-10-01",
     "d": "2026-10-01",
     "t": "clinic",
@@ -1664,6 +1652,20 @@
     "e": 1200,
     "series": "2026fall-clinic-sun",
     "no": "장소·온라인 여부 확인 필요 · 매주 일요일"
+  },
+  {
+    "d": "2026-10-11",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab03] Lab Report",
+    "s": 1439,
+    "id": "school-6c2398efd27e6514dc344c7f6915",
+    "school": {
+      "source_id": "fcba1252f5ed69cadf0df605454b2ff70c7d08f731fa4524e7b091207410f791",
+      "candidate_id": "c5d5a4119515d6662629e7b4ca181581128a3ce83e7da471fa6f670964a20fba",
+      "course": "logic",
+      "source_hash": "73bf75a98dff9511ff8785378caefa3e8541f69d45218ae93383726059306919",
+      "managed_hash": "1cb0cfa1cd25174c9f64905a7576844a81f290c0a633e330efb67f32b334c740"
+    }
   },
   {
     "id": "20260914T054522317Z-bd97efd1-1306-4d73-a746-1b4c2426ef3c-6",
@@ -4586,19 +4588,5 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
-  },
-  {
-    "d": "2026-10-11",
-    "t": "deadline",
-    "n": "논리설계 및 실험 · [Lab03] Lab Report",
-    "s": 1439,
-    "id": "school-6c2398efd27e6514dc344c7f6915",
-    "school": {
-      "source_id": "fcba1252f5ed69cadf0df605454b2ff70c7d08f731fa4524e7b091207410f791",
-      "candidate_id": "c5d5a4119515d6662629e7b4ca181581128a3ce83e7da471fa6f670964a20fba",
-      "course": "logic",
-      "source_hash": "73bf75a98dff9511ff8785378caefa3e8541f69d45218ae93383726059306919",
-      "managed_hash": "1cb0cfa1cd25174c9f64905a7576844a81f290c0a633e330efb67f32b334c740"
-    }
   }
 ]
