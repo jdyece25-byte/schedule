@@ -1408,6 +1408,15 @@
     "no": "장소 확인 필요 · 매주 토요일"
   },
   {
+    "id": "20261001T173340698Z-aab32d70-94d7-4b1f-9c27-5e6453718e0b-2",
+    "d": "2026-10-04",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · Quiz #2 리마인드",
+    "ti": "12:00",
+    "s": 720,
+    "no": "퀴즈 응시 확인 · 제출 마감: 10월 7일 14:00"
+  },
+  {
     "id": "2026fall-clinic-sun-2026-10-04",
     "d": "2026-10-04",
     "t": "clinic",
@@ -1546,6 +1555,22 @@
     "series": "2026fall-em-wed",
     "lid": "snu301",
     "loc": "서울대 301동 102호"
+  },
+  {
+    "d": "2026-10-07",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · Quiz #2",
+    "s": 840,
+    "id": "school-45e16014509fa13857479246db65",
+    "school": {
+      "source_id": "81d3a0bd9a37bb845259e8117a6f7ef208cb156efbed7e765abc14401722719c",
+      "candidate_id": "e529015788cfcfeb5ef9d4c28e19d92ad500dd6030377ab796d6d49c230803c6",
+      "course": "em",
+      "source_hash": "12bf58b3a6fa05973123f1394723f1844862c1ecfbfc8c44aa9ebeca720e981d",
+      "managed_hash": "1d415042b80c87743501c09169796f54c404b971d37a4c8f0b549987d3238489"
+    },
+    "ti": "14:00까지",
+    "no": "응시 기간: 10월 3일부터 10월 7일 14:00까지 · 시작 시각 미정"
   },
   {
     "id": "2026fall-power-wed-2026-10-07",
@@ -4587,19 +4612,5 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
-  },
-  {
-    "d": "2026-10-07",
-    "t": "deadline",
-    "n": "기초전자기학 및 연습 · Quiz #2",
-    "s": 840,
-    "id": "school-45e16014509fa13857479246db65",
-    "school": {
-      "source_id": "81d3a0bd9a37bb845259e8117a6f7ef208cb156efbed7e765abc14401722719c",
-      "candidate_id": "e529015788cfcfeb5ef9d4c28e19d92ad500dd6030377ab796d6d49c230803c6",
-      "course": "em",
-      "source_hash": "12bf58b3a6fa05973123f1394723f1844862c1ecfbfc8c44aa9ebeca720e981d",
-      "managed_hash": "1d415042b80c87743501c09169796f54c404b971d37a4c8f0b549987d3238489"
-    }
   }
 ]
