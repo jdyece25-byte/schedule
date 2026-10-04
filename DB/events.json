@@ -1472,6 +1472,17 @@
     "no": "매주 월요일 · 2026년 12월까지"
   },
   {
+    "id": "20261004T095252651Z-efe759e1-62c9-482d-8036-4555a65ca879-1",
+    "d": "2026-10-05",
+    "t": "tutor",
+    "n": "과외 · 김주환",
+    "ti": "13:30–15:30",
+    "s": 810,
+    "e": 930,
+    "lid": "daechi_prugio_summit",
+    "loc": "대치 푸르지오써밋"
+  },
+  {
     "id": "2026fall-em-mon-2026-10-05",
     "d": "2026-10-05",
     "t": "class",
@@ -1928,6 +1939,20 @@
     "lid": "snu301",
     "loc": "서울대 301동 207호",
     "no": "격주 금요일 · 9/18 기준, 9/25 없음 · 실습 3 (Ex3: Electrostatic / FDM) — Finite Difference Method. OT 일정표 기준(변동 가능). · 준비물: 노트북과 패드 챙겨가기."
+  },
+  {
+    "d": "2026-10-16",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · 실습2",
+    "s": 810,
+    "id": "school-93ca6ddcc96bb55594322f656ac0",
+    "school": {
+      "source_id": "bc4f01878894afb1bf473aa7870aa1c79b5062a2731dc24637bef9f2e1f060fa",
+      "candidate_id": "ace0083506d8c3c3c2fcff05989f7a87642ee05573e9d21eba00c5cf38347587",
+      "course": "em",
+      "source_hash": "b057035391431f5fbe28d72373747980b92ffba37a1ee2e1a8cb1ffea4fa8e0a",
+      "managed_hash": "ca924621e85debba5d3a1cd3852c36b2ffb9a498871349ebdcbc8f725c364aac"
+    }
   },
   {
     "id": "2026fall-leadership-2026-10-16",
@@ -4644,19 +4669,5 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
-  },
-  {
-    "d": "2026-10-16",
-    "t": "deadline",
-    "n": "기초전자기학 및 연습 · 실습2",
-    "s": 810,
-    "id": "school-93ca6ddcc96bb55594322f656ac0",
-    "school": {
-      "source_id": "bc4f01878894afb1bf473aa7870aa1c79b5062a2731dc24637bef9f2e1f060fa",
-      "candidate_id": "ace0083506d8c3c3c2fcff05989f7a87642ee05573e9d21eba00c5cf38347587",
-      "course": "em",
-      "source_hash": "b057035391431f5fbe28d72373747980b92ffba37a1ee2e1a8cb1ffea4fa8e0a",
-      "managed_hash": "ca924621e85debba5d3a1cd3852c36b2ffb9a498871349ebdcbc8f725c364aac"
-    }
   }
 ]
