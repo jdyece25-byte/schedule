@@ -1981,17 +1981,6 @@
     "no": "매주 토요일 · 총 16회 중 4회"
   },
   {
-    "id": "2026fall-tutor-jung-2026-10-17",
-    "d": "2026-10-17",
-    "t": "tutor",
-    "n": "과외 · 정예원",
-    "ti": "13:30–16:00",
-    "s": 810,
-    "e": 960,
-    "series": "2026fall-tutor-jung",
-    "no": "장소 확인 필요 · 매주 토요일"
-  },
-  {
     "id": "2026fall-clinic-sun-2026-10-18",
     "d": "2026-10-18",
     "t": "clinic",
@@ -2465,6 +2454,20 @@
     "lid": "snu301",
     "loc": "서울대 301동 207호",
     "no": "격주 금요일 · 9/18 기준, 9/25 없음 · 실습 4 (Ex4: Electrostatic / FDM) — OT 일정표 기준(변동 가능). · 준비물: 노트북과 패드 챙겨가기."
+  },
+  {
+    "d": "2026-10-30",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · 실습3",
+    "s": 810,
+    "id": "school-88e9562590cce129ca62718367d4",
+    "school": {
+      "source_id": "14d58589c79974f0bb3046f5eebd14cd2d8098ff6cbca267f163f5a1bdf10ad5",
+      "candidate_id": "2053c0ee2bd786b7bb733c899a8847dc256d2d07440da02ab4c08fca141318dc",
+      "course": "em",
+      "source_hash": "a52411d28e3adda2ae7c7b8b1f42a78208d2d0fc4b81db2590356d3797ff9097",
+      "managed_hash": "73343af271e34ea2e13904b731bc43a5a5f05d4b19ce0280ccf8fed3a4119168"
+    }
   },
   {
     "id": "2026fall-leadership-2026-10-30",
@@ -4400,19 +4403,5 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
-  },
-  {
-    "d": "2026-10-30",
-    "t": "deadline",
-    "n": "기초전자기학 및 연습 · 실습3",
-    "s": 810,
-    "id": "school-88e9562590cce129ca62718367d4",
-    "school": {
-      "source_id": "14d58589c79974f0bb3046f5eebd14cd2d8098ff6cbca267f163f5a1bdf10ad5",
-      "candidate_id": "2053c0ee2bd786b7bb733c899a8847dc256d2d07440da02ab4c08fca141318dc",
-      "course": "em",
-      "source_hash": "a52411d28e3adda2ae7c7b8b1f42a78208d2d0fc4b81db2590356d3797ff9097",
-      "managed_hash": "73343af271e34ea2e13904b731bc43a5a5f05d4b19ce0280ccf8fed3a4119168"
-    }
   }
 ]
