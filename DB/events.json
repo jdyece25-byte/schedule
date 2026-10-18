@@ -4403,5 +4403,19 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
+  },
+  {
+    "d": "2026-10-19",
+    "t": "deadline",
+    "n": "대학 글쓰기 1 · 과제 3 연구계획서",
+    "s": 1439,
+    "id": "school-c11a8351c76ee2139e14d7c294b4",
+    "school": {
+      "source_id": "95ce302d88c443468138bc3ca3d87693130efdce1c94dd2638e2ac4279f0c23f",
+      "candidate_id": "7af4417367cf6238c24ed0ac1c126592cd05aea0be0c74c4879c0417d3f283e2",
+      "course": "writing",
+      "source_hash": "2860c89b0a419c57fa3604a3e2cfe2d3ce6d815a2cd025464b3c85cb5e3eb85b",
+      "managed_hash": "324a5e6883c347d4e6d40fa2a8af8022af12228a0b0746e15cdfa6f95c269b24"
+    }
   }
 ]
