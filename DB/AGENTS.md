@@ -17,6 +17,10 @@ The mobile request worker is documented in `src/README.md`. It updates remote `m
 
 ## Publish DB edits while the worker stays online
 
+### Cloud execution from a tablet/browser
+
+When running in an isolated cloud checkout without the owner's Windows host, do not run the local service installer, supervisor recovery, or local OS-lock health check. Missing `%LOCALAPPDATA%/ScheduleBridge` in that checkout is not evidence that the real service has failed. State that local service health could not be verified. If already-authorized access to the private request repository is available, inspect its remote heartbeat separately; a fresh heartbeat does not prove local OS locks. Do not request or copy PC credentials merely to edit public schedule files. Repository-only edits may proceed with this explicitly reported verification limit. All schedule preservation, validation, concurrency, and publication rules below still apply. An installed PC runtime update needs a separate host-side operation; a Git commit does not install it.
+
 1. Inspect local changes and fetch remote updates. Fast-forward a clean branch; preserve unrelated local work.
 2. Read current JSON plus semester notes and make only the requested edits. Keep logically related event/location changes together.
 3. Run `python -B src/validate_db.py`. This validates shape, dates and ranges without freezing personal schedules to an old semester. Overlaps and missing travel information require an explanation, not automatic movement/deletion.

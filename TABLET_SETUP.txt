@@ -1,0 +1,31 @@
+태블릿 Chrome에서 스케줄 앱 편집
+
+대상 저장소: https://github.com/jdyece25-byte/schedule
+배포 사이트: https://jdyece25-byte.github.io/schedule/
+
+이 파일은 작업 지침이다. 이 파일을 저장하는 것만으로 ChatGPT 계정의 GitHub 연결이나 Cloud 환경이 생성되지는 않는다.
+
+최초 계정 설정
+1. ChatGPT 웹에서 Codex의 Work in > Cloud > Select environment > Create environment를 선택한다. 또는 Settings > Codex Cloud > Environments에서 생성한다. 계정에서 제공되는 메뉴를 사용한다.
+2. GitHub 연결 후 jdyece25-byte/schedule 저장소를 선택한다. 저장소 주소를 일반 채팅에 붙이는 것만으로 쓰기 권한은 생기지 않는다.
+3. 아래 환경 준비 프롬프트로 준비 및 검증을 진행하고 결과를 확인한 뒤 Publish한다.
+4. Environment published 확인 후 새 작업에서 이 환경을 선택한다. 아래 작업 프롬프트를 붙이고 원하는 변경을 덧붙인다.
+
+환경 준비 프롬프트
+jdyece25-byte/schedule 저장소의 일정과 웹 화면을 태블릿 브라우저에서 수정하기 위한 개인용 Cloud 환경을 준비해줘. AGENTS.md, DB/AGENTS.md, src/AGENTS.md, src/README.md를 읽어줘. Python 3.12와 Node.js 22 이상을 준비하고 python -B src/validate_db.py, node --test src/tests/schedule.test.cjs src/tests/bridge-client.test.cjs src/tests/push-client.test.cjs src/tests/school-client.test.cjs, python -B -m unittest discover -s src/tests -p 'test_*.py' -v를 실행해줘. 임시 디렉터리에 python src/build.py <임시 출력 경로>로 사이트 빌드도 확인해줘. 필요한 의존성은 저장소와 실제 오류에서 확인하고 설치해줘. 이 준비 단계에서는 일정과 앱 소스를 바꾸지 말고, PC 서비스 설치·중지·복구 명령도 실행하지 마. PC 인증정보나 eTL 토큰은 이 환경 준비에 필요하지 않아. 실행 결과와 실행하지 못한 검사를 구별하고, 환경 게시가 가능한 상태인지 알려줘.
+
+평소 작업 프롬프트
+내 스케줄 앱 저장소 https://github.com/jdyece25-byte/schedule 에서 작업해줘. 시간대는 Asia/Seoul이야.
+먼저 실제 저장소 접근·파일 편집·명령 실행·GitHub 반영 가능 여부를 확인해줘. 읽기만 가능한 대화라면 수정했다고 말하지 말고 필요한 연결을 알려줘.
+AGENTS.md, DB/AGENTS.md, src/AGENTS.md와 관련 코드를 읽고 최신 원격 변경을 반영해줘. 일정의 현재 기준은 DB/events.json, DB/travel.json, DB/plan.json이고 학기 규칙은 DB/SCHEDULE.md를 참고해줘.
+내 요청에 필요한 부분만 수정하고 기존 일정 ID, 반복 예외, 취소, 확인 필요 상태와 다른 작업자의 변경을 보존해줘. 모호한 날짜나 시간만 질문해줘.
+일정 변경은 DB 검증, 코드 변경은 저장소가 요구하는 테스트와 사이트 빌드를 수행해줘. 클라우드에 없는 내 PC의 서비스 상태는 확인 불가로 표시하고 서비스 재설치·중지·복구를 실행하지 마.
+요청한 변경에는 검증 후 GitHub 반영과 기존 사이트 배포까지 포함해. 허용된 권한으로 main에 정상 반영하고, 직접 반영이 지원되지 않으면 PR을 만들어 링크와 남은 병합 단계를 알려줘. 강제 푸시는 하지 말고 동시에 생긴 변경은 최신 내용을 다시 읽어 조정해줘.
+파일 수정, GitHub 반영, Pages 배포 성공을 각각 실제 근거로 구분해서 보고해줘. PC 설치형 처리기 코드를 바꿨다면 별도 설치가 남았다고 알려줘. 토큰이나 비공개 공지 원문을 공개 저장소에 넣지 마.
+이번 요청: [여기에 원하는 일정 또는 앱 기능 변경을 작성]
+
+운영 참고
+- main push가 .github/workflows/pages.yml을 실행한다. PR 생성만으로 사이트에 반영되지는 않는다.
+- Windows PC의 자연어 처리기·학교 수집기는 별도 설치 프로그램이다. Cloud 작업은 이를 자동 업데이트하지 않는다.
+- Cloud의 PC 서비스 상태 확인 한계는 DB/AGENTS.md에 규정되어 있다.
+- 공식 안내: https://learn.chatgpt.com/docs/environments/cloud-environments
