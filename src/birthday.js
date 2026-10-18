@@ -1,7 +1,7 @@
 /* A date-only gift: no schedule writes, credentials, audio or external requests. */
 (() => {
   'use strict';
-  let dialog, frame = 0, opener;
+  let dialog, frame = 0, opener, blowTimers = [], blowing = false, blowRun = 0;
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const paragraphs = [
     '생일 축하해!! 출국한 지도 벌써 한달이 넘어가네 교환 준비하고 적응하는 데에 챙길 게 너무 많았을 텐데도 벌써 룸메들이랑 잘 지내는 게 정말 대단하고 멋있어 앞으로도 유덥에서 좋은 시간만 잔뜩 보내고 무사히 돌아왔으면 좋겠다.',
@@ -82,6 +82,46 @@
     frame=requestAnimationFrame(draw);
   }
 
+  function setCandle(out) {
+    dialog.classList.toggle('candles-out', out);
+    dialog.querySelector('.birthday-candle-button').setAttribute('aria-pressed', String(out));
+    dialog.querySelector('.birthday-candle-button').setAttribute('aria-label', out ? '촛불 켜기' : '촛불 끄기');
+    dialog.querySelector('.birthday-blow').textContent = out ? '촛불 켜기' : '촛불 끄기';
+  }
+  function clearBlow() {
+    blowRun++;
+    blowTimers.forEach(clearTimeout); blowTimers = []; blowing = false;
+    dialog.classList.remove('blowing', 'blow-wind');
+    dialog.querySelector('.birthday-stage').removeAttribute('aria-busy');
+    for (const selector of ['.birthday-candle-button', '.birthday-blow']) dialog.querySelector(selector).disabled = false;
+  }
+  function settleBlow() {
+    if (blowing) setCandle(true);
+    clearBlow();
+  }
+  async function toggleCandle() {
+    if (blowing) return;
+    if (dialog.classList.contains('candles-out')) { clearBlow(); setCandle(false); return; }
+    stop();
+    if (motion.matches) { setCandle(true); return; }
+    blowing = true;
+    const run = ++blowRun;
+    dialog.querySelector('.birthday-stage').setAttribute('aria-busy', 'true');
+    for (const selector of ['.birthday-candle-button', '.birthday-blow']) dialog.querySelector(selector).disabled = true;
+    const pose = dialog.querySelector('.birthday-pose');
+    // The extra pose loads when the dialog opens; a missing asset never traps the controls.
+    if (!pose.complete || !pose.naturalWidth) {
+      setCandle(true); clearBlow(); return;
+    }
+    dialog.classList.add('blowing');
+    const later = (ms, action) => blowTimers.push(setTimeout(() => {
+      if (run === blowRun && dialog.open) action();
+    }, ms));
+    later(650, () => dialog.classList.add('blow-wind'));
+    later(1350, () => setCandle(true));
+    later(2600, () => { clearBlow(); celebrate(); });
+  }
+
   function create() {
     dialog = document.createElement('dialog');
     dialog.className = 'birthday-dialog';
@@ -91,7 +131,9 @@
       <div class="birthday-scroll"><section class="birthday-hero">
         <div class="birthday-stage">
           <div class="birthday-scene">
-            <img class="birthday-photo" src="birthday-night.webp" width="1024" height="1536" alt="은하수가 펼쳐진 밤하늘과 생크림 케이크" decoding="async">
+            <img class="birthday-photo" src="birthday-night.webp?v=20261020-4" width="1024" height="1536" alt="은하수 아래 남녀가 함께 케이크를 바라보는 모습" decoding="async">
+            <img class="birthday-pose" src="birthday-blow.webp?v=20261020-4" width="1024" height="1536" alt="" aria-hidden="true" decoding="async">
+            <svg class="birthday-breath" viewBox="0 0 1024 1536" aria-hidden="true"><path d="M609 892 Q574 930 508 979"/><path d="M617 900 Q585 940 516 990"/><path d="M605 888 Q563 916 503 971"/></svg>
             <div class="birthday-candle-glow" aria-hidden="true"></div>
             <button class="birthday-candle-button" type="button" aria-label="촛불 끄기" aria-pressed="false">
               <span class="birthday-wax" aria-hidden="true"></span><span class="birthday-wick" aria-hidden="true"></span>
@@ -114,27 +156,19 @@
     }
     document.body.appendChild(dialog);
     dialog.querySelector('.birthday-close').addEventListener('click', () => dialog.close());
-    dialog.addEventListener('close', () => { stop(); if (opener?.isConnected) opener.focus(); });
-    function toggleCandle() {
-      const out = !dialog.classList.contains('candles-out');
-      dialog.classList.toggle('candles-out', out);
-      dialog.querySelector('.birthday-candle-button').setAttribute('aria-pressed', String(out));
-      dialog.querySelector('.birthday-candle-button').setAttribute('aria-label', out ? '촛불 켜기' : '촛불 끄기');
-      dialog.querySelector('.birthday-blow').textContent = out ? '촛불 켜기' : '촛불 끄기';
-      if (out) celebrate();
-    }
+    dialog.addEventListener('close', () => { clearBlow(); stop(); if (opener?.isConnected) opener.focus(); });
     dialog.querySelector('.birthday-candle-button').addEventListener('click', toggleCandle);
     dialog.querySelector('.birthday-blow').addEventListener('click', toggleCandle);
     dialog.querySelector('.birthday-replay').addEventListener('click', celebrate);
     dialog.querySelector('.birthday-primary').addEventListener('click', event => {
-      stop();
+      settleBlow(); stop();
       dialog.querySelector('.birthday-letter').hidden = false;
       event.currentTarget.setAttribute('aria-expanded', 'true');
       dialog.querySelector('.birthday-letter').focus({preventScroll:true});
       dialog.querySelector('.birthday-letter').scrollIntoView({behavior:motion.matches?'auto':'smooth', block:'start'});
     });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
-    motion.addEventListener('change', stop);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { settleBlow(); stop(); } });
+    motion.addEventListener('change', () => { settleBlow(); stop(); });
     window.addEventListener('resize', stop);
   }
   window.ScheduleBirthday = {
@@ -142,10 +176,7 @@
       if (!dialog) create();
       if (dialog.open) return;
       opener = document.activeElement;
-      dialog.classList.remove('candles-out');
-      dialog.querySelector('.birthday-candle-button').setAttribute('aria-pressed', 'false');
-      dialog.querySelector('.birthday-candle-button').setAttribute('aria-label', '촛불 끄기');
-      dialog.querySelector('.birthday-blow').textContent = '촛불 끄기';
+      clearBlow(); setCandle(false);
       dialog.querySelector('.birthday-letter').hidden = true;
       dialog.querySelector('.birthday-primary').setAttribute('aria-expanded', 'false');
       dialog.showModal();

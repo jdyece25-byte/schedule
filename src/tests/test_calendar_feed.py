@@ -167,7 +167,7 @@ class CalendarBuildTests(unittest.TestCase):
                     "push-client.css", "manifest.webmanifest", "sw.js", "push-config.json",
                     "icon-192.png", "icon-512.png", "badge-96.png", "events.ics",
                     "school-client.js", "school-client.css", "school-calendar.js",
-                    "birthday.js", "birthday.css", "birthday-night.webp",
+                    "birthday.js", "birthday.css", "birthday-night.webp", "birthday-blow.webp",
                     "DB/events.json", "DB/travel.json", "DB/plan.json",
                     "events.json", "travel.json", "plan.json"}
         self.assertEqual(files, expected)

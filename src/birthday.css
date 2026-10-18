@@ -11,11 +11,11 @@
 .birthday-stage{position:relative;overflow:hidden;width:100%;height:calc(100vh - 110px - env(safe-area-inset-bottom));height:calc(100dvh - 110px - env(safe-area-inset-bottom));min-height:420px}
 .birthday-scene{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max(100%,calc((100vh - 110px - env(safe-area-inset-bottom))*2/3));width:max(100%,calc((100dvh - 110px - env(safe-area-inset-bottom))*2/3));min-width:280px;aspect-ratio:2/3}
 .birthday-photo{display:block;width:100%;height:auto}
-.birthday-candle-button{position:absolute;left:50%;top:69.5%;transform:translate(-50%,-100%);width:64px;height:13%;min-height:80px;padding:0;border:0;background:transparent;cursor:pointer;z-index:3;-webkit-tap-highlight-color:transparent}
+.birthday-candle-button{position:absolute;left:50%;top:71.5%;transform:translate(-50%,-100%);width:64px;height:13%;min-height:80px;padding:0;border:0;background:transparent;cursor:pointer;z-index:3;-webkit-tap-highlight-color:transparent}
 .birthday-wax{position:absolute;bottom:0;left:calc(50% - 3px);width:6px;height:48%;border-radius:2px 2px 1px 1px;background:linear-gradient(90deg,#927e5c,#f6e6bb 35%,#ddc99f 70%,#9e8661);box-shadow:2px 1px 3px #0005}
 .birthday-wick{position:absolute;left:calc(50% - .5px);bottom:48%;height:5%;width:1px;background:#322c27}
 .birthday-flame{position:absolute;left:calc(50% - 4px);bottom:51%;width:8px;height:22%;border-radius:60% 40% 45% 45%;background:radial-gradient(ellipse at 50% 88%,#7187d8 0,transparent 25%),linear-gradient(#ffb958,#fffbe3 50%,#fff0ab 80%,#d38028);box-shadow:0 0 7px #ffdb9b,0 0 21px #ffa94d99;transform-origin:50% 100%;animation:birthday-flame 1.8s ease-in-out infinite alternate;transition:opacity .25s,filter .25s}
-.birthday-candle-glow{position:absolute;left:50%;top:66%;width:32%;aspect-ratio:1;transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(ellipse,#ffce7617,transparent 68%);transition:opacity .6s}
+.birthday-candle-glow{position:absolute;left:50%;top:68%;width:32%;aspect-ratio:1;transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(ellipse,#ffce7617,transparent 68%);transition:opacity .6s}
 .birthday-smoke{position:absolute;left:calc(50% - 5px);bottom:52%;width:10px;height:45%;border-left:2px solid #c5cbd588;border-radius:50%;filter:blur(2px);opacity:0;pointer-events:none}
 .candles-out .birthday-flame,.candles-out .birthday-candle-glow{opacity:0;animation:none}
 .candles-out .birthday-smoke{animation:birthday-smoke 2.8s ease-out both}
@@ -30,3 +30,13 @@
 @media(prefers-reduced-motion:reduce){.birthday-dialog *{animation:none!important;scroll-behavior:auto!important}}
 @media(max-width:360px){.birthday-scroll{padding-left:14px;padding-right:14px}.birthday-letter{padding:28px 22px}.birthday-hero{width:calc(100% + 28px);margin-left:-14px;margin-right:-14px}}
 @media(min-aspect-ratio:2/3){.birthday-stage{width:calc(max(420px,100dvh - 110px - env(safe-area-inset-bottom))*2/3);max-width:100%;margin-inline:auto}}
+
+.birthday-pose{position:absolute;inset:0;width:100%;height:auto;opacity:0;pointer-events:none;transition:opacity .65s ease-in-out;-webkit-mask-image:radial-gradient(ellipse 40% 29% at 76% 58%,#000 60%,transparent 100%);mask-image:radial-gradient(ellipse 40% 29% at 76% 58%,#000 60%,transparent 100%)}
+.blowing .birthday-pose{opacity:1}
+.birthday-breath{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0;fill:none;stroke:#e6e9ed;stroke-width:1;stroke-linecap:round;filter:blur(.6px)}
+.blow-wind .birthday-breath{animation:birthday-breath .8s ease-out both}
+.blow-wind:not(.candles-out) .birthday-flame{animation:birthday-blow-flame .7s ease-in both}
+.birthday-blow:disabled{opacity:.65;cursor:default}
+@keyframes birthday-breath{0%{opacity:0;stroke-dasharray:0 160}35%{opacity:.24;stroke-dasharray:60 160;stroke-dashoffset:0}100%{opacity:0;stroke-dasharray:60 160;stroke-dashoffset:-120}}
+@keyframes birthday-blow-flame{0%{transform:rotate(0) scale(1)}35%{transform:rotate(-45deg) scale(.8,1.1)}65%{transform:rotate(-65deg) scale(.7,.9)}100%{transform:rotate(-75deg) scale(.25,.5);opacity:0}}
+@media(prefers-reduced-motion:reduce){.birthday-pose,.birthday-flame,.birthday-candle-glow{transition:none}.birthday-breath{display:none}}
