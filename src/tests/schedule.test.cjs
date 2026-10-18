@@ -262,3 +262,19 @@ test('calendar notice titles and source identifiers cannot inject markup or hand
   assert.match(rendered, /data-school-source="&quot;&gt;&lt;img/);
   assert.equal(a.context.stolen, undefined);
 });
+
+
+test('birthday gift appears only on October 20, 2026 without changing schedule data', async () => {
+  const a = app(); await a.run('loadData()');
+  const before = a.run('JSON.stringify(EVENTS)');
+  a.run("calendarYear=2026;calendarMonth=9;buildCal();selDay('2026-10-20')");
+  assert.match(a.get('panelBody').innerHTML, /birthday-entry/);
+  assert.match(a.get('panelBody').innerHTML, /생일 축하/);
+  const birthday = a.get('calGrid').children.find(e => e.dataset.date === '2026-10-20');
+  assert.ok(birthday.children.some(e => e.className === 'birthday-chip'));
+  for (const date of ['2026-10-19', '2026-10-21', '2027-10-20']) {
+    a.run(`selDay('${date}')`);
+    assert.doesNotMatch(a.get('panelBody').innerHTML, /birthday-entry/);
+  }
+  assert.equal(a.run('JSON.stringify(EVENTS)'), before);
+});

@@ -11,6 +11,8 @@
 <link rel="stylesheet" href="bridge-client.css?v=20260914-layout">
 <link rel="stylesheet" href="push-client.css?v=20260914-push1">
 <link rel="stylesheet" href="school-client.css?v=20260915-calendar1">
+<link rel="stylesheet" href="birthday.css?v=20261020-1">
+<script src="birthday.js?v=20261020-1" defer></script>
 <title>동영 스케줄</title>
 <style>
 :root{
@@ -1203,6 +1205,10 @@ function buildCal(){
     dn.className='dn'+(dow===0?' s':dow===6?' sa':'');
     dn.innerHTML=d+(ds===TODAY?' <span class="tb">오늘</span>':'');
     cell.appendChild(dn);
+    if(ds==='2026-10-20'){
+      const birthday=document.createElement('div');birthday.className='birthday-chip';
+      birthday.textContent='🎂 생일';cell.appendChild(birthday);
+    }
     if(notices.length){
       const badge=document.createElement('div');badge.className='calendar-school-chip';
       const count=new Set(notices.map(row=>row.sourceId)).size;
@@ -1284,6 +1290,9 @@ function selDay(ds){
   if(notices.length){
     document.getElementById('panelSub').textContent+=` · 학교 공지 ${new Set(notices.map(row=>row.sourceId)).size}건`;
     pb.innerHTML+=schoolCalendarCards(notices);
+  }
+  if(ds==='2026-10-20'){
+    pb.innerHTML='<button type="button" class="birthday-entry" onclick="window.ScheduleBirthday.open()"><span aria-hidden="true">🎂</span><span><strong>생일 축하</strong><small>누나를 위해 준비한 작은 선물</small></span><span aria-hidden="true">›</span></button>'+pb.innerHTML;
   }
   // Open panel (slide in on mobile, already visible on desktop)
   document.getElementById('calPanel').classList.add('open');
