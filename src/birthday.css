@@ -1,6 +1,6 @@
-.birthday-chip{color:#ffbbd5;font-size:10px;margin:3px 0;font-weight:700}
-.birthday-entry{width:100%;min-height:64px;display:flex;align-items:center;gap:13px;padding:15px 18px;margin-bottom:18px;border:1px solid #f4a8c85c;border-radius:17px;background:linear-gradient(120deg,#44243c,#262445);color:#ffe5ee;text-align:left;cursor:pointer;font:inherit;touch-action:manipulation}
-.birthday-entry>span:first-child{font-size:29px}.birthday-entry strong{display:block;font-size:16px}.birthday-entry>span:last-child{margin-left:auto;font-size:24px}
+.birthday-chip{font-size:16px;line-height:1.3;margin:3px 0}
+.birthday-entry{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;padding:0;margin-bottom:18px;border:1px solid #f4a8c85c;border-radius:14px;background:linear-gradient(120deg,#44243c,#262445);cursor:pointer;font:inherit;touch-action:manipulation}
+.birthday-entry span{font-size:27px}.birthday-entry:focus-visible{outline:3px solid #ffcf8c;outline-offset:3px}
 .birthday-dialog{position:fixed;inset:0;width:100%;max-width:none;height:100%;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:#080918;color:#fff1e7;overflow:hidden;overscroll-behavior:contain}
 .birthday-dialog::backdrop{background:#080918}.birthday-dialog:not([open]){display:none}
 .birthday-scroll{height:100%;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 22px calc(35px + env(safe-area-inset-bottom));background:#070b10}
