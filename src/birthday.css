@@ -1,27 +1,39 @@
 .birthday-chip{color:#ffbbd5;font-size:10px;margin:3px 0;font-weight:700}
 .birthday-entry{width:100%;min-height:64px;display:flex;align-items:center;gap:13px;padding:15px 18px;margin-bottom:18px;border:1px solid #f4a8c85c;border-radius:17px;background:linear-gradient(120deg,#44243c,#262445);color:#ffe5ee;text-align:left;cursor:pointer;font:inherit;touch-action:manipulation}
-.birthday-entry>span:first-child{font-size:29px}.birthday-entry strong{display:block;font-size:16px}.birthday-entry small{display:block;margin-top:5px;color:#dfb9d0}.birthday-entry>span:last-child{margin-left:auto;font-size:24px}
-.birthday-dialog{position:fixed;inset:0;width:100%;max-width:none;height:100%;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:#140f24;color:#fff1e7;overflow:hidden;overscroll-behavior:contain}
-.birthday-dialog::backdrop{background:#140f24}.birthday-dialog:not([open]){display:none}
-.birthday-scroll{height:100%;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:calc(70px + env(safe-area-inset-top)) 22px calc(40px + env(safe-area-inset-bottom));background:radial-gradient(ellipse at 50% 24%,#59334f77,transparent 58%),radial-gradient(ellipse at 90% 80%,#382a6077,transparent 65%)}
-.birthday-close{position:absolute;z-index:4;top:calc(12px + env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right));width:44px;height:44px;border:1px solid #ffffff30;border-radius:50%;color:#fff1e7;background:#211a34;font-size:25px;cursor:pointer}
+.birthday-entry>span:first-child{font-size:29px}.birthday-entry strong{display:block;font-size:16px}.birthday-entry>span:last-child{margin-left:auto;font-size:24px}
+.birthday-dialog{position:fixed;inset:0;width:100%;max-width:none;height:100%;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:#080918;color:#fff1e7;overflow:hidden;overscroll-behavior:contain}
+.birthday-dialog::backdrop{background:#080918}.birthday-dialog:not([open]){display:none}
+.birthday-scroll{height:100%;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 22px calc(35px + env(safe-area-inset-bottom));background:radial-gradient(ellipse at 50% 55%,#41246a88,transparent 62%),radial-gradient(ellipse at 10% 15%,#173c6355,transparent 60%)}
+.birthday-close{position:absolute;z-index:4;top:calc(12px + env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right));width:44px;height:44px;border:1px solid #ffffff30;border-radius:50%;color:#fff1e7;background:#16132cdd;font-size:25px;cursor:pointer}
 .birthday-dialog button{touch-action:manipulation}.birthday-dialog button:focus-visible{outline:3px solid #ffcf8c;outline-offset:5px}
 .birthday-confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
-.birthday-hero{text-align:center;max-width:480px;margin:0 auto;position:relative;z-index:1}
-.birthday-eyebrow{font-size:11px;letter-spacing:5px;color:#e6bc9c;margin-bottom:24px}.birthday-hero h1{font-family:'Iowan Old Style','AppleMyungjo','Batang',serif;font-weight:400;font-size:clamp(36px,10vw,56px);line-height:1.3;letter-spacing:-2px}.birthday-hero h1 em{color:#ffc6d9;font-style:normal}
-.birthday-subtitle{color:#d5bccc;font-size:14px;line-height:1.9;margin:18px 0 0;word-break:keep-all}
-.birthday-cake{position:relative;width:220px;height:190px;margin:40px auto 25px;animation:birthday-arrive 1.2s both}
-.birthday-plate{position:absolute;bottom:3px;left:0;width:220px;height:24px;border-radius:50%;background:#b69cc4;box-shadow:0 12px 35px #0006}
-.birthday-layer{position:absolute;bottom:18px;left:24px;width:172px;height:88px;border-radius:16px 16px 20px 20px;background:linear-gradient(#ffc5d4 0 42%,#cf7999 43% 54%,#f8aabe 55%);box-shadow:inset -15px 0 20px #ad587833}
-.birthday-icing{position:absolute;bottom:89px;left:24px;width:172px;height:34px;border-radius:50%;background:#fff0e0;box-shadow:0 7px 0 #ffdecf}
-.birthday-icing:after{content:'♥  ·  ♥  ·  ♥';display:block;color:#d7809a;font-size:17px;letter-spacing:6px;padding-top:6px}
-.birthday-candle{position:absolute;bottom:120px;left:105px;width:10px;height:39px;border-radius:3px;background:repeating-linear-gradient(35deg,#fff0cf 0 7px,#b89acf 7px 14px)}
-.birthday-flame{position:absolute;left:-4px;top:-28px;width:18px;height:27px;border-radius:70% 30% 60% 40%;background:linear-gradient(#fff5bd,#ffba65);box-shadow:0 0 25px #ffbe69,0 0 65px #ffbe6970;transform-origin:bottom;animation:birthday-flame 1.6s ease-in-out infinite alternate}
-.birthday-primary{display:block;width:100%;max-width:310px;min-height:54px;margin:24px auto 0;padding:15px 20px;border:1px solid #ffd6bf;border-radius:30px;background:linear-gradient(120deg,#ffe2c5,#f5b9cf);color:#4c293d;font:600 16px 'Apple SD Gothic Neo',sans-serif;box-shadow:0 8px 32px #efb2c51a;cursor:pointer}
-.birthday-replay{display:block;margin:16px auto;padding:10px 18px;min-height:44px;border:0;background:none;color:#dbc1d1;font:inherit;cursor:pointer}
-.birthday-letter{position:relative;z-index:3;max-width:480px;margin:40px auto 0;padding:36px 26px;border-radius:5px 5px 30px 5px;color:#573b42;background:linear-gradient(120deg,#fff9ed,#f8eddf);box-shadow:0 20px 70px #0004;scroll-margin-top:20px;animation:birthday-arrive .8s both}
-.birthday-letter[hidden]{display:none}.birthday-letter-date{font-size:11px;letter-spacing:3px;color:#a17a78;margin-bottom:25px}.birthday-letter h2{font-family:'AppleMyungjo','Batang',serif;font-size:26px;font-weight:400;margin-bottom:26px}.birthday-letter p{font-family:'AppleMyungjo','Batang',serif;font-size:16px;line-height:2.15;word-break:keep-all;overflow-wrap:break-word;margin-bottom:24px}.birthday-letter .birthday-sign{text-align:right;margin:35px 0 0;color:#a15d74}.birthday-letter-heart{text-align:center;font-size:25px;color:#b66c84;margin-top:28px}
+.birthday-hero{min-height:calc(100vh - 35px);min-height:calc(100dvh - 35px - env(safe-area-inset-bottom));display:flex;flex-direction:column;justify-content:flex-end;align-items:center;max-width:540px;margin:0 auto;padding:calc(65px + env(safe-area-inset-top)) 0 20px;position:relative;z-index:1}
+.birthday-stage{position:relative;overflow:hidden;width:100%;flex:1;min-height:340px;display:flex;align-items:center;justify-content:center;perspective:700px}
+.birthday-stage:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 15% 23%,#fff9 0 1px,transparent 2px),radial-gradient(circle at 78% 14%,#ffdfac 0 1px,transparent 2px),radial-gradient(circle at 90% 45%,#baadff 0 1px,transparent 2px),radial-gradient(circle at 22% 65%,#baadff 0 1px,transparent 2px);background-size:170px 190px;opacity:.7}
+.birthday-orbit{position:absolute;width:280px;height:280px;border:1px solid #e7b5ff26;border-radius:50%;transform:rotateX(65deg) rotateZ(-25deg);box-shadow:0 0 40px #ab62ff1a,inset 0 0 35px #ab62ff15;animation:birthday-orbit 12s linear infinite}
+.birthday-orbit:before,.birthday-orbit:after{content:'';position:absolute;width:7px;height:7px;border-radius:50%;background:#ffd789;box-shadow:0 0 15px #ffc56b;top:50%;left:-4px}.birthday-orbit:after{left:auto;right:-4px;background:#b19aff;box-shadow:0 0 15px #b19aff}.birthday-orbit-two{width:330px;height:330px;animation-direction:reverse;animation-duration:17s}
+.birthday-cake{position:relative;width:260px;height:280px;margin:45px auto 0;filter:drop-shadow(0 20px 30px #0005);animation:birthday-float 5s 2s ease-in-out infinite}
+.birthday-plate{position:absolute;bottom:0;left:0;width:260px;height:30px;border-radius:50%;background:linear-gradient(#e6d7fd,#8f70ac);box-shadow:0 8px 0 #56416f,0 0 40px #ab62ff33;animation:birthday-assemble .9s both}
+.birthday-tier{position:absolute;border-radius:50% / 18%;background:linear-gradient(90deg,#cd72ad,#ffbdd5 40%,#ee9ac5 75%,#b4609f);box-shadow:inset 0 -10px 15px #71335a22;animation:birthday-assemble 1.1s cubic-bezier(.16,1,.3,1) both}
+.birthday-tier:after{content:'';position:absolute;left:0;right:0;bottom:18%;height:10px;border-top:2px solid #fff1d49c;border-bottom:2px solid #fff1d45c;background:#f8bcd855}
+.birthday-tier-bottom{width:218px;height:90px;left:21px;bottom:14px;animation-delay:.15s}
+.birthday-tier-middle{width:164px;height:75px;left:48px;bottom:91px;animation-delay:.45s;background:linear-gradient(90deg,#8a70c3,#d4c1ff 40%,#b296e2 80%,#7959af)}
+.birthday-tier-top{width:112px;height:62px;left:74px;bottom:155px;animation-delay:.75s}
+.birthday-icing{position:absolute;top:0;width:100%;height:28%;border-radius:50%;background:linear-gradient(140deg,#fff9e9,#f8dacb);box-shadow:0 7px 0 #ffe7d9,0 10px 0 #ffffff25}
+.birthday-icing:after{content:'';position:absolute;top:90%;left:17%;width:11px;height:17px;border-radius:0 0 10px 10px;background:#ffe7d9;box-shadow:32px -3px 0 #ffe7d9,64px -4px 0 #ffe7d9}
+.birthday-candles{position:absolute;bottom:212px;left:96px;display:flex;gap:18px;animation:birthday-assemble 1s 1.1s both}
+.birthday-candle{display:block;position:relative;width:10px;height:37px;border-radius:3px;background:repeating-linear-gradient(35deg,#fff0cf 0 7px,#80cbd8 7px 14px)}
+.birthday-candle:nth-child(2){height:48px;margin-top:-11px;background:repeating-linear-gradient(35deg,#fff0cf 0 7px,#b89acf 7px 14px)}
+.birthday-flame{position:absolute;left:-3px;top:-24px;width:16px;height:24px;border-radius:70% 30% 60% 40%;background:linear-gradient(#fffad7,#ffb14c);box-shadow:0 0 14px #ffbe69,0 0 45px #ffbe6988;transform-origin:bottom;animation:birthday-flame 1.3s ease-in-out infinite alternate}.birthday-candle:nth-child(2) .birthday-flame{animation-delay:-.6s}
+.birthday-actions{display:flex;align-items:center;justify-content:center;gap:12px;position:relative;z-index:3;margin:20px auto 0}
+.birthday-primary,.birthday-replay{min-height:48px;border:1px solid #ffffff35;border-radius:28px;background:#ffffff0c;color:#f8e8f8;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;font:500 14px 'Apple SD Gothic Neo',sans-serif;padding:12px 24px}
+.birthday-primary svg,.birthday-replay svg{width:22px;height:22px}.birthday-replay{width:48px;padding:12px}
+.birthday-letter{position:relative;z-index:3;max-width:480px;margin:30px auto 0;padding:32px 26px;border-radius:5px;color:#473b40;background:#fff8ee;box-shadow:0 20px 70px #0004;scroll-margin-top:calc(70px + env(safe-area-inset-top));animation:birthday-arrive .6s both;outline:none}
+.birthday-letter[hidden]{display:none}.birthday-letter p{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:16px;line-height:2;word-break:keep-all;overflow-wrap:break-word;margin-bottom:24px}.birthday-letter .birthday-sign{text-align:right;margin:24px 0 0}
 @keyframes birthday-arrive{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+@keyframes birthday-assemble{from{opacity:0;transform:translateY(-90px) scale(.85)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes birthday-float{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-10px) rotate(1deg)}}
+@keyframes birthday-orbit{from{transform:rotateX(65deg) rotateZ(0)}to{transform:rotateX(65deg) rotateZ(360deg)}}
 @keyframes birthday-flame{from{transform:rotate(-7deg) scale(.94)}to{transform:rotate(7deg) scale(1.05)}}
 @media(prefers-reduced-motion:reduce){.birthday-dialog *{animation:none!important;scroll-behavior:auto!important}}
-@media(max-width:360px){.birthday-scroll{padding-left:16px;padding-right:16px}.birthday-letter{padding:30px 22px}.birthday-cake{margin-top:24px}}
+@media(max-width:360px){.birthday-scroll{padding-left:14px;padding-right:14px}.birthday-letter{padding:28px 22px}.birthday-orbit-two{width:290px;height:290px}}

@@ -23,50 +23,95 @@
     const width = dialog.clientWidth, height = dialog.clientHeight;
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = width * ratio; canvas.height = height * ratio; ctx.scale(ratio, ratio);
-    const colors = ['#ffd594', '#ffadc8', '#c2b0ff', '#fff3dd', '#9edbd5'];
-    const particles = [];
-    for (let burst = 0; burst < 5; burst++) {
-      const x = width * (.15 + Math.random() * .7), y = height * (.15 + Math.random() * .4);
-      for (let i = 0; i < 45; i++) {
-        const angle = Math.random() * Math.PI * 2, speed = 35 + Math.random() * 150;
-        particles.push({x, y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
-          delay:burst*.65, life:1.7+Math.random()*.9, color:colors[i%colors.length], size:2+Math.random()*2});
-      }
+    const colors = ['#ffcf65', '#ff65b5', '#a78bff', '#65e9ff', '#fff0c6'];
+    const particles = [], rockets = [];
+    // Timed launches, double-ring bursts, falling sparks, then a confetti finale.
+    for (let i = 0; i < 16; i++) {
+      rockets.push({at:i < 10 ? i*.65 : 7+(i-10)*.13,
+        x:width*(.12+Math.random()*.76), y:height*(.12+Math.random()*.38),
+        color:colors[i%colors.length], fired:false});
     }
     const started = performance.now();
-    function draw(now) {
-      const elapsed = (now - started) / 1000;
-      ctx.clearRect(0, 0, width, height);
-      for (const p of particles) {
-        const age = elapsed - p.delay;
-        if (age < 0 || age > p.life) continue;
-        ctx.globalAlpha = Math.max(0, 1-age/p.life);
-        ctx.fillStyle = p.color;
-        ctx.beginPath();ctx.arc(p.x+p.vx*age, p.y+p.vy*age+35*age*age, p.size, 0, Math.PI*2);ctx.fill();
+    let previous = started, confetti = false;
+    function burst(r) {
+      for (let i = 0; i < 70; i++) {
+        const angle = i/70*Math.PI*2;
+        const speed = (i%2 ? 120 : 72) * Math.min(width/390, 1.5);
+        particles.push({x:r.x,y:r.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
+          life:2.3+Math.random()*.8,age:0,color:r.color,size:1.2+Math.random()*1.2});
       }
-      ctx.globalAlpha = 1;
-      if (elapsed < 5.4 && dialog.open && !document.hidden) frame = requestAnimationFrame(draw);
+    }
+    function draw(now) {
+      const elapsed = (now-started)/1000, dt = Math.min((now-previous)/1000,.04);
+      previous = now;
+      ctx.clearRect(0,0,width,height);
+      ctx.globalCompositeOperation = 'lighter';
+      for (const r of rockets) {
+        const age = elapsed-r.at;
+        if (age >= 0 && age < .7) {
+          const t = age/.7, y = height-(height-r.y)*(1-(1-t)**2);
+          const trail = ctx.createLinearGradient(r.x,y,r.x,y+65);
+          trail.addColorStop(0,r.color);trail.addColorStop(1,'transparent');
+          ctx.strokeStyle=trail;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x,y);ctx.lineTo(r.x,y+65);ctx.stroke();
+          ctx.fillStyle='#fff6db';ctx.beginPath();ctx.arc(r.x,y,2.5,0,Math.PI*2);ctx.fill();
+        }
+        if(age>=.7&&!r.fired){r.fired=true;burst(r);}
+      }
+      if(elapsed>8&&!confetti){
+        confetti=true;
+        for(let i=0;i<110;i++)particles.push({x:Math.random()*width,y:-Math.random()*height*.4,
+          vx:(Math.random()-.5)*90,vy:70+Math.random()*95,age:0,life:5,color:colors[i%colors.length],
+          size:3+Math.random()*3,paper:true,spin:Math.random()*6});
+      }
+      for(let i=particles.length-1;i>=0;i--){
+        const p=particles[i];p.age+=dt;
+        if(p.age>p.life){particles.splice(i,1);continue;}
+        const oldX=p.x,oldY=p.y;
+        p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=(p.paper?10:42)*dt;
+        if(!p.paper){p.vx*=Math.exp(-.5*dt);p.vy*=Math.exp(-.16*dt);}
+        ctx.globalAlpha=Math.min(1,(p.life-p.age)*1.5);
+        ctx.fillStyle=p.color;ctx.strokeStyle=p.color;
+        if(p.paper){
+          ctx.globalCompositeOperation='source-over';ctx.save();ctx.translate(p.x,p.y);
+          ctx.rotate(p.spin+p.age*2);ctx.scale(Math.cos(p.age*4+p.spin),1);
+          ctx.fillRect(-p.size/2,-p.size,p.size,p.size*2);ctx.restore();
+        }else{
+          ctx.globalCompositeOperation='lighter';ctx.lineWidth=p.size;
+          ctx.beginPath();ctx.moveTo(oldX-p.vx*.035,oldY-p.vy*.035);ctx.lineTo(p.x,p.y);ctx.stroke();
+          ctx.globalAlpha*=.15;ctx.beginPath();ctx.arc(p.x,p.y,p.size*3,0,Math.PI*2);ctx.fill();
+        }
+      }
+      ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+      if(elapsed<13.2&&dialog.open&&!document.hidden)frame=requestAnimationFrame(draw);
       else stop();
     }
-    frame = requestAnimationFrame(draw);
+    frame=requestAnimationFrame(draw);
   }
+
   function create() {
     dialog = document.createElement('dialog');
     dialog.className = 'birthday-dialog';
-    dialog.setAttribute('aria-labelledby', 'birthday-title');
+    dialog.setAttribute('aria-label', '생일 축하');
     dialog.innerHTML = `<button class="birthday-close" type="button" aria-label="생일 축하 닫기" autofocus>×</button>
       <canvas class="birthday-confetti" aria-hidden="true"></canvas>
       <div class="birthday-scroll"><section class="birthday-hero">
-        <p class="birthday-eyebrow">OCTOBER 20 · FOR YOU</p>
-        <h1 id="birthday-title">태어나줘서 고마워,<br><em>생일 축하해.</em></h1>
-        <p class="birthday-subtitle">멀리 있어도, 오늘의 가장 따뜻한 마음은<br>누나에게 닿았으면 좋겠어.</p>
-        <div class="birthday-cake" role="img" aria-label="촛불이 켜진 분홍색 생일 케이크"><div class="birthday-plate"></div><div class="birthday-layer"></div><div class="birthday-icing"></div><div class="birthday-candle"><div class="birthday-flame"></div></div></div>
-        <button class="birthday-primary" type="button" aria-expanded="false" aria-controls="birthday-letter">누나에게 쓴 편지 열어보기 ♡</button>
-        <button class="birthday-replay" type="button">한 번 더 축하하기 ✨</button>
+        <div class="birthday-stage" aria-hidden="true">
+          <div class="birthday-orbit"></div><div class="birthday-orbit birthday-orbit-two"></div>
+          <div class="birthday-cake">
+            <div class="birthday-plate"></div>
+            <div class="birthday-tier birthday-tier-bottom"><div class="birthday-icing"></div></div>
+            <div class="birthday-tier birthday-tier-middle"><div class="birthday-icing"></div></div>
+            <div class="birthday-tier birthday-tier-top"><div class="birthday-icing"></div></div>
+            <div class="birthday-candles"><i class="birthday-candle"><i class="birthday-flame"></i></i><i class="birthday-candle"><i class="birthday-flame"></i></i><i class="birthday-candle"><i class="birthday-flame"></i></i></div>
+          </div>
+        </div>
+        <div class="birthday-actions">
+          <button class="birthday-primary" type="button" aria-expanded="false" aria-controls="birthday-letter"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/></svg>편지</button>
+          <button class="birthday-replay" type="button" aria-label="애니메이션 다시 보기"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg></button>
+        </div>
       </section>
-      <article class="birthday-letter" id="birthday-letter" hidden aria-labelledby="birthday-letter-title">
-        <div class="birthday-letter-date">10.20 · WITH ALL MY LOVE</div><h2 id="birthday-letter-title" tabindex="-1">사랑하는 누나에게</h2>
-        <div class="birthday-letter-body"></div><p class="birthday-sign">많이많이 사랑해<br>— 남친이</p><div class="birthday-letter-heart" aria-hidden="true">♡</div>
+      <article class="birthday-letter" id="birthday-letter" hidden aria-label="편지" tabindex="-1">
+        <div class="birthday-letter-body"></div><p class="birthday-sign">-남친이</p>
       </article></div>`;
     for (const text of paragraphs) {
       const p = document.createElement('p'); p.textContent = text;
@@ -80,8 +125,7 @@
       stop();
       dialog.querySelector('.birthday-letter').hidden = false;
       event.currentTarget.setAttribute('aria-expanded', 'true');
-      const heading = dialog.querySelector('#birthday-letter-title');
-      heading.focus({preventScroll:true});
+      dialog.querySelector('.birthday-letter').focus({preventScroll:true});
       dialog.querySelector('.birthday-letter').scrollIntoView({behavior:motion.matches?'auto':'smooth', block:'start'});
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });

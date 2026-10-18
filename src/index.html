@@ -11,8 +11,8 @@
 <link rel="stylesheet" href="bridge-client.css?v=20260914-layout">
 <link rel="stylesheet" href="push-client.css?v=20260914-push1">
 <link rel="stylesheet" href="school-client.css?v=20260915-calendar1">
-<link rel="stylesheet" href="birthday.css?v=20261020-1">
-<script src="birthday.js?v=20261020-1" defer></script>
+<link rel="stylesheet" href="birthday.css?v=20261020-2">
+<script src="birthday.js?v=20261020-2" defer></script>
 <title>동영 스케줄</title>
 <style>
 :root{
@@ -1292,7 +1292,7 @@ function selDay(ds){
     pb.innerHTML+=schoolCalendarCards(notices);
   }
   if(ds==='2026-10-20'){
-    pb.innerHTML='<button type="button" class="birthday-entry" onclick="window.ScheduleBirthday.open()"><span aria-hidden="true">🎂</span><span><strong>생일 축하</strong><small>누나를 위해 준비한 작은 선물</small></span><span aria-hidden="true">›</span></button>'+pb.innerHTML;
+    pb.innerHTML='<button type="button" class="birthday-entry" onclick="window.ScheduleBirthday.open()"><span aria-hidden="true">🎂</span><span><strong>생일 축하</strong></span><span aria-hidden="true">›</span></button>'+pb.innerHTML;
   }
   // Open panel (slide in on mobile, already visible on desktop)
   document.getElementById('calPanel').classList.add('open');
