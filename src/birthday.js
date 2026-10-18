@@ -1,4 +1,4 @@
-/* A date-only gift: no schedule writes, credentials, audio or external assets. */
+/* A date-only gift: no schedule writes, credentials, audio or external requests. */
 (() => {
   'use strict';
   let dialog, frame = 0, opener;
@@ -23,20 +23,20 @@
     const width = dialog.clientWidth, height = dialog.clientHeight;
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = width * ratio; canvas.height = height * ratio; ctx.scale(ratio, ratio);
-    const colors = ['#ffcf65', '#ff65b5', '#a78bff', '#65e9ff', '#fff0c6'];
+    const colors = ['#efd6a0', '#c1cedd', '#edd9c7', '#c8d8eb', '#fff0c6'];
     const particles = [], rockets = [];
-    // Timed launches, double-ring bursts, falling sparks, then a confetti finale.
-    for (let i = 0; i < 16; i++) {
+    // Timed launches and warm, irregular falling sparks over the night sky.
+    for (let i = 0; i < 10; i++) {
       rockets.push({at:i < 10 ? i*.65 : 7+(i-10)*.13,
-        x:width*(.12+Math.random()*.76), y:height*(.12+Math.random()*.38),
+        x:width*(.12+Math.random()*.76), y:height*(.08+Math.random()*.32),
         color:colors[i%colors.length], fired:false});
     }
     const started = performance.now();
-    let previous = started, confetti = false;
+    let previous = started;
     function burst(r) {
       for (let i = 0; i < 70; i++) {
-        const angle = i/70*Math.PI*2;
-        const speed = (i%2 ? 120 : 72) * Math.min(width/390, 1.5);
+        const angle = i/70*Math.PI*2 + Math.random()*.04;
+        const speed = (55+Math.random()*90) * Math.min(width/390, 1.5);
         particles.push({x:r.x,y:r.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
           life:2.3+Math.random()*.8,age:0,color:r.color,size:1.2+Math.random()*1.2});
       }
@@ -57,12 +57,6 @@
         }
         if(age>=.7&&!r.fired){r.fired=true;burst(r);}
       }
-      if(elapsed>8&&!confetti){
-        confetti=true;
-        for(let i=0;i<110;i++)particles.push({x:Math.random()*width,y:-Math.random()*height*.4,
-          vx:(Math.random()-.5)*90,vy:70+Math.random()*95,age:0,life:5,color:colors[i%colors.length],
-          size:3+Math.random()*3,paper:true,spin:Math.random()*6});
-      }
       for(let i=particles.length-1;i>=0;i--){
         const p=particles[i];p.age+=dt;
         if(p.age>p.life){particles.splice(i,1);continue;}
@@ -78,7 +72,7 @@
         }else{
           ctx.globalCompositeOperation='lighter';ctx.lineWidth=p.size;
           ctx.beginPath();ctx.moveTo(oldX-p.vx*.035,oldY-p.vy*.035);ctx.lineTo(p.x,p.y);ctx.stroke();
-          ctx.globalAlpha*=.15;ctx.beginPath();ctx.arc(p.x,p.y,p.size*3,0,Math.PI*2);ctx.fill();
+          ctx.globalAlpha*=.06;ctx.beginPath();ctx.arc(p.x,p.y,p.size*3,0,Math.PI*2);ctx.fill();
         }
       }
       ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
@@ -95,17 +89,18 @@
     dialog.innerHTML = `<button class="birthday-close" type="button" aria-label="생일 축하 닫기" autofocus>×</button>
       <canvas class="birthday-confetti" aria-hidden="true"></canvas>
       <div class="birthday-scroll"><section class="birthday-hero">
-        <div class="birthday-stage" aria-hidden="true">
-          <div class="birthday-orbit"></div><div class="birthday-orbit birthday-orbit-two"></div>
-          <div class="birthday-cake">
-            <div class="birthday-plate"></div>
-            <div class="birthday-tier birthday-tier-bottom"><div class="birthday-icing"></div></div>
-            <div class="birthday-tier birthday-tier-middle"><div class="birthday-icing"></div></div>
-            <div class="birthday-tier birthday-tier-top"><div class="birthday-icing"></div></div>
-            <div class="birthday-candles"><i class="birthday-candle"><i class="birthday-flame"></i></i><i class="birthday-candle"><i class="birthday-flame"></i></i><i class="birthday-candle"><i class="birthday-flame"></i></i></div>
+        <div class="birthday-stage">
+          <div class="birthday-scene">
+            <img class="birthday-photo" src="birthday-night.webp" width="1024" height="1536" alt="은하수가 펼쳐진 밤하늘과 생크림 케이크" decoding="async">
+            <div class="birthday-candle-glow" aria-hidden="true"></div>
+            <button class="birthday-candle-button" type="button" aria-label="촛불 끄기" aria-pressed="false">
+              <span class="birthday-wax" aria-hidden="true"></span><span class="birthday-wick" aria-hidden="true"></span>
+              <span class="birthday-flame" aria-hidden="true"></span><span class="birthday-smoke" aria-hidden="true"></span>
+            </button>
           </div>
         </div>
         <div class="birthday-actions">
+          <button class="birthday-blow" type="button">촛불 끄기</button>
           <button class="birthday-primary" type="button" aria-expanded="false" aria-controls="birthday-letter"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/></svg>편지</button>
           <button class="birthday-replay" type="button" aria-label="애니메이션 다시 보기"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg></button>
         </div>
@@ -120,6 +115,16 @@
     document.body.appendChild(dialog);
     dialog.querySelector('.birthday-close').addEventListener('click', () => dialog.close());
     dialog.addEventListener('close', () => { stop(); if (opener?.isConnected) opener.focus(); });
+    function toggleCandle() {
+      const out = !dialog.classList.contains('candles-out');
+      dialog.classList.toggle('candles-out', out);
+      dialog.querySelector('.birthday-candle-button').setAttribute('aria-pressed', String(out));
+      dialog.querySelector('.birthday-candle-button').setAttribute('aria-label', out ? '촛불 켜기' : '촛불 끄기');
+      dialog.querySelector('.birthday-blow').textContent = out ? '촛불 켜기' : '촛불 끄기';
+      if (out) celebrate();
+    }
+    dialog.querySelector('.birthday-candle-button').addEventListener('click', toggleCandle);
+    dialog.querySelector('.birthday-blow').addEventListener('click', toggleCandle);
     dialog.querySelector('.birthday-replay').addEventListener('click', celebrate);
     dialog.querySelector('.birthday-primary').addEventListener('click', event => {
       stop();
@@ -137,6 +142,10 @@
       if (!dialog) create();
       if (dialog.open) return;
       opener = document.activeElement;
+      dialog.classList.remove('candles-out');
+      dialog.querySelector('.birthday-candle-button').setAttribute('aria-pressed', 'false');
+      dialog.querySelector('.birthday-candle-button').setAttribute('aria-label', '촛불 끄기');
+      dialog.querySelector('.birthday-blow').textContent = '촛불 끄기';
       dialog.querySelector('.birthday-letter').hidden = true;
       dialog.querySelector('.birthday-primary').setAttribute('aria-expanded', 'false');
       dialog.showModal();
