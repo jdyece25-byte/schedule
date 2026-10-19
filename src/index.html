@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="bridge-client.css?v=20260914-layout">
 <link rel="stylesheet" href="push-client.css?v=20260914-push1">
 <link rel="stylesheet" href="school-client.css?v=20260915-calendar1">
-<link rel="stylesheet" href="birthday.css?v=20261020-9">
+<link rel="stylesheet" href="birthday.css?v=20261020-10">
 <script src="birthday.js?v=20261020-9" defer></script>
 <title>동영 스케줄</title>
 <style>
@@ -436,6 +436,7 @@ body{
 
 <!-- HOME VIEW -->
 <div class="view on" id="v-home">
+  <button type="button" class="birthday-home" onclick="window.ScheduleBirthday.open()"><span aria-hidden="true">🎂</span> 생일 축하 클릭!</button>
   <div class="home-top">
     <div class="home-greeting" id="home-greeting">안녕하세요 👋</div>
     <div class="home-date" id="home-date">로딩 중...</div>

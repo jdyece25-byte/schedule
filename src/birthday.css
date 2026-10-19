@@ -1,3 +1,5 @@
+.birthday-home{display:flex;align-items:center;justify-content:center;gap:10px;flex-shrink:0;min-height:58px;margin:18px 18px 0;padding:14px 20px;border:1px solid #ffc58c80;border-radius:18px;background:linear-gradient(120deg,#66364f,#363967);box-shadow:0 5px 22px #c77d8020;color:#fff3dc;font:700 17px "Apple SD Gothic Neo",sans-serif;cursor:pointer;touch-action:manipulation}
+.birthday-home span{font-size:25px}.birthday-home:focus-visible{outline:3px solid #ffcf8c;outline-offset:3px}
 .birthday-chip{display:inline-block;flex-shrink:0;font-size:14px;line-height:1;margin:0 0 0 auto}
 .birthday-day .dn{flex-shrink:0}.birthday-day .dn .tb{display:none}
 .birthday-entry{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;padding:0;margin-bottom:18px;border:1px solid #f4a8c85c;border-radius:14px;background:linear-gradient(120deg,#44243c,#262445);cursor:pointer;font:inherit;touch-action:manipulation}
