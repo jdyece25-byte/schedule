@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="bridge-client.css?v=20260914-layout">
 <link rel="stylesheet" href="push-client.css?v=20260914-push1">
 <link rel="stylesheet" href="school-client.css?v=20260915-calendar1">
-<link rel="stylesheet" href="birthday.css?v=20261020-6">
+<link rel="stylesheet" href="birthday.css?v=20261020-7">
 <script src="birthday.js?v=20261020-6" defer></script>
 <title>동영 스케줄</title>
 <style>
@@ -1206,8 +1206,8 @@ function buildCal(){
     dn.innerHTML=d+(ds===TODAY?' <span class="tb">오늘</span>':'');
     cell.appendChild(dn);
     if(ds==='2026-10-20'){
-      const birthday=document.createElement('div');birthday.className='birthday-chip';
-      birthday.textContent='🎂';cell.appendChild(birthday);
+      const birthday=document.createElement('span');birthday.className='birthday-chip';
+      birthday.textContent='🎂';dn.appendChild(birthday);cell.classList.add('birthday-day');
     }
     if(notices.length){
       const badge=document.createElement('div');badge.className='calendar-school-chip';
@@ -1313,12 +1313,17 @@ function toggleList(){
 function buildList(){
   const lw=document.getElementById('listWrap');lw.innerHTML='';
   const school=schoolCalendar();
-  [...new Set([...Object.keys(EM),...Object.keys(school.byDate)])].filter(ds=>ds.startsWith(monthPrefix())).sort().forEach(ds=>{
+  [...new Set([...Object.keys(EM),...Object.keys(school.byDate),'2026-10-20'])].filter(ds=>ds.startsWith(monthPrefix())).sort().forEach(ds=>{
     const d=new Date(ds+'T00:00:00');const evs=EM[ds]||[];
     const g2=document.createElement('div');g2.className='lg2';
     const h=document.createElement('div');h.className='lgh'+(ds===TODAY?' tr':'');
     h.innerHTML=`<span class="n">${d.getDate()}</span>${d.getMonth()+1}월 ${DOW[d.getDay()]}요일${ds===TODAY?' · 오늘':''}`;
     g2.appendChild(h);
+    if(ds==='2026-10-20'){
+      const gift=document.createElement('button');gift.type='button';gift.className='birthday-entry';
+      gift.setAttribute('aria-label','생일 축하 열기');gift.innerHTML='<span aria-hidden="true">🎂</span>';
+      gift.onclick=()=>window.ScheduleBirthday.open();g2.appendChild(gift);
+    }
     evs.forEach(ev=>{
       const r=document.createElement('div');r.className='lrow';
       const b=document.createElement('div');b.className='lbar';b.style.background=safeColor(TCh[ev.t]);

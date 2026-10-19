@@ -1,4 +1,5 @@
-.birthday-chip{font-size:16px;line-height:1.3;margin:3px 0}
+.birthday-chip{display:inline-block;flex-shrink:0;font-size:14px;line-height:1;margin:0 0 0 auto}
+.birthday-day .dn{flex-shrink:0}.birthday-day .dn .tb{display:none}
 .birthday-entry{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;padding:0;margin-bottom:18px;border:1px solid #f4a8c85c;border-radius:14px;background:linear-gradient(120deg,#44243c,#262445);cursor:pointer;font:inherit;touch-action:manipulation}
 .birthday-entry span{font-size:27px}.birthday-entry:focus-visible{outline:3px solid #ffcf8c;outline-offset:3px}
 .birthday-dialog{position:fixed;inset:0;width:100%;max-width:none;height:100%;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:#080918;color:#fff1e7;overflow:hidden;overscroll-behavior:contain}

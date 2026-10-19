@@ -26,7 +26,8 @@ function element() {
   const classes = new Set();
   const el = {children: [], dataset: {}, style: {}, className: '', textContent: '', value: '',
     classList: { add(...names) { names.forEach(name => classes.add(name)); }, remove(...names) { names.forEach(name => classes.delete(name)); }, contains(name) { return classes.has(name); } },
-    appendChild(child) { this.children.push(child); return child; }
+    appendChild(child) { this.children.push(child); return child; },
+    setAttribute(name, value) { this[name] = value; }
   };
   Object.defineProperty(el, 'innerHTML', {get() { return content; }, set(v) { content = v; el.children = []; }});
   return el;
@@ -271,7 +272,11 @@ test('birthday gift appears only on October 20, 2026 without changing schedule d
   assert.match(a.get('panelBody').innerHTML, /birthday-entry/);
   assert.match(a.get('panelBody').innerHTML, /생일 축하/);
   const birthday = a.get('calGrid').children.find(e => e.dataset.date === '2026-10-20');
-  assert.ok(birthday.children.some(e => e.className === 'birthday-chip'));
+  assert.ok(birthday.children[0].children.some(e => e.className === 'birthday-chip'));
+  a.run('buildList()');
+  assert.equal(a.get('listWrap').children.flatMap(e => e.children).filter(e => e.className === 'birthday-entry').length, 1);
+  a.run('calendarMonth=10;buildList()');
+  assert.equal(a.get('listWrap').children.flatMap(e => e.children).filter(e => e.className === 'birthday-entry').length, 0);
   for (const date of ['2026-10-19', '2026-10-21', '2027-10-20']) {
     a.run(`selDay('${date}')`);
     assert.doesNotMatch(a.get('panelBody').innerHTML, /birthday-entry/);
