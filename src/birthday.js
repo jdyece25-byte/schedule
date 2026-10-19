@@ -12,74 +12,109 @@
   ];
   function stop() {
     cancelAnimationFrame(frame); frame = 0;
-    const canvas = dialog?.querySelector('canvas');
-    canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    if (!dialog) return;
+    const canvas = dialog.querySelector('canvas');
+    canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    dialog.classList.remove('birthday-intro');
+    dialog.querySelector('.birthday-scroll').inert = false;
+    dialog.querySelector('.birthday-skip').hidden = true;
   }
-  function celebrate() {
-    stop();
+  function startIntro() {
+    stop(); settleBlow(); setCandle(false);
+    dialog.querySelector('.birthday-letter').hidden = true;
+    dialog.querySelector('.birthday-primary').setAttribute('aria-expanded', 'false');
+    dialog.querySelector('.birthday-scroll').scrollTop = 0;
     if (motion.matches || document.hidden || !dialog.open) return;
     const canvas = dialog.querySelector('canvas'), ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const width = dialog.clientWidth, height = dialog.clientHeight;
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = width * ratio; canvas.height = height * ratio; ctx.scale(ratio, ratio);
-    const colors = ['#efd6a0', '#c1cedd', '#edd9c7', '#c8d8eb', '#fff0c6'];
-    const particles = [], rockets = [];
-    // Timed launches and warm, irregular falling sparks over the night sky.
-    for (let i = 0; i < 10; i++) {
-      rockets.push({at:i < 10 ? i*.65 : 7+(i-10)*.13,
-        x:width*(.12+Math.random()*.76), y:height*(.08+Math.random()*.32),
-        color:colors[i%colors.length], fired:false});
-    }
-    const started = performance.now();
-    let previous = started;
-    function burst(r) {
-      for (let i = 0; i < 70; i++) {
-        const angle = i/70*Math.PI*2 + Math.random()*.04;
-        const speed = (55+Math.random()*90) * Math.min(width/390, 1.5);
-        particles.push({x:r.x,y:r.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
-          life:2.3+Math.random()*.8,age:0,color:r.color,size:1.2+Math.random()*1.2});
+    const w = dialog.clientWidth, h = dialog.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = w*dpr; canvas.height = h*dpr; ctx.scale(dpr,dpr);
+    dialog.classList.add('birthday-intro');
+    dialog.querySelector('.birthday-scroll').inert = true;
+    dialog.querySelector('.birthday-skip').hidden = false;
+    // A world-space camera follows the rocket; near and far stars move at different speeds.
+    const stars = Array.from({length:220}, () => ({x:Math.random()*w,y:(Math.random()*5-3)*h,
+      depth:.3+Math.random()*.7,size:.4+Math.random()*1.1,phase:Math.random()*6}));
+    const sparks = Array.from({length:200}, (_,i) => ({angle:i/200*Math.PI*2,
+      speed:55+Math.random()*160,life:1.5+Math.random()*1.5,color:['#ffd68c','#f4b6d0','#c4b9ff','#a8ddf0'][i%4]}));
+    const trail = [], started = performance.now();
+    const smooth = x => { x=Math.max(0,Math.min(1,x)); return x*x*(3-2*x); };
+    function render(now) {
+      const t=(now-started)/1000;
+      const camera=-h*1.55*smooth((t-.8)/3.6);
+      const zoom=1-.15*smooth((t-4.3)/1.1);
+      ctx.clearRect(0,0,w,h);
+      // Fade the camera shot into the illustrated couple after the firework bloom.
+      ctx.globalAlpha=1-smooth((t-6.1)/1.7);
+      ctx.save();
+      const sky=ctx.createLinearGradient(0,0,w,h);
+      sky.addColorStop(0,'#090f2e');sky.addColorStop(.55,'#20234b');sky.addColorStop(1,'#584069');
+      ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+      const paintedSky=dialog.querySelector('.birthday-photo');
+      if(paintedSky.complete&&paintedSky.naturalWidth){
+        ctx.globalAlpha=(1-smooth((t-6.1)/1.7))*.42;
+        const skyHeight=h*1.3, skyWidth=skyHeight*1024/440;
+        ctx.drawImage(paintedSky,0,0,1024,440,(w-skyWidth)/2,-h*.22-camera*.08,skyWidth,skyHeight);
+        ctx.globalAlpha=1-smooth((t-6.1)/1.7);
       }
-    }
-    function draw(now) {
-      const elapsed = (now-started)/1000, dt = Math.min((now-previous)/1000,.04);
-      previous = now;
-      ctx.clearRect(0,0,width,height);
-      ctx.globalCompositeOperation = 'lighter';
-      for (const r of rockets) {
-        const age = elapsed-r.at;
-        if (age >= 0 && age < .7) {
-          const t = age/.7, y = height-(height-r.y)*(1-(1-t)**2);
-          const trail = ctx.createLinearGradient(r.x,y,r.x,y+65);
-          trail.addColorStop(0,r.color);trail.addColorStop(1,'transparent');
-          ctx.strokeStyle=trail;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r.x,y);ctx.lineTo(r.x,y+65);ctx.stroke();
-          ctx.fillStyle='#fff6db';ctx.beginPath();ctx.arc(r.x,y,2.5,0,Math.PI*2);ctx.fill();
+      ctx.translate(w/2,h*.35);ctx.scale(zoom,zoom);ctx.translate(-w/2,-h*.35);
+      for(const star of stars){
+        const y=star.y-camera*star.depth;
+        if(y<-20||y>h+20)continue;
+        ctx.fillStyle=`rgba(244,229,206,${.35+.3*Math.sin(t*.8+star.phase)**2})`;
+        ctx.beginPath();ctx.arc(star.x,y,star.size,0,Math.PI*2);ctx.fill();
+      }
+      // Broad translucent cloud bands pass below the rising camera.
+      for(let i=0;i<5;i++){
+        const y=h*(.2+i*.32)-camera*.65;
+        const cloud=ctx.createRadialGradient(w*(i%2?.8:.2),y,0,w*.5,y,w*.8);
+        cloud.addColorStop(0,'#9b7aa41f');cloud.addColorStop(1,'#9b7aa400');
+        ctx.fillStyle=cloud;ctx.fillRect(-w,y-h*.15,w*3,h*.3);
+      }
+      for(let layer=0;layer<3;layer++){
+        const y=h*(.73+layer*.09)-camera*(.75+layer*.12);
+        ctx.fillStyle=['#292b4a','#181e38','#10162c'][layer];ctx.beginPath();ctx.moveTo(-w,h*4);
+        for(let i=-1;i<=12;i++)ctx.lineTo(i*w/10,y-Math.sin(i*1.6+layer)*h*.05-Math.cos(i*.7)*h*.04);
+        ctx.lineTo(w*2,h*4);ctx.fill();
+      }
+      const progress=Math.max(0,Math.min(1,(t-.35)/4));
+      const rocket={x:w*(.5+Math.sin(progress*Math.PI*1.5)*.16),y:h*(.92-2.22*progress)};
+      if(t>.35&&t<4.35){
+        trail.push({...rocket,at:t});
+        while(trail.length>75||trail[0]?.at<t-.65)trail.shift();
+        for(let i=1;i<trail.length;i++){
+          const p=trail[i],q=trail[i-1];ctx.strokeStyle=`rgba(255,211,132,${i/trail.length*.8})`;
+          ctx.lineWidth=1+i/trail.length*2;ctx.beginPath();ctx.moveTo(q.x,q.y-camera);ctx.lineTo(p.x,p.y-camera);ctx.stroke();
+          if(i%3===0){
+            ctx.fillStyle=`rgba(255,218,151,${i/trail.length*.7})`;
+            ctx.beginPath();ctx.arc(p.x+Math.sin(i*2.4+t*3)*9,p.y-camera+(t-p.at)*28,1.2,0,Math.PI*2);ctx.fill();
+          }
         }
-        if(age>=.7&&!r.fired){r.fired=true;burst(r);}
+        const y=rocket.y-camera;
+        const glow=ctx.createRadialGradient(rocket.x,y,0,rocket.x,y,24);
+        glow.addColorStop(0,'#fff4ce');glow.addColorStop(.15,'#ffdb92cc');glow.addColorStop(1,'#ffbd6000');
+        ctx.fillStyle=glow;ctx.fillRect(rocket.x-24,y-24,48,48);
+        ctx.fillStyle='#fff7df';ctx.beginPath();ctx.arc(rocket.x,y,2.8,0,Math.PI*2);ctx.fill();
       }
-      for(let i=particles.length-1;i>=0;i--){
-        const p=particles[i];p.age+=dt;
-        if(p.age>p.life){particles.splice(i,1);continue;}
-        const oldX=p.x,oldY=p.y;
-        p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=(p.paper?10:42)*dt;
-        if(!p.paper){p.vx*=Math.exp(-.5*dt);p.vy*=Math.exp(-.16*dt);}
-        ctx.globalAlpha=Math.min(1,(p.life-p.age)*1.5);
-        ctx.fillStyle=p.color;ctx.strokeStyle=p.color;
-        if(p.paper){
-          ctx.globalCompositeOperation='source-over';ctx.save();ctx.translate(p.x,p.y);
-          ctx.rotate(p.spin+p.age*2);ctx.scale(Math.cos(p.age*4+p.spin),1);
-          ctx.fillRect(-p.size/2,-p.size,p.size,p.size*2);ctx.restore();
-        }else{
-          ctx.globalCompositeOperation='lighter';ctx.lineWidth=p.size;
-          ctx.beginPath();ctx.moveTo(oldX-p.vx*.035,oldY-p.vy*.035);ctx.lineTo(p.x,p.y);ctx.stroke();
-          ctx.globalAlpha*=.06;ctx.beginPath();ctx.arc(p.x,p.y,p.size*3,0,Math.PI*2);ctx.fill();
+      // Secondary blooms stagger around the tracked rocket's final position.
+      for(let burst=0;burst<3;burst++){
+        const age=t-4.35-burst*.48;
+        if(age<0)continue;
+        const bx=w*(burst===0?.34:burst===1?.78:.15),by=-h*1.3-camera+burst*h*.11;
+        for(const p of sparks){
+          if(age>p.life)continue;
+          const vx=Math.cos(p.angle)*p.speed,vy=Math.sin(p.angle)*p.speed;
+          const scale=Math.min(w/390,1.5),a=age*scale;
+          const x=bx+vx*a,y=by+vy*a+30*age*age;
+          ctx.globalAlpha=(1-smooth((t-6.1)/1.7))*Math.max(0,1-age/p.life);
+          ctx.globalCompositeOperation='lighter';ctx.strokeStyle=p.color;ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(x-vx*.035,y-vy*.035);ctx.lineTo(x,y);ctx.stroke();
         }
       }
-      ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-      if(elapsed<13.2&&dialog.open&&!document.hidden)frame=requestAnimationFrame(draw);
+      ctx.restore();ctx.globalAlpha=1;
+      if(t<7.8&&dialog.open&&!document.hidden)frame=requestAnimationFrame(render);
       else stop();
     }
-    frame=requestAnimationFrame(draw);
+    frame=requestAnimationFrame(render);
   }
 
   function setCandle(out) {
@@ -103,7 +138,7 @@
     if (blowing) return;
     if (dialog.classList.contains('candles-out')) { clearBlow(); setCandle(false); return; }
     stop();
-    if (motion.matches) { setCandle(true); return; }
+    if (motion.matches) { setCandle(true); openLetter(); return; }
     blowing = true;
     const run = ++blowRun;
     dialog.querySelector('.birthday-stage').setAttribute('aria-busy', 'true');
@@ -111,7 +146,7 @@
     const pose = dialog.querySelector('.birthday-pose');
     // The extra pose loads when the dialog opens; a missing asset never traps the controls.
     if (!pose.complete || !pose.naturalWidth) {
-      setCandle(true); clearBlow(); return;
+      setCandle(true); clearBlow(); openLetter(); return;
     }
     dialog.classList.add('blowing');
     const later = (ms, action) => blowTimers.push(setTimeout(() => {
@@ -119,7 +154,17 @@
     }, ms));
     later(650, () => dialog.classList.add('blow-wind'));
     later(1350, () => setCandle(true));
-    later(2600, () => { clearBlow(); celebrate(); });
+    later(2600, () => { clearBlow(); openLetter(); });
+  }
+
+  function openLetter() {
+    settleBlow(); stop();
+    if (!dialog.open) return;
+    const letter = dialog.querySelector('.birthday-letter');
+    letter.hidden = false;
+    dialog.querySelector('.birthday-primary').setAttribute('aria-expanded', 'true');
+    letter.focus({preventScroll:true});
+    letter.scrollIntoView({behavior:motion.matches?'auto':'smooth', block:'start'});
   }
 
   function create() {
@@ -128,11 +173,12 @@
     dialog.setAttribute('aria-label', '생일 축하');
     dialog.innerHTML = `<button class="birthday-close" type="button" aria-label="생일 축하 닫기" autofocus>×</button>
       <canvas class="birthday-confetti" aria-hidden="true"></canvas>
+      <button class="birthday-skip" type="button" aria-label="오프닝 건너뛰기" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m7 5 8 7-8 7M18 5v14"/></svg></button>
       <div class="birthday-scroll"><section class="birthday-hero">
         <div class="birthday-stage">
           <div class="birthday-scene">
-            <img class="birthday-photo" src="birthday-night.webp?v=20261020-4" width="1024" height="1536" alt="은하수 아래 남녀가 함께 케이크를 바라보는 모습" decoding="async">
-            <img class="birthday-pose" src="birthday-blow.webp?v=20261020-4" width="1024" height="1536" alt="" aria-hidden="true" decoding="async">
+            <img class="birthday-photo" src="birthday-night.webp?v=20261020-6" width="1024" height="1536" alt="은하수 아래 남녀가 함께 케이크를 바라보는 모습" decoding="async">
+            <img class="birthday-pose" src="birthday-blow.webp?v=20261020-6" width="1024" height="1536" alt="" aria-hidden="true" decoding="async">
             <svg class="birthday-breath" viewBox="0 0 1024 1536" aria-hidden="true"><path d="M609 892 Q574 930 508 979"/><path d="M617 900 Q585 940 516 990"/><path d="M605 888 Q563 916 503 971"/></svg>
             <div class="birthday-candle-glow" aria-hidden="true"></div>
             <button class="birthday-candle-button" type="button" aria-label="촛불 끄기" aria-pressed="false">
@@ -159,16 +205,13 @@
     dialog.addEventListener('close', () => { clearBlow(); stop(); if (opener?.isConnected) opener.focus(); });
     dialog.querySelector('.birthday-candle-button').addEventListener('click', toggleCandle);
     dialog.querySelector('.birthday-blow').addEventListener('click', toggleCandle);
-    dialog.querySelector('.birthday-replay').addEventListener('click', celebrate);
-    dialog.querySelector('.birthday-primary').addEventListener('click', event => {
-      settleBlow(); stop();
-      dialog.querySelector('.birthday-letter').hidden = false;
-      event.currentTarget.setAttribute('aria-expanded', 'true');
-      dialog.querySelector('.birthday-letter').focus({preventScroll:true});
-      dialog.querySelector('.birthday-letter').scrollIntoView({behavior:motion.matches?'auto':'smooth', block:'start'});
+    dialog.querySelector('.birthday-replay').addEventListener('click', startIntro);
+    dialog.querySelector('.birthday-skip').addEventListener('click', () => {
+      stop(); dialog.querySelector('.birthday-candle-button').focus({preventScroll:true});
     });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) { settleBlow(); stop(); } });
-    motion.addEventListener('change', () => { settleBlow(); stop(); });
+    dialog.querySelector('.birthday-primary').addEventListener('click', openLetter);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { const pending=blowing; settleBlow(); stop(); if(pending) openLetter(); } });
+    motion.addEventListener('change', () => { const pending=blowing; settleBlow(); stop(); if(pending) openLetter(); });
     window.addEventListener('resize', stop);
   }
   window.ScheduleBirthday = {
@@ -181,7 +224,7 @@
       dialog.querySelector('.birthday-primary').setAttribute('aria-expanded', 'false');
       dialog.showModal();
       dialog.querySelector('.birthday-scroll').scrollTop = 0;
-      celebrate();
+      startIntro();
     }
   };
 })();

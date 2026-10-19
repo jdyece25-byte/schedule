@@ -40,3 +40,13 @@
 @keyframes birthday-breath{0%{opacity:0;stroke-dasharray:0 160}35%{opacity:.24;stroke-dasharray:60 160;stroke-dashoffset:0}100%{opacity:0;stroke-dasharray:60 160;stroke-dashoffset:-120}}
 @keyframes birthday-blow-flame{0%{transform:rotate(0) scale(1)}35%{transform:rotate(-45deg) scale(.8,1.1)}65%{transform:rotate(-65deg) scale(.7,.9)}100%{transform:rotate(-75deg) scale(.25,.5);opacity:0}}
 @media(prefers-reduced-motion:reduce){.birthday-pose,.birthday-flame,.birthday-candle-glow{transition:none}.birthday-breath{display:none}}
+
+.birthday-skip{position:absolute;z-index:4;bottom:calc(24px + env(safe-area-inset-bottom));right:22px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:1px solid #ffffff40;border-radius:50%;background:#171b38aa;color:#fff1d5;cursor:pointer}
+.birthday-skip svg{width:23px;height:23px}.birthday-skip[hidden]{display:none}
+.birthday-intro .birthday-confetti{z-index:4;pointer-events:auto}
+.birthday-intro .birthday-close,.birthday-intro .birthday-skip{z-index:5}
+.birthday-intro .birthday-actions{visibility:hidden}
+.birthday-intro .birthday-scroll{overflow:hidden}
+.birthday-scene{transition:transform 1.7s ease-out}
+.birthday-intro .birthday-scene{transform:translate(-50%,-50%) scale(1.07)}
+@media(prefers-reduced-motion:reduce){.birthday-scene{transition:none}}
