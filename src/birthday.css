@@ -14,14 +14,12 @@
 .birthday-photo{display:block;width:100%;height:auto}
 .birthday-scene{container-type:inline-size}
 .birthday-candle-button{position:absolute;left:51.8%;top:76%;transform:translate(-50%,-100%);width:25%;height:10%;min-height:65px;display:flex;align-items:flex-end;justify-content:center;padding:0;border:0;background:transparent;cursor:pointer;z-index:3;-webkit-tap-highlight-color:transparent}
-.birthday-number{position:relative;display:block;width:25%;height:48%;color:#f9c0cc}
-.birthday-number:nth-child(2){color:#b8dbef}.birthday-number:nth-child(3){color:#ffe09c}.birthday-number:nth-child(4){color:#c6b3ed}
-.birthday-digit{display:block;font:bold 32px/1 Georgia,serif;font-size:clamp(24px,6cqi,42px);-webkit-text-stroke:1px #fff6df;text-shadow:1px 2px 0 #a35c6380,0 2px 3px #4f343580}
+.birthday-number{position:relative;display:block;width:25%;height:48%;color:#e83841}
+.birthday-digit{display:block;font:bold 32px/1 Georgia,serif;font-size:clamp(24px,6cqi,42px);-webkit-text-stroke:1px #ffb3a0;text-shadow:1px 2px 0 #a35c6380,0 2px 3px #4f343580}
 .birthday-wick{position:absolute;left:50%;bottom:100%;height:8%;width:1px;background:#44362a}
 .birthday-flame{position:absolute;left:calc(50% - 4px);bottom:106%;width:8px;height:40%;border-radius:60% 40% 45% 45%;background:linear-gradient(#ffa943,#fffbe0 60%,#ffc163);box-shadow:0 0 7px #ffdb9b,0 0 18px #ffa94d80;transform-origin:50% 100%;animation:birthday-flame 1.8s ease-in-out infinite alternate;transition:opacity .25s}
 .birthday-number:nth-child(even) .birthday-flame{animation-delay:-.6s}
 .birthday-smoke{position:absolute;left:calc(50% - 5px);bottom:105%;width:10px;height:85%;border-left:2px solid #d5d9e288;border-radius:50%;filter:blur(2px);opacity:0;pointer-events:none}
-.birthday-caption{position:absolute;top:82.5%;left:0;width:100%;margin:0;text-align:center;font-size:clamp(13px,3.3cqi,18px);font-weight:600;color:#63402c;text-shadow:0 1px 2px #fff0c9;letter-spacing:.5px}
 .birthday-candle-glow{position:absolute;left:51.8%;top:73%;width:32%;aspect-ratio:1;transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(ellipse,#ffce7617,transparent 68%);transition:opacity .6s}
 .candles-out .birthday-flame,.candles-out .birthday-candle-glow{opacity:0;animation:none}
 .candles-blown .birthday-smoke{animation:birthday-smoke 2.8s ease-out both}

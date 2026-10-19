@@ -48,6 +48,27 @@
       light.addColorStop(0,'#fffbe9');light.addColorStop(.14,color);light.addColorStop(1,color+'00');
       g.fillStyle=light;g.fillRect(0,0,32,32);return sprite;
     });
+    // Rasterize three Korean lines once, then let the second volley form their glyphs.
+    const lettering = document.createElement('canvas');
+    lettering.width = Math.ceil(w); lettering.height = Math.ceil(h);
+    const ink = lettering.getContext('2d', {willReadFrequently:true});
+    const fontSize = Math.min(w*.155, h*.09, 72), lineGap = fontSize*1.6;
+    ink.font = `700 ${fontSize}px "Apple SD Gothic Neo", "Noto Sans CJK KR", sans-serif`;
+    ink.textAlign = 'center'; ink.textBaseline = 'middle'; ink.fillStyle = '#fff';
+    const words = ['22번째', '생일', '축하해'];
+    const letterSparks = [];
+    for (let row=0; row<words.length; row++) {
+      ink.clearRect(0,0,w,h);
+      const cy=h*.46+(row-1)*lineGap;
+      ink.fillText(words[row],w/2,cy);
+      const pixels=ink.getImageData(0,0,lettering.width,lettering.height).data;
+      for(let y=Math.max(0,Math.floor(cy-fontSize));y<Math.min(h,cy+fontSize);y+=3){
+        for(let x=0;x<w;x+=3){
+          if(pixels[(y*lettering.width+x)*4+3]<100)continue;
+          letterSparks.push({x,y,row,cy,delay:Math.random()*.15,phase:Math.random()*6});
+        }
+      }
+    }
     const trail = [], started = performance.now();
     const smooth = x => { x=Math.max(0,Math.min(1,x)); return x*x*(3-2*x); };
     function render(now) {
@@ -56,17 +77,17 @@
       const zoom=1-.15*smooth((t-4.3)/1.1);
       ctx.clearRect(0,0,w,h);
       // Fade the camera shot into the illustrated couple after the firework bloom.
-      ctx.globalAlpha=1-smooth((t-8.6)/1.9);
+      ctx.globalAlpha=1-smooth((t-12.6)/1.9);
       ctx.save();
       const sky=ctx.createLinearGradient(0,0,w,h);
       sky.addColorStop(0,'#090f2e');sky.addColorStop(.55,'#20234b');sky.addColorStop(1,'#584069');
       ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
       const paintedSky=dialog.querySelector('.birthday-photo');
       if(paintedSky.complete&&paintedSky.naturalWidth){
-        ctx.globalAlpha=(1-smooth((t-8.6)/1.9))*.42;
+        ctx.globalAlpha=(1-smooth((t-12.6)/1.9))*.42;
         const skyHeight=h*1.3, skyWidth=skyHeight*1024/440;
         ctx.drawImage(paintedSky,0,0,1024,440,(w-skyWidth)/2,-h*.22-camera*.08,skyWidth,skyHeight);
-        ctx.globalAlpha=1-smooth((t-8.6)/1.9);
+        ctx.globalAlpha=1-smooth((t-12.6)/1.9);
       }
       ctx.translate(w/2,h*.35);ctx.scale(zoom,zoom);ctx.translate(-w/2,-h*.35);
       for(const star of stars){
@@ -119,7 +140,7 @@
             return {x:shell.x+Math.cos(p.angle)*radius,
               y:shell.y+Math.sin(p.angle)*radius+20*at*at};
           };
-          const head=point(age),alpha=(1-smooth((t-8.6)/1.9))*Math.min(1,age*8)*Math.max(0,1-age/p.life);
+          const head=point(age),alpha=(1-smooth((t-12.6)/1.9))*Math.min(1,age*8)*Math.max(0,1-age/p.life);
           ctx.strokeStyle=shell.color;
           for(let tail=3;tail>0;tail--){
             const from=point(Math.max(0,age-tail*.075)),to=point(Math.max(0,age-(tail-1)*.075));
@@ -130,8 +151,26 @@
           ctx.drawImage(glows[b],head.x-7,head.y-7,14,14);
         }
       }
+      // A staggered second volley bursts into the exact message, then drifts away.
+      for(const p of letterSparks){
+        const age=t-(7.9+p.row*.48+p.delay);
+        if(age<0)continue;
+        const spread=1-(1-Math.min(1,age/1.45))**3;
+        const dissolve=smooth((t-12.6)/1.9);
+        const x=w/2+(p.x-w/2)*spread+Math.sin(p.phase)*dissolve*18;
+        const y=p.cy+(p.y-p.cy)*spread+dissolve*dissolve*75;
+        const prev=Math.max(0,age-.065),before=1-(1-Math.min(1,prev/1.45))**3;
+        const colorIndex=[0,1,2][p.row];
+        ctx.globalAlpha=Math.min(1,age*5)*(1-dissolve)*(.78+.22*Math.sin(t*4+p.phase)**2);
+        if(age<1.5){
+          ctx.strokeStyle=palette[colorIndex];ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(w/2+(p.x-w/2)*before,p.cy+(p.y-p.cy)*before);ctx.lineTo(x,y);ctx.stroke();
+        }
+        ctx.drawImage(glows[colorIndex],x-3.2,y-3.2,6.4,6.4);
+        ctx.fillStyle=palette[colorIndex];ctx.fillRect(x-.65,y-.65,1.3,1.3);
+      }
       ctx.restore();ctx.globalAlpha=1;
-      if(t<10.5&&dialog.open&&!document.hidden)frame=requestAnimationFrame(render);
+      if(t<14.5&&dialog.open&&!document.hidden)frame=requestAnimationFrame(render);
       else stop();
     }
     frame=requestAnimationFrame(render);
@@ -197,14 +236,13 @@
       <div class="birthday-scroll"><section class="birthday-hero">
         <div class="birthday-stage">
           <div class="birthday-scene">
-            <img class="birthday-photo" src="birthday-night.webp?v=20261020-8" width="1024" height="1536" alt="별이 많은 밤하늘 아래 단발 여성과 남성이 작은 케이크를 바라보는 그림" decoding="async">
-            <img class="birthday-pose" src="birthday-blow.webp?v=20261020-8" width="1024" height="1536" alt="" aria-hidden="true" decoding="async">
-            <svg class="birthday-breath" viewBox="0 0 1024 1536" aria-hidden="true"><path d="M610 970 Q570 1020 530 1080"/><path d="M618 978 Q580 1030 538 1090"/><path d="M605 965 Q560 1010 523 1075"/></svg>
+            <img class="birthday-photo" src="birthday-night.webp?v=20261020-9" width="1024" height="1536" alt="별이 많은 밤하늘 아래 단발 여성과 남성이 핏불테리어와 작은 케이크를 바라보는 그림" decoding="async">
+            <img class="birthday-pose" src="birthday-blow.webp?v=20261020-9" width="1024" height="1536" alt="" aria-hidden="true" decoding="async">
+            <svg class="birthday-breath" viewBox="0 0 1024 1536" aria-hidden="true"><path d="M666 950 Q590 1010 530 1080"/><path d="M674 958 Q600 1020 538 1090"/><path d="M660 945 Q580 1000 523 1075"/></svg>
             <div class="birthday-candle-glow" aria-hidden="true"></div>
             <button class="birthday-candle-button" type="button" aria-label="촛불 켜기" aria-pressed="true">
               ${[...'2026'].map(n=>`<span class="birthday-number" aria-hidden="true"><span class="birthday-digit">${n}</span><span class="birthday-wick"></span><span class="birthday-flame"></span><span class="birthday-smoke"></span></span>`).join('')}
             </button>
-            <p class="birthday-caption">22번째 생일 축하해</p>
           </div>
           <button class="birthday-blow" type="button">촛불 켜기</button>
         </div>
