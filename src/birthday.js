@@ -20,9 +20,8 @@
     dialog.querySelector('.birthday-skip').hidden = true;
   }
   function startIntro() {
-    stop(); settleBlow(); setCandle(false);
+    stop(); settleBlow(); setCandle(true);
     dialog.querySelector('.birthday-letter').hidden = true;
-    dialog.querySelector('.birthday-primary').setAttribute('aria-expanded', 'false');
     dialog.querySelector('.birthday-scroll').scrollTop = 0;
     if (motion.matches || document.hidden || !dialog.open) return;
     const canvas = dialog.querySelector('canvas'), ctx = canvas.getContext('2d');
@@ -35,8 +34,20 @@
     // A world-space camera follows the rocket; near and far stars move at different speeds.
     const stars = Array.from({length:220}, () => ({x:Math.random()*w,y:(Math.random()*5-3)*h,
       depth:.3+Math.random()*.7,size:.4+Math.random()*1.1,phase:Math.random()*6}));
-    const sparks = Array.from({length:200}, (_,i) => ({angle:i/200*Math.PI*2,
-      speed:55+Math.random()*160,life:1.5+Math.random()*1.5,color:['#ffd68c','#f4b6d0','#c4b9ff','#a8ddf0'][i%4]}));
+    const palette=['#ffd477','#ff81c5','#94dfff','#b7a1ff','#ffbd70','#9ef2cf','#ffe8a6'];
+    // Each shell expands to a screen-sized peony, with long luminous falling trails.
+    const shells=palette.map((color,index)=>({color,at:4.35+index*.53,
+      x:[.34,.78,.18,.64,.38,.84,.5][index]*w,
+      y:[.26,.43,.61,.18,.74,.68,.46][index]*h,
+      radius:Math.max(w,h)*(.55+(index%3)*.09),
+      sparks:Array.from({length:130},(_,i)=>({angle:i/130*Math.PI*2+Math.random()*.025,
+        reach:.6+Math.random()*.4,life:2.8+Math.random()*.8,phase:Math.random()*6}))}));
+    const glows=palette.map(color=>{
+      const sprite=document.createElement('canvas');sprite.width=32;sprite.height=32;
+      const g=sprite.getContext('2d'),light=g.createRadialGradient(16,16,0,16,16,16);
+      light.addColorStop(0,'#fffbe9');light.addColorStop(.14,color);light.addColorStop(1,color+'00');
+      g.fillStyle=light;g.fillRect(0,0,32,32);return sprite;
+    });
     const trail = [], started = performance.now();
     const smooth = x => { x=Math.max(0,Math.min(1,x)); return x*x*(3-2*x); };
     function render(now) {
@@ -45,17 +56,17 @@
       const zoom=1-.15*smooth((t-4.3)/1.1);
       ctx.clearRect(0,0,w,h);
       // Fade the camera shot into the illustrated couple after the firework bloom.
-      ctx.globalAlpha=1-smooth((t-6.1)/1.7);
+      ctx.globalAlpha=1-smooth((t-8.6)/1.9);
       ctx.save();
       const sky=ctx.createLinearGradient(0,0,w,h);
       sky.addColorStop(0,'#090f2e');sky.addColorStop(.55,'#20234b');sky.addColorStop(1,'#584069');
       ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
       const paintedSky=dialog.querySelector('.birthday-photo');
       if(paintedSky.complete&&paintedSky.naturalWidth){
-        ctx.globalAlpha=(1-smooth((t-6.1)/1.7))*.42;
+        ctx.globalAlpha=(1-smooth((t-8.6)/1.9))*.42;
         const skyHeight=h*1.3, skyWidth=skyHeight*1024/440;
         ctx.drawImage(paintedSky,0,0,1024,440,(w-skyWidth)/2,-h*.22-camera*.08,skyWidth,skyHeight);
-        ctx.globalAlpha=1-smooth((t-6.1)/1.7);
+        ctx.globalAlpha=1-smooth((t-8.6)/1.9);
       }
       ctx.translate(w/2,h*.35);ctx.scale(zoom,zoom);ctx.translate(-w/2,-h*.35);
       for(const star of stars){
@@ -96,22 +107,31 @@
         ctx.fillStyle=glow;ctx.fillRect(rocket.x-24,y-24,48,48);
         ctx.fillStyle='#fff7df';ctx.beginPath();ctx.arc(rocket.x,y,2.8,0,Math.PI*2);ctx.fill();
       }
-      // Secondary blooms stagger around the tracked rocket's final position.
-      for(let burst=0;burst<3;burst++){
-        const age=t-4.35-burst*.48;
+      // Large, overlapping shells fill all quadrants without full-screen flashes.
+      ctx.globalCompositeOperation='lighter';
+      for(let b=0;b<shells.length;b++){
+        const shell=shells[b],age=t-shell.at;
         if(age<0)continue;
-        const bx=w*(burst===0?.34:burst===1?.78:.15),by=-h*1.3-camera+burst*h*.11;
-        for(const p of sparks){
+        for(const p of shell.sparks){
           if(age>p.life)continue;
-          const vx=Math.cos(p.angle)*p.speed,vy=Math.sin(p.angle)*p.speed;
-          const scale=Math.min(w/390,1.5),a=age*scale;
-          const x=bx+vx*a,y=by+vy*a+30*age*age;
-          ctx.globalAlpha=(1-smooth((t-6.1)/1.7))*Math.max(0,1-age/p.life);
-          ctx.globalCompositeOperation='lighter';ctx.strokeStyle=p.color;ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(x-vx*.035,y-vy*.035);ctx.lineTo(x,y);ctx.stroke();
+          const point=at=>{
+            const radius=shell.radius*(1-Math.exp(-at*1.25))*p.reach;
+            return {x:shell.x+Math.cos(p.angle)*radius,
+              y:shell.y+Math.sin(p.angle)*radius+20*at*at};
+          };
+          const head=point(age),alpha=(1-smooth((t-8.6)/1.9))*Math.min(1,age*8)*Math.max(0,1-age/p.life);
+          ctx.strokeStyle=shell.color;
+          for(let tail=3;tail>0;tail--){
+            const from=point(Math.max(0,age-tail*.075)),to=point(Math.max(0,age-(tail-1)*.075));
+            ctx.globalAlpha=alpha*(1-tail*.19);ctx.lineWidth=tail===1?2:1.2;
+            ctx.beginPath();ctx.moveTo(from.x,from.y);ctx.lineTo(to.x,to.y);ctx.stroke();
+          }
+          ctx.globalAlpha=alpha*(.75+.25*Math.sin(t*8+p.phase)**2);
+          ctx.drawImage(glows[b],head.x-7,head.y-7,14,14);
         }
       }
       ctx.restore();ctx.globalAlpha=1;
-      if(t<7.8&&dialog.open&&!document.hidden)frame=requestAnimationFrame(render);
+      if(t<10.5&&dialog.open&&!document.hidden)frame=requestAnimationFrame(render);
       else stop();
     }
     frame=requestAnimationFrame(render);
@@ -119,6 +139,7 @@
 
   function setCandle(out) {
     dialog.classList.toggle('candles-out', out);
+    if (!out) dialog.classList.remove('candles-blown');
     dialog.querySelector('.birthday-candle-button').setAttribute('aria-pressed', String(out));
     dialog.querySelector('.birthday-candle-button').setAttribute('aria-label', out ? '촛불 켜기' : '촛불 끄기');
     dialog.querySelector('.birthday-blow').textContent = out ? '촛불 켜기' : '촛불 끄기';
@@ -131,7 +152,7 @@
     for (const selector of ['.birthday-candle-button', '.birthday-blow']) dialog.querySelector(selector).disabled = false;
   }
   function settleBlow() {
-    if (blowing) setCandle(true);
+    if (blowing) { dialog.classList.add('candles-blown'); setCandle(true); }
     clearBlow();
   }
   async function toggleCandle() {
@@ -153,7 +174,7 @@
       if (run === blowRun && dialog.open) action();
     }, ms));
     later(650, () => dialog.classList.add('blow-wind'));
-    later(1350, () => setCandle(true));
+    later(1350, () => { dialog.classList.add('candles-blown'); setCandle(true); });
     later(2600, () => { clearBlow(); openLetter(); });
   }
 
@@ -162,7 +183,6 @@
     if (!dialog.open) return;
     const letter = dialog.querySelector('.birthday-letter');
     letter.hidden = false;
-    dialog.querySelector('.birthday-primary').setAttribute('aria-expanded', 'true');
     letter.focus({preventScroll:true});
     letter.scrollIntoView({behavior:motion.matches?'auto':'smooth', block:'start'});
   }
@@ -177,20 +197,16 @@
       <div class="birthday-scroll"><section class="birthday-hero">
         <div class="birthday-stage">
           <div class="birthday-scene">
-            <img class="birthday-photo" src="birthday-night.webp?v=20261020-6" width="1024" height="1536" alt="은하수 아래 남녀가 함께 케이크를 바라보는 모습" decoding="async">
-            <img class="birthday-pose" src="birthday-blow.webp?v=20261020-6" width="1024" height="1536" alt="" aria-hidden="true" decoding="async">
-            <svg class="birthday-breath" viewBox="0 0 1024 1536" aria-hidden="true"><path d="M609 892 Q574 930 508 979"/><path d="M617 900 Q585 940 516 990"/><path d="M605 888 Q563 916 503 971"/></svg>
+            <img class="birthday-photo" src="birthday-night.webp?v=20261020-8" width="1024" height="1536" alt="별이 많은 밤하늘 아래 단발 여성과 남성이 작은 케이크를 바라보는 그림" decoding="async">
+            <img class="birthday-pose" src="birthday-blow.webp?v=20261020-8" width="1024" height="1536" alt="" aria-hidden="true" decoding="async">
+            <svg class="birthday-breath" viewBox="0 0 1024 1536" aria-hidden="true"><path d="M610 970 Q570 1020 530 1080"/><path d="M618 978 Q580 1030 538 1090"/><path d="M605 965 Q560 1010 523 1075"/></svg>
             <div class="birthday-candle-glow" aria-hidden="true"></div>
-            <button class="birthday-candle-button" type="button" aria-label="촛불 끄기" aria-pressed="false">
-              <span class="birthday-wax" aria-hidden="true"></span><span class="birthday-wick" aria-hidden="true"></span>
-              <span class="birthday-flame" aria-hidden="true"></span><span class="birthday-smoke" aria-hidden="true"></span>
+            <button class="birthday-candle-button" type="button" aria-label="촛불 켜기" aria-pressed="true">
+              ${[...'2026'].map(n=>`<span class="birthday-number" aria-hidden="true"><span class="birthday-digit">${n}</span><span class="birthday-wick"></span><span class="birthday-flame"></span><span class="birthday-smoke"></span></span>`).join('')}
             </button>
+            <p class="birthday-caption">22번째 생일 축하해</p>
           </div>
-        </div>
-        <div class="birthday-actions">
-          <button class="birthday-blow" type="button">촛불 끄기</button>
-          <button class="birthday-primary" type="button" aria-expanded="false" aria-controls="birthday-letter"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/></svg>편지</button>
-          <button class="birthday-replay" type="button" aria-label="애니메이션 다시 보기"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg></button>
+          <button class="birthday-blow" type="button">촛불 켜기</button>
         </div>
       </section>
       <article class="birthday-letter" id="birthday-letter" hidden aria-label="편지" tabindex="-1">
@@ -205,11 +221,9 @@
     dialog.addEventListener('close', () => { clearBlow(); stop(); if (opener?.isConnected) opener.focus(); });
     dialog.querySelector('.birthday-candle-button').addEventListener('click', toggleCandle);
     dialog.querySelector('.birthday-blow').addEventListener('click', toggleCandle);
-    dialog.querySelector('.birthday-replay').addEventListener('click', startIntro);
     dialog.querySelector('.birthday-skip').addEventListener('click', () => {
       stop(); dialog.querySelector('.birthday-candle-button').focus({preventScroll:true});
     });
-    dialog.querySelector('.birthday-primary').addEventListener('click', openLetter);
     document.addEventListener('visibilitychange', () => { if (document.hidden) { const pending=blowing; settleBlow(); stop(); if(pending) openLetter(); } });
     motion.addEventListener('change', () => { const pending=blowing; settleBlow(); stop(); if(pending) openLetter(); });
     window.addEventListener('resize', stop);
@@ -219,9 +233,8 @@
       if (!dialog) create();
       if (dialog.open) return;
       opener = document.activeElement;
-      clearBlow(); setCandle(false);
+      clearBlow(); setCandle(true); dialog.classList.remove('candles-blown');
       dialog.querySelector('.birthday-letter').hidden = true;
-      dialog.querySelector('.birthday-primary').setAttribute('aria-expanded', 'false');
       dialog.showModal();
       dialog.querySelector('.birthday-scroll').scrollTop = 0;
       startIntro();
