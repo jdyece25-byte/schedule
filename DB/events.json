@@ -4431,5 +4431,19 @@
       "source_hash": "927f152bd89bb688076f37eb0fa9353dadaf34b7a81a81425181771251dad28f",
       "managed_hash": "bfc748e7f36b7c5078bf3d2593aed35dd3830ef329330d65cf09f3d563c4b7ec"
     }
+  },
+  {
+    "d": "2026-11-01",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab05] Lab Report",
+    "s": 1439,
+    "id": "school-92b735b03cbe128732af0343224a",
+    "school": {
+      "source_id": "b206b3435dbffeafdde53f492a31265f13a2119b3dffa19485dd4af633c46fbe",
+      "candidate_id": "6bf602ad005f8466db12707f37e3881e0eeb3616fa2735be32de6518f0803587",
+      "course": "logic",
+      "source_hash": "d12cc19d652ee606dba529e5b5f855f812b83c9469b29a8046344d53d9400bd6",
+      "managed_hash": "0ad64a18447559c3c997592977c5d0428e40d55faa33d138a36a2c451e73e10d"
+    }
   }
 ]
