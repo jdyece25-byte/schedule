@@ -4417,5 +4417,19 @@
       "source_hash": "a6565d53a941e911a783d6cb3ff1ef5c09b76a6b6888d18a911ae8ebbf68c16e",
       "managed_hash": "f27c5ead7d48d22f853c856b82c9f6497b223bebf547303a991dcadd825c2112"
     }
+  },
+  {
+    "d": "2026-10-25",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab05] Prelab",
+    "s": 1439,
+    "id": "school-83fd0b37ba740eb96750da873d52",
+    "school": {
+      "source_id": "291812d381876e2e43b020a3ca1157a4ac6b1fbfbe905fbae162c33b3929dee2",
+      "candidate_id": "994c4dd9364e295c4cb08cbd36289333be8cca3ef18cdfc24b561b7835f1641e",
+      "course": "logic",
+      "source_hash": "927f152bd89bb688076f37eb0fa9353dadaf34b7a81a81425181771251dad28f",
+      "managed_hash": "bfc748e7f36b7c5078bf3d2593aed35dd3830ef329330d65cf09f3d563c4b7ec"
+    }
   }
 ]
