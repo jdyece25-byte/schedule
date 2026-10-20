@@ -2098,21 +2098,36 @@
     "d": "2026-10-20",
     "t": "exam",
     "n": "[논설] 중간고사",
-    "ti": "18:30~ (종료·장소 미공지)",
+    "ti": "18:30–22:30",
     "s": 1110,
     "status": "tentative",
-    "no": "실습 시간대에 진행 · 장소·종료 시각 공지 확인 · 출처: Lec01-Intro.pdf, Lec02-Comb.pdf, [Lab00] Introduction.pdf"
+    "no": "실습 시간대에 진행 · 장소 공지 확인 · 출처: Lec01-Intro.pdf, Lec02-Comb.pdf, [Lab00] Introduction.pdf · 사용자 확인: 22:30 종료",
+    "e": 1350
   },
   {
     "id": "2026fall-online-tue-2026-10-20",
     "d": "2026-10-20",
     "t": "tutor",
     "n": "온라인 과외 · 나형준",
-    "ti": "22:00–24:00",
-    "s": 1320,
+    "ti": "22:30–24:00",
+    "s": 1350,
     "e": 1440,
     "series": "2026fall-online-tue",
     "no": "온라인 · 매주 화요일"
+  },
+  {
+    "d": "2026-10-20",
+    "t": "deadline",
+    "n": "대학 글쓰기 1 · 과제 3 연구계획서",
+    "s": 1439,
+    "id": "school-c11a8351c76ee2139e14d7c294b4",
+    "school": {
+      "source_id": "95ce302d88c443468138bc3ca3d87693130efdce1c94dd2638e2ac4279f0c23f",
+      "candidate_id": "7af4417367cf6238c24ed0ac1c126592cd05aea0be0c74c4879c0417d3f283e2",
+      "course": "writing",
+      "source_hash": "a6565d53a941e911a783d6cb3ff1ef5c09b76a6b6888d18a911ae8ebbf68c16e",
+      "managed_hash": "f27c5ead7d48d22f853c856b82c9f6497b223bebf547303a991dcadd825c2112"
+    }
   },
   {
     "id": "20260920T004930942Z-89b00729-b7f4-4b39-b2c4-e00a125f0ad0-4",
@@ -2274,6 +2289,20 @@
     "e": 1200,
     "series": "2026fall-clinic-sun",
     "no": "장소·온라인 여부 확인 필요 · 매주 일요일"
+  },
+  {
+    "d": "2026-10-25",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab05] Prelab",
+    "s": 1439,
+    "id": "school-83fd0b37ba740eb96750da873d52",
+    "school": {
+      "source_id": "291812d381876e2e43b020a3ca1157a4ac6b1fbfbe905fbae162c33b3929dee2",
+      "candidate_id": "994c4dd9364e295c4cb08cbd36289333be8cca3ef18cdfc24b561b7835f1641e",
+      "course": "logic",
+      "source_hash": "927f152bd89bb688076f37eb0fa9353dadaf34b7a81a81425181771251dad28f",
+      "managed_hash": "bfc748e7f36b7c5078bf3d2593aed35dd3830ef329330d65cf09f3d563c4b7ec"
+    }
   },
   {
     "id": "20260914T054522317Z-bd97efd1-1306-4d73-a746-1b4c2426ef3c-10",
@@ -2535,6 +2564,20 @@
     "ti": "23:00까지",
     "s": 1380,
     "no": "참고문헌 포함 A4 5장 이내(표지 불필요, 도표·그림·각주 분량 제외). 한글파일만(워드·PDF 불가), 10pt/160%, 직접인용 9pt/130%, 쪽번호. · 교수 공지 23:00 기준(eTL 시스템 23:59) · 출처: assignments, eTL planner, 화목 계획서(2026년 2학기)_최종 수정본.docx"
+  },
+  {
+    "d": "2026-11-01",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab05] Lab Report",
+    "s": 1439,
+    "id": "school-92b735b03cbe128732af0343224a",
+    "school": {
+      "source_id": "b206b3435dbffeafdde53f492a31265f13a2119b3dffa19485dd4af633c46fbe",
+      "candidate_id": "6bf602ad005f8466db12707f37e3881e0eeb3616fa2735be32de6518f0803587",
+      "course": "logic",
+      "source_hash": "d12cc19d652ee606dba529e5b5f855f812b83c9469b29a8046344d53d9400bd6",
+      "managed_hash": "0ad64a18447559c3c997592977c5d0428e40d55faa33d138a36a2c451e73e10d"
+    }
   },
   {
     "id": "20260914T054522317Z-bd97efd1-1306-4d73-a746-1b4c2426ef3c-12",
@@ -4403,47 +4446,5 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
-  },
-  {
-    "d": "2026-10-20",
-    "t": "deadline",
-    "n": "대학 글쓰기 1 · 과제 3 연구계획서",
-    "s": 1439,
-    "id": "school-c11a8351c76ee2139e14d7c294b4",
-    "school": {
-      "source_id": "95ce302d88c443468138bc3ca3d87693130efdce1c94dd2638e2ac4279f0c23f",
-      "candidate_id": "7af4417367cf6238c24ed0ac1c126592cd05aea0be0c74c4879c0417d3f283e2",
-      "course": "writing",
-      "source_hash": "a6565d53a941e911a783d6cb3ff1ef5c09b76a6b6888d18a911ae8ebbf68c16e",
-      "managed_hash": "f27c5ead7d48d22f853c856b82c9f6497b223bebf547303a991dcadd825c2112"
-    }
-  },
-  {
-    "d": "2026-10-25",
-    "t": "deadline",
-    "n": "논리설계 및 실험 · [Lab05] Prelab",
-    "s": 1439,
-    "id": "school-83fd0b37ba740eb96750da873d52",
-    "school": {
-      "source_id": "291812d381876e2e43b020a3ca1157a4ac6b1fbfbe905fbae162c33b3929dee2",
-      "candidate_id": "994c4dd9364e295c4cb08cbd36289333be8cca3ef18cdfc24b561b7835f1641e",
-      "course": "logic",
-      "source_hash": "927f152bd89bb688076f37eb0fa9353dadaf34b7a81a81425181771251dad28f",
-      "managed_hash": "bfc748e7f36b7c5078bf3d2593aed35dd3830ef329330d65cf09f3d563c4b7ec"
-    }
-  },
-  {
-    "d": "2026-11-01",
-    "t": "deadline",
-    "n": "논리설계 및 실험 · [Lab05] Lab Report",
-    "s": 1439,
-    "id": "school-92b735b03cbe128732af0343224a",
-    "school": {
-      "source_id": "b206b3435dbffeafdde53f492a31265f13a2119b3dffa19485dd4af633c46fbe",
-      "candidate_id": "6bf602ad005f8466db12707f37e3881e0eeb3616fa2735be32de6518f0803587",
-      "course": "logic",
-      "source_hash": "d12cc19d652ee606dba529e5b5f855f812b83c9469b29a8046344d53d9400bd6",
-      "managed_hash": "0ad64a18447559c3c997592977c5d0428e40d55faa33d138a36a2c451e73e10d"
-    }
   }
 ]
