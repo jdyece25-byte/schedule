@@ -4405,7 +4405,7 @@
     "no": "매주 토요일 · 총 16회 중 16회"
   },
   {
-    "d": "2026-10-19",
+    "d": "2026-10-20",
     "t": "deadline",
     "n": "대학 글쓰기 1 · 과제 3 연구계획서",
     "s": 1439,
@@ -4414,8 +4414,8 @@
       "source_id": "95ce302d88c443468138bc3ca3d87693130efdce1c94dd2638e2ac4279f0c23f",
       "candidate_id": "7af4417367cf6238c24ed0ac1c126592cd05aea0be0c74c4879c0417d3f283e2",
       "course": "writing",
-      "source_hash": "2860c89b0a419c57fa3604a3e2cfe2d3ce6d815a2cd025464b3c85cb5e3eb85b",
-      "managed_hash": "324a5e6883c347d4e6d40fa2a8af8022af12228a0b0746e15cdfa6f95c269b24"
+      "source_hash": "a6565d53a941e911a783d6cb3ff1ef5c09b76a6b6888d18a911ae8ebbf68c16e",
+      "managed_hash": "f27c5ead7d48d22f853c856b82c9f6497b223bebf547303a991dcadd825c2112"
     }
   }
 ]
