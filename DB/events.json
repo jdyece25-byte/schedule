@@ -2116,20 +2116,6 @@
     "no": "온라인 · 매주 화요일"
   },
   {
-    "d": "2026-10-22",
-    "t": "deadline",
-    "n": "대학 글쓰기 1 · 과제 3 연구계획서",
-    "s": 1439,
-    "id": "school-c11a8351c76ee2139e14d7c294b4",
-    "school": {
-      "source_id": "95ce302d88c443468138bc3ca3d87693130efdce1c94dd2638e2ac4279f0c23f",
-      "candidate_id": "7af4417367cf6238c24ed0ac1c126592cd05aea0be0c74c4879c0417d3f283e2",
-      "course": "writing",
-      "source_hash": "8a160356cb002dbc05cbd8ff27177d455e9a02147e473fd7340f1b0741387b83",
-      "managed_hash": "ee68c17281b4afc99052b91d2fd0c3c83f367d7a75fa1e9101689afb01e9f6ef"
-    }
-  },
-  {
     "id": "20260920T004930942Z-89b00729-b7f4-4b39-b2c4-e00a125f0ad0-4",
     "d": "2026-10-21",
     "t": "tutor",
@@ -2223,6 +2209,20 @@
     "no": "장소·온라인 여부 확인 필요 · 매주 목요일"
   },
   {
+    "d": "2026-10-22",
+    "t": "deadline",
+    "n": "대학 글쓰기 1 · 과제 3 연구계획서",
+    "s": 1439,
+    "id": "school-c11a8351c76ee2139e14d7c294b4",
+    "school": {
+      "source_id": "95ce302d88c443468138bc3ca3d87693130efdce1c94dd2638e2ac4279f0c23f",
+      "candidate_id": "7af4417367cf6238c24ed0ac1c126592cd05aea0be0c74c4879c0417d3f283e2",
+      "course": "writing",
+      "source_hash": "8a160356cb002dbc05cbd8ff27177d455e9a02147e473fd7340f1b0741387b83",
+      "managed_hash": "ee68c17281b4afc99052b91d2fd0c3c83f367d7a75fa1e9101689afb01e9f6ef"
+    }
+  },
+  {
     "id": "20261022T010423350Z-c5199651-3a1e-437c-bfbe-774d46986fca-1",
     "d": "2026-10-23",
     "t": "tutor",
@@ -2245,17 +2245,6 @@
     "lid": "snu38",
     "loc": "서울대 38동 422호",
     "no": "중간 피칭 1 · Intro 강의계획표 기준"
-  },
-  {
-    "id": "2026fall-clinic-fri-2026-10-23",
-    "d": "2026-10-23",
-    "t": "clinic",
-    "n": "브레인밸리 클리닉",
-    "ti": "22:00–24:00",
-    "s": 1320,
-    "e": 1440,
-    "series": "2026fall-clinic-fri",
-    "no": "장소·온라인 여부 확인 필요 · 매주 금요일"
   },
   {
     "id": "20260914T103554341Z-fff48272-5a8c-43b9-86a9-4e30cd257603-7",
