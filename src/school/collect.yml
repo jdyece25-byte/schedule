@@ -5,7 +5,7 @@ name: Collect school notices
 
 on:
   schedule:
-    - cron: '7-59/15 * * * *'
+    - cron: '7 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
@@ -77,7 +77,7 @@ jobs:
           exit "$result"
       # Persist completed downloads even when a later request/collection fails.
       # Only changed record content gets a new immutable cache entry, avoiding
-      # identical copies every 15 minutes. Its records contain hashed revisions
+      # identical copies every hour. Its records contain hashed revisions
       # and parsed text, excluding downloader headers and signed download URLs.
       - name: Fingerprint completed document cache
         id: document-cache-state

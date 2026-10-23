@@ -10,7 +10,7 @@ import sys
 import time
 
 POLL_SECONDS = 5
-COLLECT_SECONDS = 900
+COLLECT_SECONDS = 3600
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from src.bridge.github import GitHub
