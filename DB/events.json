@@ -4457,5 +4457,19 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
+  },
+  {
+    "d": "2026-10-30",
+    "t": "deadline",
+    "n": "공학도의 도전과 리더십 2 · 중간 피칭 발표자료 제출",
+    "s": 1020,
+    "id": "school-32ff6f5559374d0e3d55428ba701",
+    "school": {
+      "source_id": "ed51bf368408a6e75739d0e4ebc59883c4776fbd6d8d4119424a1ee64fa1d663",
+      "candidate_id": "58aa3075c258c9320aba187a675e9562813d042c14496ccc4f4d89ba16dc22f1",
+      "course": "leadership",
+      "source_hash": "05fd0399f91e518247d353ab15995ca578ac1a13a2ad8c1e8f8580375d559cd8",
+      "managed_hash": "949710bc9ec6ee6c49b08647c5a47b2ce47c9b57ae3adb0f6330b9a797d3745f"
+    }
   }
 ]
