@@ -2178,7 +2178,7 @@
     "no": "장소·온라인 여부 확인 필요 · 매주 목요일"
   },
   {
-    "d": "2026-10-22",
+    "d": "2026-10-27",
     "t": "deadline",
     "n": "대학 글쓰기 1 · 과제 3 연구계획서",
     "s": 1439,
@@ -2187,8 +2187,8 @@
       "source_id": "95ce302d88c443468138bc3ca3d87693130efdce1c94dd2638e2ac4279f0c23f",
       "candidate_id": "7af4417367cf6238c24ed0ac1c126592cd05aea0be0c74c4879c0417d3f283e2",
       "course": "writing",
-      "source_hash": "8a160356cb002dbc05cbd8ff27177d455e9a02147e473fd7340f1b0741387b83",
-      "managed_hash": "ee68c17281b4afc99052b91d2fd0c3c83f367d7a75fa1e9101689afb01e9f6ef"
+      "source_hash": "30402c862080e5c5897aa038101803e777af0c7396b464f6d46852d33cad32b9",
+      "managed_hash": "15f500c1f84442a8850ae3aa888eb1ee110e1e2e7baf73e3397ecba12ece6762"
     }
   },
   {
