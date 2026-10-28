@@ -15,29 +15,29 @@
     {id:'onion',name:'노란 양파',brand:'브랜드 무관 · Yellow Onion',query:'yellow onion',amount:n=>`${n===4?'작은 것 1개 (약 150g)':'작은 것 ½개 (약 75g)'}`,note:'1개 목표 $1 이내. 대용량 망을 새로 살 필요 없어요. 남은 반 개는 밀폐해서 냉장하세요.'}
   ];
   function save() { try { localStorage.setItem(KEY, JSON.stringify({servings,checked:[...checked]})); } catch {} }
-  function progress() { $('shopping-progress').textContent = `준비 완료 ${checked.size} / 5 · 체크는 이 기기에 저장됩니다`; }
+  function progress() { $('shopping-progress').textContent = `준비 ${checked.size} / 5`; }
   function renderIngredients() {
     $('ingredients').replaceChildren();
     products.forEach((item,index)=>{
       const card=document.createElement('article');card.className='ingredient';
-      card.innerHTML=`<div class="ingredient-top"><div class="art tile-${index}" role="img" aria-label="${item.name} 예시 그림"></div><div><h3>${item.name}</h3><p class="brand">${item.brand}</p><p class="amount">사용량 · ${item.amount(servings)}</p></div></div><p class="buy-note">${item.note}</p><div class="ingredient-bottom"><a href="https://www.qfc.com/search?query=${encodeURIComponent(item.query)}" target="_blank" rel="noopener noreferrer">QFC 상품 찾기 ↗</a><label><input type="checkbox" aria-label="${item.name} 준비 완료">준비 완료</label></div>`;
+      card.innerHTML=`<div class="ingredient-top"><div class="art tile-${index}" role="img" aria-label="${item.name} 예시 그림"></div><div><h3>${item.name}</h3><p class="amount">${item.amount(servings)}</p></div></div><details class="product-detail"><summary>제품·절약 팁</summary><p class="brand">${item.brand}</p><p class="buy-note">${item.note}</p></details><div class="ingredient-bottom"><a href="https://www.qfc.com/search?query=${encodeURIComponent(item.query)}" target="_blank" rel="noopener noreferrer">QFC 상품 ↗</a><label><input type="checkbox" aria-label="${item.name} 준비 완료">준비</label></div>`;
       const input=card.querySelector('input');input.checked=checked.has(item.id);
       input.addEventListener('change',()=>{if(input.checked)checked.add(item.id);else checked.delete(item.id);save();progress();});
       $('ingredients').append(card);
     });
-    $('pantry-amounts').textContent=servings===4?'물 1.5L · 식용유 1큰술(15mL) · 후추 약간 · 소금은 마지막에 필요할 때만':'물 750mL · 식용유 ½큰술(7.5mL) · 후추 약간 · 소금은 마지막에 필요할 때만';
+    $('pantry-amounts').textContent=servings===4?'물 1.5L · 기름 1큰술 · 후추 · 소금 선택':'물 750mL · 기름 ½큰술 · 후추 · 소금 선택';
     document.querySelectorAll('[data-servings]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.servings)===servings)));
     progress();
   }
   function steps() {
     const big=servings===4;
     return [
-      {title:'재료를 작게 썰어요',time:0,detail:`당근 ${big?'2개':'1개'}를 5mm 두께로 썰고, 양파 ${big?'1개':'½개'}는 잘게 썰어요. 면 ${big?'170g':'85g'}과 물 ${big?'1.5L':'750mL'}를 준비하세요.`,tip:'채소를 먼저 손질하세요. 생닭은 씻지 말고, 만진 뒤 손·도마·칼을 씻으세요.'},
-      {title:'양파와 당근을 볶아요',time:300,detail:`냄비에 식용유 ${big?'1큰술':'½큰술'}을 두르고 중불로 켜요. 양파와 당근을 넣고 5분 동안 가끔 저으며 볶아요.`,tip:'양파가 살짝 투명해지면 돼요. 타려고 하면 불을 줄이고 물 1~2큰술을 넣으세요.'},
-      {title:'닭을 넣고 푹 끓여요',time:900,detail:`닭 ${big?'450g':'225g'}, 물 ${big?'1.5L':'750mL'}, 부용 ${big?'4개':'2개'}를 넣어요. 한 번 끓으면 중약불로 낮추고 뚜껑을 살짝 열어 15~20분 뭉근하게 끓여요.`,tip:'타이머는 끓기 시작한 뒤 누르세요. 닭의 가장 두꺼운 곳이 74°C / 165°F가 될 때까지 추가로 익히세요. 시간만으로 익힘을 판단하지 마세요.'},
-      {title:'닭고기를 찢어요',time:0,detail:'익은 닭을 깨끗한 접시에 꺼내요. 포크 두 개로 한입 크기로 찢은 뒤 냄비에 다시 넣어요.',tip:'뜨거우니 손 대신 포크를 사용하세요. 닭을 만졌던 생고기 접시를 그대로 사용하지 마세요.'},
-      {title:'면을 넣고 6~8분',time:480,detail:`국물이 다시 끓으면 면 ${big?'170g':'85g'}을 넣고 가끔 저어요. 포장에 적힌 시간만큼, 보통 6~8분 익혀요. 한 가닥 먹어 보고 부드러우면 끝이에요.`,tip:'내일 먹을 몫은 면을 넣기 전에 국물을 덜어 두세요. 다른 파스타를 쓴다면 그 포장 조리 시간을 따르세요.'},
-      {title:'간을 맞추면 완성',time:0,detail:`후추를 조금 넣고 맛봐요. 싱거우면 부용을 조금씩 더 넣되 총 ${big?'6개':'3개'} 이내로 먼저 맞춰 보세요. 짜면 뜨거운 물을 조금씩 넣어 조절해요.`,tip:'부용 자체가 짭짤해서 소금은 안 넣어도 될 수 있어요. 남은 수프는 2시간 안에 나눠 냉장하세요.'}
+      {title:'재료 썰기',time:0,detail:`당근 ${big?'2개':'1개'} → 5mm. 양파 ${big?'1개':'½개'} → 잘게. 면 ${big?'170g':'85g'}, 물 ${big?'1.5L':'750mL'} 준비.`,tip:'생닭은 씻지 않기. 만진 뒤 손·칼·도마 세척.'},
+      {title:'채소 볶기',time:300,detail:`기름 ${big?'1큰술':'½큰술'} + 양파 + 당근. 중불에서 저으며 5분.`,tip:'타면 불을 줄이고 물 1~2큰술.'},
+      {title:'닭 끓이기',time:900,detail:`닭 ${big?'450g':'225g'} + 물 ${big?'1.5L':'750mL'} + 부용 ${big?'4개':'2개'}. 끓으면 중약불, 15~20분.`,tip:'끓기 시작하면 타이머. 닭 중심 74°C / 165°F까지 익히기. 부용은 제품 희석 비율 확인.'},
+      {title:'닭 찢기',time:0,detail:'익은 닭을 꺼내 포크로 찢고, 냄비에 다시 넣기.',tip:'생닭을 담았던 접시 대신 깨끗한 접시 사용.'},
+      {title:'면 넣기',time:480,detail:`다시 끓으면 면 ${big?'170g':'85g'}. 저으며 6~8분, 포장 조리 시간 확인.`,tip:'내일 먹을 국물은 면을 넣기 전에 덜어두기.'},
+      {title:'간 맞추기',time:0,detail:`후추 약간. 싱거우면 부용 조금씩 추가(총 ${big?'6개':'3개'} 이내부터). 짜면 뜨거운 물.`,tip:'남은 수프는 2시간 안에 냉장, 3~4일 안에 먹기.'}
     ];
   }
   function updateTimer() {
@@ -45,7 +45,7 @@
     $('timer-value').textContent=`${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
     $('timer-start').textContent=deadline?'일시정지':remaining===0?'다시 시작':'타이머 시작';
   }
-  function resetTimer(){deadline=0;remaining=steps()[step].time;$('timer-status').textContent='화면을 다시 열면 남은 시간이 갱신됩니다. 휴대폰 알람은 울리지 않아요.';updateTimer();}
+  function resetTimer(){deadline=0;remaining=steps()[step].time;$('timer-status').textContent='앱 내 타이머 · 알람 없음';updateTimer();}
   function renderStep(focus=false) {
     const current=steps()[step];
     $('step-meta').textContent=`${step+1} / 6 · ${servings}인분`;
@@ -61,7 +61,20 @@
   document.querySelectorAll('[data-servings]').forEach(button=>button.addEventListener('click',()=>{servings=Number(button.dataset.servings);save();renderIngredients();renderStep();}));
   $('shop-tab').addEventListener('click',()=>showTab(false));$('cook-tab').addEventListener('click',()=>showTab(true));$('start-cooking').addEventListener('click',()=>showTab(true));$('back-shopping').addEventListener('click',()=>showTab(false));
   $('previous-step').addEventListener('click',()=>{if(step>0){step--;renderStep(true);}});$('next-step').addEventListener('click',()=>{step=(step+1)%6;renderStep(true);});
-  $('timer-start').addEventListener('click',()=>{if(deadline){updateTimer();deadline=0;}else{if(!remaining)remaining=steps()[step].time;deadline=Date.now()+remaining*1000;}$('timer-status').textContent='단계나 인분을 바꾸면 타이머가 초기화됩니다.';updateTimer();});
+  $('timer-start').addEventListener('click',()=>{if(deadline){updateTimer();deadline=0;}else{if(!remaining)remaining=steps()[step].time;deadline=Date.now()+remaining*1000;}$('timer-status').textContent='단계·인분 변경 시 초기화';updateTimer();});
   $('timer-reset').addEventListener('click',resetTimer);document.addEventListener('visibilitychange',updateTimer);
+  const stores = {
+    qfc: {name:'QFC · University Village',address:'2746 NE 45th St, Seattle, WA 98105',query:'QFC 2746 NE 45th St Seattle WA',match:'아래 Kroger·Heritage Farm 상품 검색용'},
+    trader: {name:'Trader Joe’s · University District',address:'4555 Roosevelt Way NE, Seattle, WA 98105',query:'Trader Joes 4555 Roosevelt Way NE Seattle WA',match:'자체 브랜드 대안 · 에그 누들은 파스타로 대체'}
+  };
+  document.querySelectorAll('[data-store]').forEach(button=>button.addEventListener('click',()=>{
+    const store=stores[button.dataset.store],query=encodeURIComponent(store.query);
+    document.querySelectorAll('[data-store]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+    $('store-name').textContent=store.name;$('store-address').textContent=store.address;$('store-match').textContent=store.match;
+    $('store-map').src=`https://www.google.com/maps?q=${query}&z=14&output=embed`;
+    $('store-map').title=`${store.name} 위치 지도`;
+    $('store-open-map').href=`https://www.google.com/maps/search/?api=1&query=${query}`;
+    $('store-directions').href=`https://www.google.com/maps/dir/?api=1&origin=University+of+Washington+Seattle&destination=${query}&travelmode=walking`;
+  }));
   renderIngredients();renderStep();setInterval(updateTimer,500);
 })();

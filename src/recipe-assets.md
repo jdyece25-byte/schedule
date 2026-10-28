@@ -22,3 +22,12 @@ The five-item checklist and serving choice are stored only in the browser
 under `schedule-chicken-soup-v1`. The in-page countdown uses an absolute
 wall-clock deadline, pauses on request and resets on a step/serving change.
 It does not schedule a background alarm. No schedule data is modified.
+
+The map selector embeds Google Maps address searches for QFC University
+Village (2746 NE 45th St) and Trader Joe's University District (4555 Roosevelt
+Way NE), Seattle. These are address-based candidates, not verified current
+inventory or operating-status claims. Official location pages and Google
+Maps were blocked by the environment's network proxy on 2026-10-28; the UI
+states the verification limit and offers external map/directions links.
+Directions use UW Seattle as a campus starting point, not the user's GPS.
+Trader Joe's is an own-brand alternative; QFC product links remain distinct.
