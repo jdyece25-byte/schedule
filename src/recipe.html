@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f6f1e8"><title>치킨 누들 수프 · 장보기와 조리</title>
-<link rel="stylesheet" href="recipe.css?v=20261028-2"><script src="recipe.js?v=20261028-2" defer></script>
+<link rel="stylesheet" href="recipe.css?v=20261028-3"><script src="recipe.js?v=20261028-3" defer></script>
 </head>
 <body>
 <header class="top"><a href="./index.html" aria-label="스케줄 홈으로">← 홈</a><span>한 냄비 레시피</span></header>
@@ -15,7 +15,7 @@
  <div class="facts"><span>약 40분</span><span>냄비 1개</span><span>재료 5가지</span></div>
  <p class="image-note">재료 예시 그림 · 실제 상품 사진 아님</p>
 </section>
-<div class="portions"><span>만들 양</span><div role="group" aria-label="인분 선택"><button data-servings="2" aria-pressed="false">2인분</button><button data-servings="4" aria-pressed="true">4인분</button></div></div>
+<div class="portions"><span>만들 양</span><div role="group" aria-label="인분 선택"><button data-servings="1" aria-pressed="true">1인분</button><button data-servings="2" aria-pressed="false">2인분</button><button data-servings="4" aria-pressed="false">4인분</button></div></div>
 <nav class="tabs" aria-label="레시피 화면"><button id="shop-tab" aria-pressed="true" aria-controls="shop">장보기</button><button id="cook-tab" aria-pressed="false" aria-controls="cook">조리 시작</button></nav>
 <section id="shop" aria-labelledby="shop-heading">
  <section class="store-map" aria-labelledby="map-heading">
@@ -30,10 +30,10 @@
   <p class="subtle">주소 기준 표시 · 현재 영업·상품 재고 미확인</p>
   <details class="notes"><summary>매장 정보</summary><p>UW 시애틀 캠퍼스 기준입니다. 공식 사이트 접속 제한으로 최신 주소·영업시간·재고를 재확인하지 못했습니다. 출발 전 지도 앱에서 확인하세요. 지도 표시가 안 되면 ‘지도 앱’을 누르세요.</p><p>QFC: 아래 브랜드 목록의 검색 매장. Trader Joe’s: 자체 브랜드 대안. 동일 상품을 보장하지 않으며 면은 일반 파스타로 대체할 수 있습니다. 상품 링크는 QFC 기준입니다.</p><p><a href="https://uvillage.com/qfc/" target="_blank" rel="noopener noreferrer">QFC 매장 안내 ↗</a> · <a href="https://locations.traderjoes.com/wa/seattle/" target="_blank" rel="noopener noreferrer">Trader Joe’s 매장 안내 ↗</a></p></details>
  </section>
- <div class="budget"><span>4인분 목표</span><strong>$14</strong><p>현재 판매가 아님 · 기름·양념·배송비 제외</p></div>
+ <div class="budget"><span>포장 구매 목표</span><strong>$14</strong><p>1끼 비용 아님 · 남은 재료 보관</p></div>
  <h2 id="shop-heading">재료 5가지</h2>
  <div id="ingredients"></div>
- <div class="pantry"><h3>집에서 꺼낼 것</h3><p id="pantry-amounts"></p><p>냄비 3L · 칼·도마 · 포크 · 계량스푼 · 식품 온도계</p></div>
+ <div class="pantry"><h3>집에서 꺼낼 것</h3><p id="pantry-amounts"></p><p>작은 냄비(1인분 1~1.5L) · 칼·도마 · 포크 · 계량스푼 · 식품 온도계</p></div>
  <div class="shopping-progress" role="status" id="shopping-progress"></div>
  <button class="primary" id="start-cooking">조리 시작 →</button>
  <details class="notes"><summary>예산·브랜드·링크 안내</summary><p>작성: 2026-10-28 · 시애틀 UW 근처 장보기 기준. 판매 사이트 접근 제한으로 실시간 가격·최저가·재고를 확인하지 못했습니다. $14는 닭 $6 + 면 $2 + 부용 $3 + 당근 $2 + 양파 $1의 목표 합계입니다. 할인·세금·회원 조건에 따라 달라질 수 있습니다.</p><p>QFC의 Kroger 자체 브랜드를 우선 검색하도록 연결했습니다. 닭은 Heritage Farm을 먼저 찾고, 없다면 같은 종류의 가장 저렴한 상품을 고르세요. 신선 채소는 브랜드 지정 없이 낱개나 최저 단가 포장을 선택하세요. 상품 링크는 구매를 완료하지 않는 검색 링크입니다.</p><p>부용이 집에 있으면 새로 사지 마세요. 면·당근·부용은 한 번 조리 후에도 남습니다. 표시된 가격은 한 끼 원가가 아니라 포장 구매 목표입니다.</p></details>
@@ -42,7 +42,7 @@
  <div class="section-heading"><div class="eyebrow">02 / COOKING</div><h2 id="cook-heading">6단계 조리</h2></div>
  <p class="subtle">약 40분 · 닭 중심 74°C / 165°F</p>
  <div class="step-dots" id="step-dots" aria-label="조리 단계"></div>
- <article class="step-card" tabindex="-1" id="step-card"><div class="step-meta" id="step-meta"></div><h3 id="step-title"></h3><p id="step-body"></p><div class="step-tip" id="step-tip"></div></article>
+ <article class="step-card" tabindex="-1" id="step-card"><div class="step-meta" id="step-meta"></div><h3 id="step-title"></h3><div id="step-visual" class="step-visual cooking-0" role="img" aria-label="재료를 써는 모습"><span class="steam" aria-hidden="true"></span><span class="steam" aria-hidden="true"></span><span class="steam" aria-hidden="true"></span></div><p id="step-body"></p><div class="step-tip" id="step-tip"></div></article>
  <div class="timer"><div><span>조리 타이머</span><strong id="timer-value" role="timer" aria-label="남은 조리 시간">00:00</strong></div><button id="timer-start">타이머 시작</button><button id="timer-reset" aria-label="타이머 초기화">초기화</button></div>
  <p id="timer-status" class="subtle" role="status">앱 내 타이머 · 알람 없음</p>
  <div class="step-nav"><button id="previous-step">← 이전</button><button id="next-step" class="primary">다음 단계 →</button></div>

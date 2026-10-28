@@ -15,7 +15,7 @@ FRONTEND_FILES = (
     "push-client.js", "push-client.css", "manifest.webmanifest", "sw.js",
     "push-config.json", "icon-192.png", "icon-512.png", "badge-96.png",
     "school-client.js", "school-client.css", "school-calendar.js",
-    "recipe.html", "recipe.js", "recipe.css", "recipe-home.css", "recipe-ingredients.webp",
+    "recipe.html", "recipe.js", "recipe.css", "recipe-home.css", "recipe-ingredients.webp", "recipe-steps.webp",
     "birthday.js", "birthday.css", "birthday-night.webp", "birthday-blow.webp",
 )
 

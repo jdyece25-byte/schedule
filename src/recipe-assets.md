@@ -7,8 +7,10 @@ yellow onion, and a finished soup. CSS displays each panel independently.
 It is not a product photograph or a representation of a branded package;
 the recipe page states this explicitly.
 
-The recipe uses a four-serving baseline (450 g boneless chicken, 170 g noodles,
-150 g carrots, 150 g onion, 1.5 L water) with a two-serving option. Bouillon
+The recipe defaults to one serving: 120 g boneless chicken, 40 g noodles,
+40 g carrots, 40 g onion, 400 mL water and 1 tsp oil. Optional two/four-serving
+choices scale these amounts. Previous portion preferences migrate once to
+one serving while retaining the shopping checklist. Bouillon
 amounts assume one cube per US cup on the label and begin below full strength.
 Chicken must reach 74°C/165°F; simmer time is only a guide.
 
@@ -31,3 +33,10 @@ Maps were blocked by the environment's network proxy on 2026-10-28; the UI
 states the verification limit and offers external map/directions links.
 Directions use UW Seattle as a campus starting point, not the user's GPS.
 Trader Joe's is an own-brand alternative; QFC product links remain distinct.
+
+`recipe-steps.webp` is an original six-panel cooking illustration generated
+on 2026-10-28, encoded at WebP quality 88. Panels depict chopping, sautéing,
+simmering chicken, shredding, adding noodles and seasoning. The active step
+selects its panel and accessible description; CSS steam animates hot dishes.
+Reduced-motion preferences disable steam without removing instructional art.
+The $14 figure remains a full-package purchase target, not a single meal cost.

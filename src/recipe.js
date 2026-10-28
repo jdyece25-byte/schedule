@@ -4,17 +4,18 @@
   const KEY = 'schedule-chicken-soup-v1';
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch {}
-  let servings = saved.servings === 2 ? 2 : 4;
+  let servings = saved.portionVersion === 2 && [1,2,4].includes(saved.servings) ? saved.servings : 1;
   const checked = new Set(Array.isArray(saved.checked) ? saved.checked.filter(id => ['chicken','noodles','bouillon','carrots','onion'].includes(id)) : []);
   let step = 0, deadline = 0, remaining = 0;
+  const quantity = (n=servings) => ({chicken:120*n,noodles:40*n,water:n===4?'1.6L':`${400*n}mL`,oil:`${n}작은술`,carrots:{1:'½개',2:'1개',4:'2개'}[n],onion:{1:'¼개',2:'½개',4:'1개'}[n],cubes:n});
   const products = [
-    {id:'chicken',name:'뼈 없는 닭다리살',brand:'Heritage Farm · Boneless & Skinless Chicken Thighs',query:'Heritage Farm boneless skinless chicken thighs',amount:n=>`${n===4?'450g (약 1 lb)':'225g (약 ½ lb)'}`,note:'4인분 구매 목표 $6 이내. 가변 중량 팩은 총액을 확인하세요. 같은 무게의 할인 닭가슴살이 더 저렴하면 대체 가능.'},
-    {id:'noodles',name:'넓은 에그 누들',brand:'Kroger · Wide Egg Noodles · 12 oz',query:'Kroger wide egg noodles 12 oz',amount:n=>`${n===4?'170g (6 oz, 12 oz 봉지의 ½)':'85g (3 oz, 12 oz 봉지의 ¼)'}`,note:'1봉지 목표 $2 이내. 집에 짧은 파스타가 있으면 구매 생략. 대체 면의 조리 시간은 포장 지침을 따르세요.'},
-    {id:'bouillon',name:'치킨 부용 큐브',brand:'Kroger · Chicken Bouillon Cubes · 25 ct',query:'Kroger chicken bouillon cubes 25 ct',amount:n=>`${n===4?'우선 4개, 간을 보고 최대 6개':'우선 2개, 간을 보고 최대 3개'}`,note:'1병 목표 $3 이내. 1큐브당 물 1 US cup(약 240mL)인 제품 기준. 다른 농축도라면 포장 비율을 따르고 싱겁게 시작하세요.'},
-    {id:'carrots',name:'당근',brand:'브랜드 무관 · Fresh Carrots',query:'fresh carrots',amount:n=>`${n===4?'중간 크기 2개 (약 150g)':'중간 크기 1개 (약 75g)'}`,note:'목표 $2 이내. 필요한 낱개와 가장 작은 봉지의 총액을 비교하세요. 손질된 베이비 캐럿보다 일반 당근을 먼저 비교해요.'},
-    {id:'onion',name:'노란 양파',brand:'브랜드 무관 · Yellow Onion',query:'yellow onion',amount:n=>`${n===4?'작은 것 1개 (약 150g)':'작은 것 ½개 (약 75g)'}`,note:'1개 목표 $1 이내. 대용량 망을 새로 살 필요 없어요. 남은 반 개는 밀폐해서 냉장하세요.'}
+    {id:'chicken',name:'뼈 없는 닭다리살',brand:'Heritage Farm · Boneless & Skinless Chicken Thighs',query:'Heritage Farm boneless skinless chicken thighs',amount:n=>`${quantity(n).chicken}g`,note:'필요한 양만 사용하고 나머지는 소분 냉동. 작은 팩 총액과 $/lb를 비교하세요. 할인 닭가슴살로 대체 가능.'},
+    {id:'noodles',name:'넓은 에그 누들',brand:'Kroger · Wide Egg Noodles · 12 oz',query:'Kroger wide egg noodles 12 oz',amount:n=>`${quantity(n).noodles}g`,note:'1봉지 목표 $2 이내. 집에 짧은 파스타가 있으면 구매 생략. 조리 시간은 포장 지침을 따르세요.'},
+    {id:'bouillon',name:'치킨 부용 큐브',brand:'Kroger · Chicken Bouillon Cubes · 25 ct',query:'Kroger chicken bouillon cubes 25 ct',amount:n=>`${quantity(n).cubes}개부터`,note:'1병 목표 $3 이내. 1큐브당 물 약 240mL인 제품 기준. 다른 농축도라면 포장 비율을 따르고 싱겁게 시작하세요.'},
+    {id:'carrots',name:'당근',brand:'브랜드 무관 · Fresh Carrots',query:'fresh carrots',amount:n=>`${quantity(n).carrots} · 약 ${40*n}g`,note:'낱개와 작은 봉지의 총액 비교. 남은 당근은 밀폐 냉장.'},
+    {id:'onion',name:'노란 양파',brand:'브랜드 무관 · Yellow Onion',query:'yellow onion',amount:n=>`${quantity(n).onion} · 약 ${40*n}g`,note:'작은 양파 기준. 대용량 망 대신 낱개 구매. 남은 양파는 밀폐 냉장.'}
   ];
-  function save() { try { localStorage.setItem(KEY, JSON.stringify({servings,checked:[...checked]})); } catch {} }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({portionVersion:2,servings,checked:[...checked]})); } catch {} }
   function progress() { $('shopping-progress').textContent = `준비 ${checked.size} / 5`; }
   function renderIngredients() {
     $('ingredients').replaceChildren();
@@ -25,19 +26,19 @@
       input.addEventListener('change',()=>{if(input.checked)checked.add(item.id);else checked.delete(item.id);save();progress();});
       $('ingredients').append(card);
     });
-    $('pantry-amounts').textContent=servings===4?'물 1.5L · 기름 1큰술 · 후추 · 소금 선택':'물 750mL · 기름 ½큰술 · 후추 · 소금 선택';
+    const q=quantity();$('pantry-amounts').textContent=`물 ${q.water} · 기름 ${q.oil} · 후추 · 소금 선택`;
     document.querySelectorAll('[data-servings]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.servings)===servings)));
     progress();
   }
   function steps() {
-    const big=servings===4;
+    const q=quantity();
     return [
-      {title:'재료 썰기',time:0,detail:`당근 ${big?'2개':'1개'} → 5mm. 양파 ${big?'1개':'½개'} → 잘게. 면 ${big?'170g':'85g'}, 물 ${big?'1.5L':'750mL'} 준비.`,tip:'생닭은 씻지 않기. 만진 뒤 손·칼·도마 세척.'},
-      {title:'채소 볶기',time:300,detail:`기름 ${big?'1큰술':'½큰술'} + 양파 + 당근. 중불에서 저으며 5분.`,tip:'타면 불을 줄이고 물 1~2큰술.'},
-      {title:'닭 끓이기',time:900,detail:`닭 ${big?'450g':'225g'} + 물 ${big?'1.5L':'750mL'} + 부용 ${big?'4개':'2개'}. 끓으면 중약불, 15~20분.`,tip:'끓기 시작하면 타이머. 닭 중심 74°C / 165°F까지 익히기. 부용은 제품 희석 비율 확인.'},
-      {title:'닭 찢기',time:0,detail:'익은 닭을 꺼내 포크로 찢고, 냄비에 다시 넣기.',tip:'생닭을 담았던 접시 대신 깨끗한 접시 사용.'},
-      {title:'면 넣기',time:480,detail:`다시 끓으면 면 ${big?'170g':'85g'}. 저으며 6~8분, 포장 조리 시간 확인.`,tip:'내일 먹을 국물은 면을 넣기 전에 덜어두기.'},
-      {title:'간 맞추기',time:0,detail:`후추 약간. 싱거우면 부용 조금씩 추가(총 ${big?'6개':'3개'} 이내부터). 짜면 뜨거운 물.`,tip:'남은 수프는 2시간 안에 냉장, 3~4일 안에 먹기.'}
+      {title:'재료 썰기',visual:'당근과 양파를 도마에서 작게 써는 모습',time:0,detail:`당근 ${q.carrots} → 5mm. 양파 ${q.onion} → 잘게. 면 ${q.noodles}g, 물 ${q.water}.`,tip:'생닭은 씻지 않기. 만진 뒤 손·칼·도마 세척.'},
+      {title:'채소 볶기',visual:'냄비에서 당근과 양파를 나무주걱으로 볶는 모습',time:300,detail:`기름 ${q.oil} + 양파 + 당근. 중불에서 저으며 5분.`,tip:'타면 불을 줄이고 물 1~2큰술.'},
+      {title:'닭 끓이기',visual:'닭고기와 당근을 넣은 국물이 냄비에서 끓는 모습',time:900,detail:`닭 ${q.chicken}g + 물 ${q.water} + 부용 ${q.cubes}개. 끓으면 중약불, 15~20분.`,tip:'끓기 시작하면 타이머. 닭 중심 74°C / 165°F까지. 부용은 포장 희석 비율 확인.'},
+      {title:'닭 찢기',visual:'깨끗한 접시에서 두 개의 포크로 익은 닭고기를 찢는 모습',time:0,detail:'익은 닭을 꺼내 포크로 찢고, 냄비에 다시 넣기.',tip:'생닭 접시 대신 깨끗한 접시 사용.'},
+      {title:'면 넣기',visual:'끓는 닭고기 수프에 에그 누들을 붓는 모습',time:480,detail:`다시 끓으면 면 ${q.noodles}g. 저으며 6~8분, 포장 조리 시간 확인.`,tip:'면이 부드러워지면 불을 끄세요.'},
+      {title:'간 맞추기',visual:'완성된 치킨 누들 수프 한 그릇에 후추를 뿌리는 모습',time:0,detail:`후추 약간. 싱거우면 부용 ¼개씩. 짜면 뜨거운 물.`,tip:'남으면 2시간 안에 냉장, 3~4일 안에 먹기.'}
     ];
   }
   function updateTimer() {
@@ -48,6 +49,8 @@
   function resetTimer(){deadline=0;remaining=steps()[step].time;$('timer-status').textContent='앱 내 타이머 · 알람 없음';updateTimer();}
   function renderStep(focus=false) {
     const current=steps()[step];
+    $('step-visual').className=`step-visual cooking-${step}`;
+    $('step-visual').setAttribute('aria-label',current.visual);
     $('step-meta').textContent=`${step+1} / 6 · ${servings}인분`;
     $('step-title').textContent=current.title;$('step-body').textContent=current.detail;$('step-tip').textContent=current.tip;
     $('step-dots').replaceChildren();
