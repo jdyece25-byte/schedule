@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f1e8"><title>치킨 누들 수프 · 장보기와 조리</title>
+<link rel="stylesheet" href="recipe.css?v=20261028-1"><script src="recipe.js?v=20261028-1" defer></script>
+</head>
+<body>
+<header class="top"><a href="./index.html" aria-label="스케줄 홈으로">← 홈</a><span>한 냄비 레시피</span></header>
+<main>
+<section class="intro">
+ <div class="eyebrow">SEATTLE · UW / 가볍게 장보고, 따뜻하게</div>
+ <h1>치킨 누들 수프</h1><p class="lead">닭고기와 채소를 끓이고, 면만 넣으면 끝.</p>
+ <div class="hero art tile-5" role="img" aria-label="닭고기와 당근, 넓은 면이 들어간 수프 예시 그림"></div>
+ <div class="facts"><span>약 40분</span><span>냄비 1개</span><span>필수 구매 5가지</span></div>
+ <p class="image-note">이미지는 재료 예시 그림입니다. 실제 상품 포장 사진이 아닙니다.</p>
+</section>
+<div class="portions"><span>만들 양</span><div role="group" aria-label="인분 선택"><button data-servings="2" aria-pressed="false">2인분</button><button data-servings="4" aria-pressed="true">4인분</button></div></div>
+<nav class="tabs" aria-label="레시피 화면"><button id="shop-tab" aria-pressed="true" aria-controls="shop">장보기</button><button id="cook-tab" aria-pressed="false" aria-controls="cook">조리 시작</button></nav>
+<section id="shop" aria-labelledby="shop-heading">
+ <div class="section-heading"><div class="eyebrow">01 / SHOPPING</div><h2 id="shop-heading">이 다섯 가지만 준비해요</h2></div>
+ <div class="budget"><span>4인분 장보기 목표</span><strong>$14 이내</strong><p>실제 판매가가 아닌 구매 목표입니다. 기름·소금·후추는 집에 있는 것을 사용하고, 배송비는 제외했어요. 2인분도 포장 단위 구매 비용은 비슷합니다.</p></div>
+ <details class="store"><summary>UW 근처에서 저렴하게 사는 순서</summary><ol><li><a href="https://www.google.com/maps/search/?api=1&query=QFC+University+Village+Seattle" target="_blank" rel="noopener noreferrer">University Village QFC 위치 보기 ↗</a> · 방문 가능한 가까운 지점을 먼저 확인하세요.</li><li>아래 상품 링크에서 매장을 선택하고 <b>단위 가격($/lb, $/oz)</b>을 비교하세요. 회원 할인은 적용 조건을 확인하세요.</li><li>닭다리살이 비싸면 같은 무게의 할인 닭가슴살로 바꾸세요. 큰 팩은 총액이 커지므로 필요한 양만 쓰고 나머지는 바로 소분 냉동하세요.</li><li>면은 브랜드보다 가격을 우선해요. 집에 있는 파스타를 써도 됩니다. 배송·서비스 비용을 아끼려면 직접 장보기, 여러 매장을 오가는 비용도 함께 생각하세요.</li></ol><p>셀러리·생허브·레몬·별도 액상 육수는 구매하지 않는 절약형 구성입니다.</p></details>
+ <p class="subtle">상품명은 매장에서 검색할 이름입니다. 매장별 취급·재고·현재 가격은 링크에서 확인하세요.</p>
+ <div id="ingredients"></div>
+ <div class="pantry"><h3>집에서 꺼낼 것</h3><p id="pantry-amounts"></p><p>큰 냄비(4인분은 3L 이상), 칼, 도마, 포크 2개, 계량스푼. 닭 중심 온도 확인용 식품 온도계가 있으면 좋아요.</p></div>
+ <div class="shopping-progress" role="status" id="shopping-progress"></div>
+ <button class="primary" id="start-cooking">준비 끝 · 조리 시작 →</button>
+ <details class="notes"><summary>예산·브랜드·링크 안내</summary><p>작성: 2026-10-28 · 시애틀 UW 근처 장보기 기준. 판매 사이트 접근 제한으로 실시간 가격·최저가·재고를 확인하지 못했습니다. $14는 닭 $6 + 면 $2 + 부용 $3 + 당근 $2 + 양파 $1의 목표 합계입니다. 할인·세금·회원 조건에 따라 달라질 수 있습니다.</p><p>QFC의 Kroger 자체 브랜드를 우선 검색하도록 연결했습니다. 닭은 Heritage Farm을 먼저 찾고, 없다면 같은 종류의 가장 저렴한 상품을 고르세요. 신선 채소는 브랜드 지정 없이 낱개나 최저 단가 포장을 선택하세요. 상품 링크는 구매를 완료하지 않는 검색 링크입니다.</p><p>부용이 집에 있으면 새로 사지 마세요. 면·당근·부용은 한 번 조리 후에도 남습니다. 표시된 가격은 한 끼 원가가 아니라 포장 구매 목표입니다.</p></details>
+</section>
+<section id="cook" hidden aria-labelledby="cook-heading">
+ <div class="section-heading"><div class="eyebrow">02 / COOKING</div><h2 id="cook-heading">한 단계씩, 천천히</h2></div>
+ <p class="subtle">총 약 40분 · 시간은 참고용, 닭의 익힘은 중심 온도로 확인하세요.</p>
+ <div class="step-dots" id="step-dots" aria-label="조리 단계"></div>
+ <article class="step-card" tabindex="-1" id="step-card"><div class="step-meta" id="step-meta"></div><h3 id="step-title"></h3><p id="step-body"></p><div class="step-tip" id="step-tip"></div></article>
+ <div class="timer"><div><span>조리 타이머</span><strong id="timer-value" role="timer" aria-label="남은 조리 시간">00:00</strong></div><button id="timer-start">타이머 시작</button><button id="timer-reset" aria-label="타이머 초기화">초기화</button></div>
+ <p id="timer-status" class="subtle" role="status">화면을 다시 열면 남은 시간이 갱신됩니다. 휴대폰 알람은 울리지 않아요.</p>
+ <div class="step-nav"><button id="previous-step">← 이전</button><button id="next-step" class="primary">다음 단계 →</button></div>
+ <details class="notes"><summary>남은 수프 보관하기</summary><p>조리 후 2시간 안에 얕은 용기에 나눠 냉장하세요. 냉장 3~4일 안에 먹고, 다시 데울 때는 전체가 74°C / 165°F가 되도록 충분히 가열하세요. 오래 보관할 분량은 냉동하세요.</p><p>면은 국물을 계속 흡수해요. 다음 날 먹을 분량은 면을 따로 삶아 보관하면 덜 불어요.</p><a href="https://www.foodsafety.gov/food-safety-charts/safe-minimum-internal-temperatures" target="_blank" rel="noopener noreferrer">FoodSafety.gov · 닭고기 안전 조리 온도 ↗</a></details>
+ <button class="text-button" id="back-shopping">장보기 목록 다시 보기</button>
+</section>
+</main>
+</body>
+</html>
