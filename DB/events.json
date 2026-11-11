@@ -4593,5 +4593,19 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
+  },
+  {
+    "d": "2026-11-15",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab07] Prelab",
+    "s": 1439,
+    "id": "school-f838054af0f8d2e006ad27f33f3c",
+    "school": {
+      "source_id": "7606eec85295e83462b5d5792f240a3553992fe5d8c13ff6a0275b51b5f3001f",
+      "candidate_id": "298a7ae7bc5dfff1a76d19f948901fec77a76a7deca7d313ec71287e00e76a8a",
+      "course": "logic",
+      "source_hash": "5cfa5586cb4b3b79057d6dd905920cfa9742521ffc1a02a52f49e5651707e3ab",
+      "managed_hash": "517c68d7dd4aac9ee01bcc3e5ca78a289a566aa3f50d2fd126f400986db016a2"
+    }
   }
 ]
