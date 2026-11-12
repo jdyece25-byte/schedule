@@ -4621,5 +4621,19 @@
       "source_hash": "f4914421e8d4b1c67ad84457607a129d54ce88957edb78f0f5a843088a03eef5",
       "managed_hash": "2181dd14a0f371c939c0d0ef10d8c2596e50cf4e1e8e9a8d2d5b2a851ef19c75"
     }
+  },
+  {
+    "d": "2026-11-27",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · 실습5",
+    "s": 810,
+    "id": "school-aa0dc7eca69598ca958e33221d9c",
+    "school": {
+      "source_id": "b200bbda2a85f2fe7f880443bc7975232ada445fcc0a4bd713e22719959e1704",
+      "candidate_id": "a677aee7c543bbc35c8557c6da3a3ca1afed91ad31a64bf8b69167dfd12d00c7",
+      "course": "em",
+      "source_hash": "d3029559861752bf7525e36d8cbbcf96ace9fba082074feb32ca2ef7fd83d080",
+      "managed_hash": "4f4dec05c92fc209d9d0b83e7568d22b3c9ec95438e1e7bd52c1a59462e2dd50"
+    }
   }
 ]
