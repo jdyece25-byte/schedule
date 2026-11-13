@@ -3148,6 +3148,17 @@
     }
   },
   {
+    "id": "20261113T033545975Z-e2d15e6b-9932-4356-b8d9-cc6b7f14bbb6-1",
+    "d": "2026-11-13",
+    "t": "tutor",
+    "n": "과외 · 김주환",
+    "ti": "17:15–19:15",
+    "s": 1035,
+    "e": 1155,
+    "lid": "daechi_prugio_summit",
+    "loc": "대치 푸르지오써밋"
+  },
+  {
     "id": "2026fall-leadership-2026-11-13",
     "d": "2026-11-13",
     "t": "class",
@@ -3158,6 +3169,17 @@
     "series": "2026fall-leadership",
     "lid": "snu38",
     "loc": "서울대 38동 422호"
+  },
+  {
+    "id": "20261113T033545975Z-e2d15e6b-9932-4356-b8d9-cc6b7f14bbb6-2",
+    "d": "2026-11-13",
+    "t": "tutor",
+    "n": "과외 · 김주환",
+    "ti": "19:30–21:30",
+    "s": 1170,
+    "e": 1290,
+    "lid": "daechi_prugio_summit",
+    "loc": "대치 푸르지오써밋"
   },
   {
     "id": "20260921T051621998Z-a1108ae0-438a-4328-af5e-7165046bc52d-9",
@@ -3183,13 +3205,37 @@
     "no": "장소 확인 필요 · 매주 토요일"
   },
   {
-    "id": "20261101T060438744Z-9c16ed56-0d8a-4e12-b18a-421ec02741de-4",
+    "id": "20261113T033545975Z-e2d15e6b-9932-4356-b8d9-cc6b7f14bbb6-3",
+    "d": "2026-11-14",
+    "t": "clinic",
+    "n": "브레인밸리 클리닉",
+    "ti": "16:00–17:00",
+    "s": 960,
+    "e": 1020,
+    "no": "장소·온라인 여부 확인 필요 · 일회성"
+  },
+  {
+    "id": "20261113T033545975Z-e2d15e6b-9932-4356-b8d9-cc6b7f14bbb6-4",
     "d": "2026-11-15",
     "t": "tutor",
-    "n": "과외 · 이민희·최지요",
-    "ti": "시간 미정",
-    "loc": "Zoom",
-    "no": "온라인 · 10:00–12:00 예상이나 미확정"
+    "n": "과외 · 최지요",
+    "ti": "10:00–12:00",
+    "s": 600,
+    "e": 720,
+    "lid": "sadang_station",
+    "loc": "사당역",
+    "no": "상세 장소 미정"
+  },
+  {
+    "id": "20261113T033545975Z-e2d15e6b-9932-4356-b8d9-cc6b7f14bbb6-5",
+    "d": "2026-11-15",
+    "t": "tutor",
+    "n": "과외 · 김주환",
+    "ti": "16:00–18:00",
+    "s": 960,
+    "e": 1080,
+    "lid": "daechi_prugio_summit",
+    "loc": "대치 푸르지오써밋"
   },
   {
     "id": "2026fall-clinic-sun-2026-11-15",
@@ -3201,6 +3247,31 @@
     "e": 1200,
     "series": "2026fall-clinic-sun",
     "no": "장소·온라인 여부 확인 필요 · 매주 일요일"
+  },
+  {
+    "id": "20261101T060438744Z-9c16ed56-0d8a-4e12-b18a-421ec02741de-4",
+    "d": "2026-11-15",
+    "t": "tutor",
+    "n": "과외 · 이민희·최지요",
+    "ti": "22:30–24:00",
+    "loc": "Zoom",
+    "no": "온라인 · 다음 날 00:30까지 총 2시간 중 첫 구간",
+    "s": 1350,
+    "e": 1440
+  },
+  {
+    "d": "2026-11-15",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab07] Prelab",
+    "s": 1439,
+    "id": "school-f838054af0f8d2e006ad27f33f3c",
+    "school": {
+      "source_id": "7606eec85295e83462b5d5792f240a3553992fe5d8c13ff6a0275b51b5f3001f",
+      "candidate_id": "298a7ae7bc5dfff1a76d19f948901fec77a76a7deca7d313ec71287e00e76a8a",
+      "course": "logic",
+      "source_hash": "5cfa5586cb4b3b79057d6dd905920cfa9742521ffc1a02a52f49e5651707e3ab",
+      "managed_hash": "517c68d7dd4aac9ee01bcc3e5ca78a289a566aa3f50d2fd126f400986db016a2"
+    }
   },
   {
     "id": "20260914T054522317Z-bd97efd1-1306-4d73-a746-1b4c2426ef3c-16",
@@ -3228,6 +3299,17 @@
     "ti": "발표 전날까지 · 시각 미공지",
     "series": "etl-writing-presentation-comments",
     "no": "2026-11-17 발표문 3편에 논평식 댓글 작성 · 최신 강의계획서·과제3 초고 공지의 전날 제출 규칙 · 마감 시각은 확인 필요"
+  },
+  {
+    "id": "20261113T033545975Z-e2d15e6b-9932-4356-b8d9-cc6b7f14bbb6-7",
+    "d": "2026-11-16",
+    "t": "tutor",
+    "n": "과외 · 이민희·최지요",
+    "ti": "00:00–00:30",
+    "s": 0,
+    "e": 30,
+    "loc": "Zoom",
+    "no": "온라인 · 전날 22:30에 시작한 총 2시간 과외의 이어지는 구간"
   },
   {
     "id": "2026fall-em-mon-2026-11-16",
@@ -3469,6 +3551,20 @@
     "no": "장소·온라인 여부 확인 필요 · 매주 일요일"
   },
   {
+    "d": "2026-11-22",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab07] Lab Report",
+    "s": 1439,
+    "id": "school-49525083e957b18cf881340c453e",
+    "school": {
+      "source_id": "6562f82add2c6ee5aea313395e1b2757f89cf2601d6b29549f72ffc7c0f40b9b",
+      "candidate_id": "82c8bb1252ecdd504ffba6af42ec53a62773f58e2ec714650d968d652627f1bc",
+      "course": "logic",
+      "source_hash": "f4914421e8d4b1c67ad84457607a129d54ce88957edb78f0f5a843088a03eef5",
+      "managed_hash": "2181dd14a0f371c939c0d0ef10d8c2596e50cf4e1e8e9a8d2d5b2a851ef19c75"
+    }
+  },
+  {
     "id": "20260914T054522317Z-bd97efd1-1306-4d73-a746-1b4c2426ef3c-18",
     "d": "2026-11-22",
     "t": "deadline",
@@ -3667,6 +3763,20 @@
     "lid": "snu301",
     "loc": "서울대 301동 207호",
     "no": "격주 금요일 · 9/18 기준, 9/25 없음 · 실습 7 (Ex7: Magnetostatic) — 마지막 실습 — 마지막 실습. OT 일정표 기준(변동 가능). · 준비물: 노트북과 패드 챙겨가기."
+  },
+  {
+    "d": "2026-11-27",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · 실습5",
+    "s": 810,
+    "id": "school-aa0dc7eca69598ca958e33221d9c",
+    "school": {
+      "source_id": "b200bbda2a85f2fe7f880443bc7975232ada445fcc0a4bd713e22719959e1704",
+      "candidate_id": "a677aee7c543bbc35c8557c6da3a3ca1afed91ad31a64bf8b69167dfd12d00c7",
+      "course": "em",
+      "source_hash": "d3029559861752bf7525e36d8cbbcf96ace9fba082074feb32ca2ef7fd83d080",
+      "managed_hash": "4f4dec05c92fc209d9d0b83e7568d22b3c9ec95438e1e7bd52c1a59462e2dd50"
+    }
   },
   {
     "id": "2026fall-leadership-2026-11-27",
@@ -4593,47 +4703,5 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
-  },
-  {
-    "d": "2026-11-15",
-    "t": "deadline",
-    "n": "논리설계 및 실험 · [Lab07] Prelab",
-    "s": 1439,
-    "id": "school-f838054af0f8d2e006ad27f33f3c",
-    "school": {
-      "source_id": "7606eec85295e83462b5d5792f240a3553992fe5d8c13ff6a0275b51b5f3001f",
-      "candidate_id": "298a7ae7bc5dfff1a76d19f948901fec77a76a7deca7d313ec71287e00e76a8a",
-      "course": "logic",
-      "source_hash": "5cfa5586cb4b3b79057d6dd905920cfa9742521ffc1a02a52f49e5651707e3ab",
-      "managed_hash": "517c68d7dd4aac9ee01bcc3e5ca78a289a566aa3f50d2fd126f400986db016a2"
-    }
-  },
-  {
-    "d": "2026-11-22",
-    "t": "deadline",
-    "n": "논리설계 및 실험 · [Lab07] Lab Report",
-    "s": 1439,
-    "id": "school-49525083e957b18cf881340c453e",
-    "school": {
-      "source_id": "6562f82add2c6ee5aea313395e1b2757f89cf2601d6b29549f72ffc7c0f40b9b",
-      "candidate_id": "82c8bb1252ecdd504ffba6af42ec53a62773f58e2ec714650d968d652627f1bc",
-      "course": "logic",
-      "source_hash": "f4914421e8d4b1c67ad84457607a129d54ce88957edb78f0f5a843088a03eef5",
-      "managed_hash": "2181dd14a0f371c939c0d0ef10d8c2596e50cf4e1e8e9a8d2d5b2a851ef19c75"
-    }
-  },
-  {
-    "d": "2026-11-27",
-    "t": "deadline",
-    "n": "기초전자기학 및 연습 · 실습5",
-    "s": 810,
-    "id": "school-aa0dc7eca69598ca958e33221d9c",
-    "school": {
-      "source_id": "b200bbda2a85f2fe7f880443bc7975232ada445fcc0a4bd713e22719959e1704",
-      "candidate_id": "a677aee7c543bbc35c8557c6da3a3ca1afed91ad31a64bf8b69167dfd12d00c7",
-      "course": "em",
-      "source_hash": "d3029559861752bf7525e36d8cbbcf96ace9fba082074feb32ca2ef7fd83d080",
-      "managed_hash": "4f4dec05c92fc209d9d0b83e7568d22b3c9ec95438e1e7bd52c1a59462e2dd50"
-    }
   }
 ]
