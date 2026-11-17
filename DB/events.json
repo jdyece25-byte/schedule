@@ -4852,5 +4852,19 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
+  },
+  {
+    "d": "2026-12-06",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab09] Lab Report",
+    "s": 1439,
+    "id": "school-6c6cb87e6547f1641800884dca70",
+    "school": {
+      "source_id": "927e48e93f90f384e11ac4974b96b81e657948a96bc20753adf6572ea60a7fe3",
+      "candidate_id": "784fcb2da9e3c028b6b711095016553c031cf51370f4b39a9bc8763ef17a4f66",
+      "course": "logic",
+      "source_hash": "ecfda8d5854b16f451ad2ea59d4b4d48ef37765ab580b15d8ec57c11a8b23e2b",
+      "managed_hash": "a8577b9b5896d39648b00026edd2236ceea5d26330dcd83734edd60b0b947b75"
+    }
   }
 ]
