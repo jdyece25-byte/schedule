@@ -3124,6 +3124,18 @@
     "no": "장소·온라인 여부 확인 필요 · 매주 목요일"
   },
   {
+    "id": "20261118T050428101Z-9c6c9520-82ed-4049-906f-393d9d1cec76-1",
+    "d": "2026-11-13",
+    "t": "tutor",
+    "n": "과외 · 하승준",
+    "ti": "09:00–12:00",
+    "s": 540,
+    "e": 720,
+    "lid": "acrovista",
+    "loc": "아크로비스타",
+    "no": "실제 수업은 취소됐으나 수업 인정하기로 함"
+  },
+  {
     "id": "etl-em-20261113-f754c1",
     "d": "2026-11-13",
     "t": "deadline",
@@ -3451,6 +3463,18 @@
     "series": "2026fall-em-wed",
     "lid": "snu301",
     "loc": "서울대 301동 102호"
+  },
+  {
+    "id": "20261118T050428101Z-9c6c9520-82ed-4049-906f-393d9d1cec76-2",
+    "d": "2026-11-18",
+    "t": "tutor",
+    "n": "과외 · 하승준",
+    "ti": "18:00–21:00",
+    "s": 1080,
+    "e": 1260,
+    "lid": "acrovista",
+    "loc": "아크로비스타",
+    "no": "진행 예정"
   },
   {
     "id": "20261025T125846953Z-3920c1a4-1c9d-4d11-a4a9-db8122d95b0b-4",
@@ -4132,6 +4156,20 @@
     "no": "장소·온라인 여부 확인 필요 · 매주 일요일"
   },
   {
+    "d": "2026-12-06",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · [Lab09] Lab Report",
+    "s": 1439,
+    "id": "school-6c6cb87e6547f1641800884dca70",
+    "school": {
+      "source_id": "927e48e93f90f384e11ac4974b96b81e657948a96bc20753adf6572ea60a7fe3",
+      "candidate_id": "784fcb2da9e3c028b6b711095016553c031cf51370f4b39a9bc8763ef17a4f66",
+      "course": "logic",
+      "source_hash": "ecfda8d5854b16f451ad2ea59d4b4d48ef37765ab580b15d8ec57c11a8b23e2b",
+      "managed_hash": "a8577b9b5896d39648b00026edd2236ceea5d26330dcd83734edd60b0b947b75"
+    }
+  },
+  {
     "id": "20260914T054522317Z-bd97efd1-1306-4d73-a746-1b4c2426ef3c-22",
     "d": "2026-12-06",
     "t": "deadline",
@@ -4420,6 +4458,20 @@
     "loc": "서울대 301동 308호",
     "status": "tentative",
     "no": "Project grading · Lab00 OT 일정표 기준 · 기존 실습 시간대 임시 확보, 상세 시각·장소 및 변경 공지 확인 필요"
+  },
+  {
+    "d": "2026-12-15",
+    "t": "deadline",
+    "n": "논리설계 및 실험 · Final project",
+    "s": 1110,
+    "id": "school-333b2fb684b2c80387beb31d06ad",
+    "school": {
+      "source_id": "e0343c10315069d6b27a1f933214f129d40e797f3cbba894e2ec3c997bd3e4a1",
+      "candidate_id": "162bda5a937ffd4061364f359f5bff4821082eab5cec2351a418c251a25aeef2",
+      "course": "logic",
+      "source_hash": "76a8818f5ae012eccc9983192618f741143178a03f0e90350168fca260251af0",
+      "managed_hash": "7248115695b5ecf95e5698a7bbf7bd80ad83043e8375531dd2c2e2bdb8912088"
+    }
   },
   {
     "id": "2026fall-online-tue-2026-12-15",
@@ -4852,33 +4904,5 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
-  },
-  {
-    "d": "2026-12-06",
-    "t": "deadline",
-    "n": "논리설계 및 실험 · [Lab09] Lab Report",
-    "s": 1439,
-    "id": "school-6c6cb87e6547f1641800884dca70",
-    "school": {
-      "source_id": "927e48e93f90f384e11ac4974b96b81e657948a96bc20753adf6572ea60a7fe3",
-      "candidate_id": "784fcb2da9e3c028b6b711095016553c031cf51370f4b39a9bc8763ef17a4f66",
-      "course": "logic",
-      "source_hash": "ecfda8d5854b16f451ad2ea59d4b4d48ef37765ab580b15d8ec57c11a8b23e2b",
-      "managed_hash": "a8577b9b5896d39648b00026edd2236ceea5d26330dcd83734edd60b0b947b75"
-    }
-  },
-  {
-    "d": "2026-12-15",
-    "t": "deadline",
-    "n": "논리설계 및 실험 · Final project",
-    "s": 1110,
-    "id": "school-333b2fb684b2c80387beb31d06ad",
-    "school": {
-      "source_id": "e0343c10315069d6b27a1f933214f129d40e797f3cbba894e2ec3c997bd3e4a1",
-      "candidate_id": "162bda5a937ffd4061364f359f5bff4821082eab5cec2351a418c251a25aeef2",
-      "course": "logic",
-      "source_hash": "76a8818f5ae012eccc9983192618f741143178a03f0e90350168fca260251af0",
-      "managed_hash": "7248115695b5ecf95e5698a7bbf7bd80ad83043e8375531dd2c2e2bdb8912088"
-    }
   }
 ]
