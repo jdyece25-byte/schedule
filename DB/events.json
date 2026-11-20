@@ -4923,5 +4923,19 @@
     "lid": "acrovista",
     "loc": "아크로비스타",
     "no": "매주 토요일 · 총 16회 중 16회"
+  },
+  {
+    "d": "2026-12-04",
+    "t": "deadline",
+    "n": "기초전자기학 및 연습 · 실습6",
+    "s": 809,
+    "id": "school-c711bab62c5fca3b40f3bb02e361",
+    "school": {
+      "source_id": "9d0db777341cee7a2d44601e2eb96c6f56dccda46c88ec58b8f0af76de654d51",
+      "candidate_id": "644a5dd17771f46c7a0835f35a1d77fcd644ca61a6ac91d65b24a38a2f9c74e5",
+      "course": "em",
+      "source_hash": "369d3d3c0a7b0ba8e4da624dfff1d4ada34a3c271617d9a1a202d5ab91c2fbbc",
+      "managed_hash": "0c8c62a751b41f2be562332657d82f1f82f06be4e3367e36dc001c9aadccb20d"
+    }
   }
 ]
