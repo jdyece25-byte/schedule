@@ -424,10 +424,7 @@ body{
   <span class="logo">동영 <em id="hdr-month">스케줄</em></span>
   <div class="dt-tabs">
     <button class="dt-btn on" id="dt-home" onclick="sw('home')">홈</button>
-    <button class="dt-btn" id="dt-today" onclick="sw('today')">오늘</button>
     <button class="dt-btn" id="dt-cal" onclick="sw('cal')">달력</button>
-    <button class="dt-btn" id="dt-plan" onclick="sw('plan')">공부 플랜</button>
-    <button class="dt-btn" id="dt-alert" onclick="sw('alert')">충돌 <span class="dt-badge" id="alrt-n2">…</span></button>
     <button class="dt-btn" id="dt-edit" onclick="sw('edit')">편집·설정</button>
     <button class="dt-btn" id="dt-school" onclick="sw('school')">학교 공지</button>
   </div>
@@ -435,7 +432,7 @@ body{
 </header>
 
 <!-- HOME VIEW -->
-<div class="view on" id="v-home">
+<div class="view" id="v-home">
   <div class="home-top">
     <div class="home-greeting" id="home-greeting">안녕하세요 👋</div>
     <div class="home-date" id="home-date">로딩 중...</div>
@@ -471,7 +468,7 @@ body{
 </div>
 
 <!-- TODAY VIEW -->
-<div class="view" id="v-today">
+<div class="view on" id="v-today">
   <div class="today-empty">로딩 중...</div>
 </div>
 
@@ -734,14 +731,6 @@ body{
   <button class="bn" id="bn-cal" onclick="sw('cal')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     달력
-  </button>
-  <button class="bn" id="bn-plan" onclick="sw('plan')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-    플랜
-  </button>
-  <button class="bn" id="bn-alert" onclick="sw('alert')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-    충돌<span class="bn-badge" id="alrt-n">…</span>
   </button>
   <button class="bn" id="bn-edit" onclick="sw('edit')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1053,9 +1042,11 @@ function buildToday(){
   const nowStr=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} 현재`;
 
   let h=`<div class="today-hdr">
+    <div class="today-time">오늘 할 일</div>
     <div class="today-date">${dateStr}</div>
     <div class="today-time">${nowStr}</div>
-  </div>`;
+  </div>
+  <button type="button" class="school-home-link" data-school-action="open">학교 공지 확인 <span aria-hidden="true">›</span></button>`;
 
   if(!evs.length){
     h+=`<div class="today-empty">${dataReady?'📅 오늘은 등록된 일정이 없어요':'일정을 불러오지 못했어요. 새로고침해 주세요.'}</div>`;
@@ -1340,11 +1331,13 @@ function buildList(){
 
 // ── TAB SWITCH ────────────────────────────────────────────────────────
 function sw(v){
+  if(['home','plan','alert'].includes(v))v='today';
+  const nav=v==='today'?'home':v;
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
   document.querySelectorAll('.bn,.dt-btn').forEach(x=>x.classList.remove('on'));
   document.getElementById('v-'+v).classList.add('on');
-  const bn=document.getElementById('bn-'+v);if(bn)bn.classList.add('on');
-  const dt=document.getElementById('dt-'+v);if(dt)dt.classList.add('on');
+  const bn=document.getElementById('bn-'+nav);if(bn)bn.classList.add('on');
+  const dt=document.getElementById('dt-'+nav);if(dt)dt.classList.add('on');
   clearInterval(todayTimer);
   if(v==='home')buildHome();
   if(v==='today'){buildToday();todayTimer=setInterval(buildToday,60000);}
@@ -1620,7 +1613,7 @@ function applyBridgeSnapshot(events,travel){
 // ── INIT ──────────────────────────────────────────────────────────────
 window.scheduleDataReady=loadData().then(()=>{
   buildCal();
-  buildHome();
+  buildToday();todayTimer=setInterval(buildToday,60000);
   selDay(TODAY);closePanel();
 });
 </script>

@@ -283,3 +283,21 @@ test('birthday gift appears only on October 20, 2026 without changing schedule d
   }
   assert.equal(a.run('JSON.stringify(EVENTS)'), before);
 });
+
+
+test('home opens today with the home tab selected and retired tabs absent', () => {
+  const a = app();
+  const selected = [];
+  for (const id of ['v-today', 'bn-home', 'dt-home']) {
+    a.get(id).classList.add = name => selected.push(id + ':' + name);
+  }
+  a.run('buildToday=()=>{};setInterval=()=>123;clearInterval=()=>{}');
+  for (const route of ['home', 'today', 'plan', 'alert']) {
+    selected.length = 0;
+    a.run(`sw('${route}')`);
+    assert.deepEqual(selected, ['v-today:on', 'bn-home:on', 'dt-home:on']);
+  }
+  assert.match(html, /class="view on" id="v-today"/);
+  assert.doesNotMatch(html, /id="(?:bn|dt)-(?:plan|alert)"/);
+  assert.doesNotMatch(html, /id="dt-today"/);
+});
